@@ -3,11 +3,12 @@
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "dev": "pnpm --parallel --filter @bless/api --filter @bless/web run dev",
     "build": "pnpm -r build",
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
-    "seed:airtable": "pnpm --filter @bless/api seed:airtable"
+    "seed:airtable": "pnpm --filter @bless/api seed:airtable",
+    "reset:data": "rm -f apps/api/data/store.json && echo 'Local demo data cleared; it reseeds on the next pnpm dev'"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

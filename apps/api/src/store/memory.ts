@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewFamily
 import { nowIso, uuid } from '../lib/ids.ts';
 
 interface Snapshot {
+  seedVersion?: string;
   families: Family[];
   sponsors: Sponsor[];
   sponsorships: Sponsorship[];
@@ -52,6 +53,14 @@ export class MemoryStore implements Store {
 
   get isEmpty() {
     return this.data.families.length === 0;
+  }
+  get seedVersion() {
+    return this.data.seedVersion ?? '';
+  }
+  /** Drops all data (used when the bundled demo seed changes). */
+  reset(seedVersion: string) {
+    this.data = { seedVersion, families: [], sponsors: [], sponsorships: [], activity: [], settings: { ...DEFAULT_SETTINGS } };
+    this.persist();
   }
 
   private clone<T>(x: T): T {

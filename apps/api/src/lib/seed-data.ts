@@ -5,6 +5,9 @@ import type { NewChild } from '../store/types.ts';
  * store seed and by `pnpm seed:airtable --demo`. Guardian names, phones and
  * addresses are invented; keep them obviously non-real (555 numbers).
  */
+/** Bump when the demo dataset changes so stale local stores reseed. */
+export const SEED_VERSION = '2026-10-23.2';
+
 export type SeedStatus = 'Available' | 'Claimed' | 'Fulfilled' | 'Submitted' | 'Needs Info';
 export interface SeedHousehold {
   status: SeedStatus;

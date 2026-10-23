@@ -10,8 +10,11 @@ A PWA for The Konnection's holiday giving program. Families in the organization 
 Design: the "Bless This Family v3" prototype (Konnection purple, Poppins, loading page). Stack: React 19 + Vite + Tailwind v4 + motion (Netlify) · Hono on Node 22 (Fly.io) · Airtable now, Postgres later · Claude for the assistant.
 
 ```bash
-pnpm install && pnpm dev      # web :5173, api :8787 with demo data
+pnpm install && pnpm dev      # web http://localhost:5173, api :8787 with demo data
 pnpm test && pnpm typecheck
+pnpm reset:data               # wipe the local demo data; it reseeds on the next pnpm dev
 ```
+
+Admin: http://localhost:5173/admin/login — enter `admin@example.com` (the default `ADMIN_EMAILS`); in local dev the sign-in link is shown right on the page. In production the admin lives at `https://<your-netlify-domain>/admin/login` and only emails listed in the API's `ADMIN_EMAILS` can sign in.
 
 Docs: [Architecture](docs/ARCHITECTURE.md) · [Deploy](docs/DEPLOY.md) · [Airtable](docs/AIRTABLE.md) · [Decisions & pushback](docs/DECISIONS.md)
