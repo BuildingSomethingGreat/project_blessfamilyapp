@@ -18,3 +18,6 @@ Status options must stay in sync with `packages/shared/src/status.ts`. The API w
 Settings keys: season, dropoffDeadline, dropoffLocation, dropoffHours, contactEmail, contactPhone, catalogOpen, registrationOpen, perChildBudgetNote, orgDonateUrl, chipInsEnabled, chipInUrl, showPhotos.
 
 Useful Airtable views to create by hand: *Families · Available* (Status = Available, sort by Approved At), *Sponsorships · Needs attention* (Flagged = ✓ or Last Response At older than 3 days), *Activity · Messages* (Type = message_sent).
+
+## Test data
+The base is prefilled with 16 fictional households (30 children), 5 sponsors and 5 sponsorships at different dominoes steps, matching `apps/api/src/lib/seed-data.ts`. Guardian names, addresses and 555 phone numbers are invented. To wipe them before the real season, delete the rows in Families, Children, Sponsors, Sponsorships and Activity (Settings stay). The same data loads automatically in local dev (memory store).

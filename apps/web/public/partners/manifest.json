@@ -1,0 +1,4 @@
+{
+  "_comment": "Partner logos for the landing-page marquee. Run `pnpm --filter @bless/web partners:fetch` to pull them from https://www.thekonnection.org/donate, or drop files here and list them below. Empty list = fall back to the combined strip image.",
+  "logos": []
+}

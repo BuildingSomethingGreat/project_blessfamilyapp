@@ -85,15 +85,7 @@ export default function Landing() {
       </section>
 
       {/* Partners marquee */}
-      <section className="reveal pt-16 text-center">
-        <div className="px-4 text-[13px] font-medium text-ink-3">The Konnection is powered by partners who take action</div>
-        <div className="mt-[22px] overflow-hidden" style={{ maskImage: 'linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)', WebkitMaskImage: 'linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)' }}>
-          <div className="marquee flex w-max gap-16 opacity-70 grayscale">
-            <img src={PHOTOS.partners} alt="Konnection partners" className="block h-[72px] w-auto" />
-            <img src={PHOTOS.partners} alt="" className="block h-[72px] w-auto" />
-          </div>
-        </div>
-      </section>
+      <PartnersMarquee />
 
       {/* How it works */}
       <section className="px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
@@ -188,6 +180,27 @@ export default function Landing() {
         </div>
       </section>
     </div>
+  );
+}
+
+/**
+ * Partner logos scroll in a seamless loop. Logos come from /partners/manifest.json
+ * (populate with `pnpm --filter @bless/web partners:fetch`); until then the combined
+ * strip from thekonnection.org is used.
+ */
+function PartnersMarquee() {
+  const manifest = useQuery({ queryKey: ['partners'], queryFn: async () => (await fetch('/partners/manifest.json')).json() as Promise<{ logos: { src: string; alt: string }[] }>, staleTime: Infinity, retry: false });
+  const logos = manifest.data?.logos?.length ? manifest.data.logos : [{ src: PHOTOS.partners, alt: 'Konnection partners' }];
+  const row = [...logos, ...logos]; // duplicated so the -50% translate loops cleanly
+  return (
+    <section className="reveal pt-16 text-center">
+      <div className="px-4 text-[13px] font-medium text-ink-3">The Konnection is powered by partners who take action</div>
+      <div className="mt-[22px] overflow-hidden" style={{ maskImage: 'linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)', WebkitMaskImage: 'linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)' }}>
+        <div className="marquee flex w-max items-center gap-16 opacity-70 grayscale" style={{ animationDuration: `${Math.max(20, row.length * 4)}s` }}>
+          {row.map((l, i) => <img key={i} src={l.src} alt={i < logos.length ? l.alt : ''} className="block h-[56px] w-auto max-w-[220px] object-contain sm:h-[72px]" loading="lazy" />)}
+        </div>
+      </div>
+    </section>
   );
 }
 

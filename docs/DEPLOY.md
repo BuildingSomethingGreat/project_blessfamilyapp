@@ -49,5 +49,12 @@ pnpm dev                                  # api on :8787, web on :5173 (proxies 
 Admin sign-in locally: enter `admin@example.com` on /admin/login; the dev link is shown in the UI and printed in the API log.
 Run the follow-up tick on demand from the Follow-ups page, or `curl -X POST localhost:8787/api/admin/followups/run` with the session cookie.
 
+## Partner logos (landing-page marquee)
+The marquee reads `apps/web/public/partners/manifest.json`. Populate it from The Konnection's donate page (run on a machine that can reach the site):
+```bash
+pnpm --filter @bless/web partners:fetch        # downloads logos into apps/web/public/partners and writes manifest.json
+```
+Review the printed list, delete anything that is not a partner logo, and commit. Until the manifest has entries the marquee falls back to the combined partner strip from thekonnection.org.
+
 ## Custom domain
 Point `bless.thekonnection.org` at Netlify; the API can stay on `*.fly.dev` because it is only reached through the proxy.
