@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { cx } from '@/lib/format';
 
 const base = 'w-full rounded-2xl border bg-paper px-4 py-3.5 text-[16px] text-ink placeholder:text-ink-3/70 transition-colors duration-200 focus:outline-none focus:border-ink';
@@ -14,22 +15,22 @@ export function Error({ children }: { children?: React.ReactNode }) {
   if (!children) return null;
   return <p className="mt-1.5 text-sm text-bad" role="alert">{children}</p>;
 }
-export function Input({ className, error, ...rest }: React.InputHTMLAttributes<HTMLInputElement> & { error?: string }) {
+export const Input = forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement> & { error?: string }>(function Input({ className, error, ...rest }, ref) {
   return (
     <>
-      <input className={cx(base, error ? 'border-bad' : 'border-line', className)} aria-invalid={!!error} {...rest} />
+      <input ref={ref} className={cx(base, error ? 'border-bad' : 'border-line', className)} aria-invalid={!!error} {...rest} />
       <Error>{error}</Error>
     </>
   );
-}
-export function Textarea({ className, error, ...rest }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { error?: string }) {
+});
+export const Textarea = forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement> & { error?: string }>(function Textarea({ className, error, ...rest }, ref) {
   return (
     <>
-      <textarea className={cx(base, 'min-h-28 resize-y', error ? 'border-bad' : 'border-line', className)} aria-invalid={!!error} {...rest} />
+      <textarea ref={ref} className={cx(base, 'min-h-28 resize-y', error ? 'border-bad' : 'border-line', className)} aria-invalid={!!error} {...rest} />
       <Error>{error}</Error>
     </>
   );
-}
+});
 export function Select({ className, error, children, ...rest }: React.SelectHTMLAttributes<HTMLSelectElement> & { error?: string }) {
   return (
     <>
