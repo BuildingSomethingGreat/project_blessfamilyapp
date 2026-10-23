@@ -81,7 +81,7 @@ export function HBars({ data, color = 'var(--color-s1)', format = (v: number) =>
       {data.map((d, i) => (
         <div key={d.label} className="grid grid-cols-[7.5rem_1fr_3rem] items-center gap-3 text-sm sm:grid-cols-[9rem_1fr_3.5rem]">
           <span className="truncate text-ink-2" title={d.label}>{d.label}</span>
-          <span className="h-2.5 overflow-hidden rounded-full bg-cream-2">
+          <span className="h-2.5 overflow-hidden rounded-full bg-soft">
             <motion.span className="block h-full rounded-full" style={{ background: color }} initial={{ width: 0 }} animate={{ width: `${(d.value / max) * 100}%` }} transition={{ duration: 0.7, delay: i * 0.05, ease: [0.16, 1, 0.3, 1] }} />
           </span>
           <span className="text-right font-semibold tabular-nums">{format(d.value)}</span>
@@ -96,7 +96,7 @@ export function Stack({ parts, className }: { parts: { label: string; value: num
   const total = parts.reduce((a, p) => a + p.value, 0) || 1;
   return (
     <div className={cx('viz-root', className)}>
-      <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-cream-2">
+      <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full bg-soft">
         {parts.filter((p) => p.value > 0).map((p) => (
           <motion.span key={p.label} className="h-full first:rounded-l-full last:rounded-r-full" style={{ background: p.color }} initial={{ flexBasis: 0 }} animate={{ flexBasis: `${(p.value / total) * 100}%` }} transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }} title={`${p.label}: ${p.value}`} />
         ))}

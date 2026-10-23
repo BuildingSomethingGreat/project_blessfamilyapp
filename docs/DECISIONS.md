@@ -1,15 +1,18 @@
 # Decisions and pushback
 
+> **October 23 update — v3 redesign.** The product now follows the "Bless This Family v3" prototype (purple Konnection palette, Poppins, loading page, swipe deck). Three earlier decisions changed with it: chip-ins exist (as pledges that hand off to the org's existing Zeffy checkout, see §1), families may opt in to a photo that staff approve before it shows (§2), and the dominoes have six steps (Claimed → Shopping → Purchased → Wrapped → Dropped Off → Delivered). Everything else below still holds.
+
 Short record of where the build deliberately departs from the brief, and why. Each one is reversible.
 
 ## 1. Sponsors claim a family; the app does not take money
 The brief mentions "donate" and a GoFundMe feel. The demo HTML, and the program as described, is an **adoption** model: a sponsor takes on a whole household and buys the wishlist. Adding card payments means Stripe onboarding for the nonprofit, PCI scope, refunds, and receipts for tax purposes. None of that is needed for the core pain point (follow-up). So:
 - The catalog reads like a store, but the call to action is "Bless this family", not "Donate".
 - A "Can't take on a whole family?" card links to the org's existing general-fund page (`orgDonateUrl` in Settings).
+- **v3 adds "Chip in"** on each family page. The app records the pledge (amount, fee cover, email) against the family and opens the external checkout in `chipInUrl` (today: The Konnection's Zeffy form, prefilled with the amount and a note naming the family). The app never touches card data. Reconciling Zeffy payouts to families is manual until a Stripe Connect/Zeffy webhook is wired; `Raised` on the family is the pledged amount, not confirmed cash. Turn it off with `chipInsEnabled` in Settings.
 - If you later want partial giving (e.g. "cover one child" or "chip in $50"), that is a new flow; the data model already keeps children as separate records so it can be added without a migration.
 
-## 2. No photos of children, anywhere
-The inspiration shots are photo-heavy. For a public catalog of minors' wishlists that is a safeguarding and consent problem, and it would also make families self-conscious about applying. Instead every family gets abstract "family art": a gradient generated from the kids' favorite colors. It is distinctive, warm, and fully private. Public cards show first names, ages, sizes, wishes, city, and a short story the family wrote and an admin approved. Never a surname, address, or guardian name.
+## 2. Photos are opt-in, consented, and staff-approved
+Public cards default to "family art", a gradient generated from the kids' favorite colors, so a family with no photo never looks like the odd one out. In v3 a family may add one photo during the application ("a doorway, hands, a holiday table — faces are optional"). It stays private until an admin ticks **Photo Approved** in the review queue, where the checklist reminds staff not to publish faces of minors without the consent box. `showPhotos` in Settings hides every photo at once. Never a surname, address, or guardian name, with or without a photo.
 
 ## 3. Typeform-style, but children are grouped into a few screens
 One question per screen is great for the household info (and it's built that way). For children it would be brutal: three kids × 15 fields = 45 screens. So each child is a short group of 5 screens (who, sizes, interests, clothing, gifts). Progress is saved to the device so a parent can stop and resume.
@@ -18,7 +21,7 @@ One question per screen is great for the household info (and it's built that way
 Codes are cold and stories need a subject. Each family gets a derived, non-identifying nickname ("The Bright Builders") based on the kids' interests. Admins can override it.
 
 ## 5. The follow-up system flags, it never auto-releases
-The dominoes engine nudges sponsors on a schedule (48h to confirm, check-ins every 5 days, tighter as the deadline nears). After two unanswered nudges it **flags** the sponsorship for a human and stops. Automatically reopening a family that someone may already be shopping for is a worse failure than a day of admin delay. Release is one click in the admin, with a reason, and it notifies the sponsor.
+The dominoes engine nudges sponsors on a schedule (48h after a claim if they haven't started shopping, then every 5 days while shopping/purchased/wrapped, daily inside the last week). After two unanswered nudges it **flags** the sponsorship for a human and stops. Automatically reopening a family that someone may already be shopping for is a worse failure than a day of admin delay. Release is one click in the admin, with a reason, and it notifies the sponsor.
 
 ## 6. Email first, SMS optional, no gamification
 Email via Resend is the default because it needs no carrier approval. Twilio SMS is wired behind a flag because texts get better response rates from sponsors who chose "Text". The "points" and social-feed ideas from the first inspiration shot don't fit a nonprofit holiday program; the equivalent motivation here is the live "families waiting / blessed" counter and the thank-you emails that close the loop.

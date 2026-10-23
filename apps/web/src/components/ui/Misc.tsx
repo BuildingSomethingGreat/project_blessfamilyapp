@@ -1,62 +1,80 @@
 import { motion } from 'motion/react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { cx } from '@/lib/format';
 
-export function Logo({ dark, className }: { dark?: boolean; className?: string }) {
+export function Logo({ className, to = '/', light }: { className?: string; to?: string; light?: boolean }) {
   return (
-    <Link to="/" className={cx('inline-flex items-center gap-2 font-display text-[17px] font-800 tracking-tight', dark ? 'text-cream' : 'text-ink', className)} style={{ fontWeight: 800 }}>
-      <span className="grid size-8 place-items-center rounded-xl bg-ember text-white">
-        <svg viewBox="0 0 24 24" className="size-4" fill="currentColor"><path d="M12 20.5c-.3 0-.6-.1-.8-.3L6.4 15.8C4.6 14.2 3.5 12.9 3.5 11c0-2.1 1.6-3.7 3.7-3.7 1.2 0 2.3.6 3.1 1.5.8-.9 1.9-1.5 3.1-1.5 2.1 0 3.7 1.6 3.7 3.7 0 1.9-1.1 3.2-2.9 4.8l-4.8 4.4c-.2.2-.5.3-.8.3Z" /></svg>
-      </span>
-      <span>Bless-A-Family</span>
+    <Link to={to} className={cx('inline-flex items-center gap-2.5 no-underline', light ? 'text-white' : 'text-ink', className)}>
+      <img src="/brand/konnection-logo.png" alt="The Konnection" className="block h-[30px] w-auto" />
+      <span className={cx('h-[18px] w-px', light ? 'bg-white/30' : 'bg-line')} />
+      <span className="text-[14px] font-semibold">Bless This Family</span>
     </Link>
   );
 }
-
-export function Skeleton({ className }: { className?: string }) {
-  return <div className={cx('animate-pulse rounded-2xl bg-cream-2', className)} />;
+/** Square "K" mark used in the questionnaire and admin sidebar. */
+export function KMark({ size = 30, className }: { size?: number; className?: string }) {
+  return <div className={cx('grid place-items-center rounded-[10px] bg-pri font-extrabold text-white', className)} style={{ width: size, height: size, fontSize: size * 0.47 }}>K</div>;
 }
 
-export function Progress({ value, className, tone = 'ember' }: { value: number; className?: string; tone?: 'ember' | 'pine' | 'ink' }) {
-  const bg = { ember: 'bg-ember', pine: 'bg-pine', ink: 'bg-ink' }[tone];
+export function Skeleton({ className }: { className?: string }) {
+  return <div className={cx('animate-pulse rounded-2xl bg-soft-2', className)} />;
+}
+
+export function Progress({ value, className, tone = 'pri', track = 'bg-soft' }: { value: number; className?: string; tone?: 'pri' | 'lav' | 'ink'; track?: string }) {
+  const bg = { pri: 'bg-pri', lav: 'bg-lav', ink: 'bg-ink' }[tone];
   return (
-    <div className={cx('h-1.5 w-full overflow-hidden rounded-full bg-line', className)} role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100}>
-      <motion.div className={cx('h-full rounded-full', bg)} initial={false} animate={{ width: `${Math.max(2, Math.min(100, value * 100))}%` }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
+    <div className={cx('h-1.5 w-full overflow-hidden rounded-full', track, className)} role="progressbar" aria-valuenow={Math.round(value * 100)} aria-valuemin={0} aria-valuemax={100}>
+      <motion.div className={cx('h-full rounded-full', bg)} initial={false} animate={{ width: `${Math.max(0, Math.min(100, value * 100))}%` }} transition={{ type: 'spring', stiffness: 120, damping: 20 }} />
     </div>
   );
 }
 
-export function EmptyState({ title, body, action }: { title: string; body?: string; action?: React.ReactNode }) {
+export function EmptyState({ title, body, action, className }: { title: string; body?: string; action?: React.ReactNode; className?: string }) {
   return (
-    <div className="rounded-xl3 border border-dashed border-line bg-paper/60 px-6 py-12 text-center">
-      <h3 className="text-xl">{title}</h3>
-      {body && <p className="mx-auto mt-2 max-w-sm text-ink-3">{body}</p>}
+    <div className={cx('rounded-xl3 border border-dashed border-line bg-white px-6 py-10 text-center', className)}>
+      <div className="font-bold">{title}</div>
+      {body && <p className="mx-auto mt-1 max-w-sm text-[13px] text-ink-3">{body}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );
 }
 
-/** Abstract "family art": a soft gradient built from the kids' favorite colors. No photos of minors, by design. */
-export function FamilyArt({ colors, className, seed = 0 }: { colors: string[]; className?: string; seed?: number }) {
-  const cs = colors.length ? colors : ['#eb6834'];
-  const stops = cs.map((c, i) => `${c} ${Math.round((i / Math.max(1, cs.length - 1)) * 100)}%`).join(', ');
-  const angle = 120 + (seed % 7) * 15;
+/** Family art: the approved photo when there is one, else the two-color gradient from the kids' favorite colors. */
+export function FamilyArt({ art, photoUrl, className, children, alt = '' }: { art: string; photoUrl?: string; className?: string; children?: React.ReactNode; alt?: string }) {
+  const [broken, setBroken] = useState(false);
   return (
-    <div className={cx('relative overflow-hidden', className)} aria-hidden>
-      <div className="absolute inset-0" style={{ background: `linear-gradient(${angle}deg, ${stops})` }} />
-      <div className="absolute inset-0 opacity-60" style={{ background: 'radial-gradient(120% 80% at 80% 0%, rgba(255,255,255,.55), transparent 60%), radial-gradient(80% 60% at 0% 100%, rgba(21,19,15,.25), transparent 60%)' }} />
-      <svg className="absolute inset-0 size-full opacity-[0.12] mix-blend-overlay" aria-hidden><filter id={`n${seed}`}><feTurbulence baseFrequency="0.9" numOctaves="2" /></filter><rect width="100%" height="100%" filter={`url(#n${seed})`} /></svg>
+    <div className={cx('relative overflow-hidden', className)} style={{ background: art }}>
+      {photoUrl && !broken && <img src={photoUrl} alt={alt} loading="lazy" onError={() => setBroken(true)} className="absolute inset-0 size-full object-cover" />}
+      {children}
     </div>
   );
 }
 
-export function Stat({ label, value, sub, tone, small }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: 'ember' | 'pine' | 'ink' | 'warn' | 'bad'; small?: boolean }) {
-  const col = tone === 'ember' ? 'text-ember' : tone === 'pine' ? 'text-pine' : tone === 'warn' ? 'text-warn' : tone === 'bad' ? 'text-bad' : 'text-ink';
+/** Photo with graceful gradient fallback (for Konnection photography on the landing page). */
+export function Photo({ src, alt, className, fallback = 'linear-gradient(135deg,#c9b8ff,#6c22dd)' }: { src: string; alt: string; className?: string; fallback?: string }) {
+  const [broken, setBroken] = useState(false);
   return (
-    <div className="rounded-xl2 border border-line/70 bg-paper p-4 shadow-soft sm:p-5">
-      <div className="text-[13px] font-medium text-ink-3">{label}</div>
-      <div className={cx('display mt-1 tabular-nums leading-none', small ? 'text-3xl' : 'text-4xl sm:text-5xl', col)}>{value}</div>
-      {sub && <div className="mt-2 text-[13px] text-ink-3">{sub}</div>}
+    <div className={cx('relative overflow-hidden', className)} style={{ background: fallback }}>
+      {!broken && <img src={src} alt={alt} onError={() => setBroken(true)} className="absolute inset-0 size-full object-cover" />}
     </div>
   );
+}
+
+/** KPI tile per v3: white card, small label, 38px number, sub line. `tone='pri'` renders the purple hero tile. */
+export function Stat({ label, value, sub, tone, className }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: 'pri' | 'ok' | 'warn' | 'bad' | 'dark'; className?: string }) {
+  const filled = tone === 'pri' || tone === 'dark';
+  const valueColor = tone === 'ok' ? 'text-ok' : tone === 'warn' ? 'text-warn' : tone === 'bad' ? 'text-bad' : '';
+  return (
+    <div className={cx('rounded-[22px] border border-line p-[18px]', tone === 'pri' ? 'bg-pri text-white' : tone === 'dark' ? 'bg-ink text-white' : 'bg-white text-ink', className)}>
+      <div className={cx('text-[12px] font-semibold', filled ? 'opacity-70' : 'text-ink-3')}>{label}</div>
+      <div className={cx('display mt-1.5 text-[38px] font-extrabold leading-[1.1] tracking-[-.04em] tabular', valueColor)}>{value}</div>
+      {sub && <div className={cx('mt-1 text-[12px]', filled ? 'opacity-70' : 'text-ink-3')}>{sub}</div>}
+    </div>
+  );
+}
+
+/** Blurred purple orb used behind heroes and loaders. */
+export function Orb({ className, color = '#c9b8ff', size = 380, opacity = 0.55, delay = '0s', reverse }: { className?: string; color?: string; size?: number; opacity?: number; delay?: string; reverse?: boolean }) {
+  return <div aria-hidden className={cx('pointer-events-none absolute rounded-full drift', className)} style={{ width: size, height: size, background: color, filter: 'blur(90px)', opacity, animationDelay: delay, animationDirection: reverse ? 'reverse' : undefined }} />;
 }

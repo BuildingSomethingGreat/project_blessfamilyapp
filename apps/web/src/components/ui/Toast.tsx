@@ -20,7 +20,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         <AnimatePresence>
           {items.map((t) => (
             <motion.div key={t.id} initial={{ y: 20, opacity: 0, scale: 0.95 }} animate={{ y: 0, opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className={`pointer-events-auto rounded-full px-4 py-2.5 text-sm font-medium shadow-lift ${t.tone === 'ok' ? 'bg-pine text-white' : t.tone === 'bad' ? 'bg-bad text-white' : 'bg-ink text-cream'}`}>
+              className={`pointer-events-auto rounded-full px-4 py-2.5 text-sm font-medium shadow-lift ${t.tone === 'ok' ? 'bg-ok text-white' : t.tone === 'bad' ? 'bg-bad text-white' : 'bg-ink text-white'}`}>
               {t.text}
             </motion.div>
           ))}

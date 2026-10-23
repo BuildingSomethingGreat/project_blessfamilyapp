@@ -7,3 +7,4 @@ export * from './Toast.tsx';
 export * from './Misc.tsx';
 export * from './Dominoes.tsx';
 export * from './Page.tsx';
+export * from './Loader.tsx';

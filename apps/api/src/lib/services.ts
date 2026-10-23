@@ -57,11 +57,12 @@ export class Services {
     return family;
   }
 
-  async publicCatalog(): Promise<{ families: PublicFamily[]; counts: { available: number; claimed: number; fulfilled: number } }> {
+  async publicCatalog(): Promise<{ families: PublicFamily[]; counts: { available: number; claimed: number; fulfilled: number; kids: number } }> {
     const settings = await this.store.getSettings();
     const all = await this.store.listFamilies({ season: settings.season });
-    const counts = { available: 0, claimed: 0, fulfilled: 0 };
+    const counts = { available: 0, claimed: 0, fulfilled: 0, kids: 0 };
     for (const f of all) {
+      if (['Available', 'Claimed', 'Fulfilled'].includes(f.status)) counts.kids += f.children.length;
       if (f.status === 'Available') counts.available++;
       else if (f.status === 'Claimed') counts.claimed++;
       else if (f.status === 'Fulfilled') counts.fulfilled++;

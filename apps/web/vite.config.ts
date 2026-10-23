@@ -12,11 +12,11 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/favicon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'Bless-A-Family · The Konnection',
-        short_name: 'Bless-A-Family',
+        name: 'Bless This Family · The Konnection',
+        short_name: 'Bless This Family',
         description: 'Holiday giving program by The Konnection. Families share what they need; sponsors bless a whole household.',
-        theme_color: '#f6f1e9',
-        background_color: '#f6f1e9',
+        theme_color: '#f6f3fb',
+        background_color: '#1d1133',
         display: 'standalone',
         start_url: '/',
         scope: '/',
@@ -28,6 +28,7 @@ export default defineConfig({
         shortcuts: [
           { name: 'Find a family', url: '/families' },
           { name: 'Register my family', url: '/register' },
+          { name: 'My family page', url: '/my-family' },
         ],
       },
       workbox: {
