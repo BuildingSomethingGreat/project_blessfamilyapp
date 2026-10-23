@@ -118,6 +118,7 @@ export class AirtableStore implements Store {
       nickname: f['Nickname'] ?? '', guardianName: f['Guardian Name'] ?? '', phone: f['Phone'] ?? '', email: f['Email'] ?? '',
       preferredContact: f['Preferred Contact'] ?? 'Text', address: f['Address'] ?? '', city: f['City'] ?? '', state: f['State'] ?? '', zip: f['ZIP'] ?? '',
       transportation: f['Transportation'] ?? 'No', familyStory: f['Family Story'] ?? '', storyApproved: !!f['Story Approved'],
+      photoUrl: f['Photo']?.[0]?.url ?? '', photoApproved: !!f['Photo Approved'], raised: Number(f['Raised'] ?? 0), goal: Number(f['Goal'] ?? 0),
       eligibilityConfirmed: !!f['Eligibility Confirmed'], notes: f['Notes'] ?? '', adminNotes: f['Admin Notes'] ?? '', views: Number(f['Views'] ?? 0),
       claimStarts: Number(f['Claim Starts'] ?? 0), createdAt: f['Created At'] ?? r.createdTime, approvedAt: f['Approved At'] ?? null, fulfilledAt: f['Fulfilled At'] ?? null,
       children: children.sort((a, b) => a.sortOrder - b.sortOrder),
@@ -129,6 +130,7 @@ export class AirtableStore implements Store {
       Email: p.email || undefined, 'Preferred Contact': p.preferredContact, Address: p.address, City: p.city, State: p.state, ZIP: p.zip,
       Transportation: p.transportation, 'Family Story': p.familyStory, 'Story Approved': p.storyApproved, 'Eligibility Confirmed': p.eligibilityConfirmed,
       Notes: p.notes, 'Admin Notes': p.adminNotes, Views: p.views, 'Claim Starts': p.claimStarts, 'Approved At': p.approvedAt, 'Fulfilled At': p.fulfilledAt,
+      'Photo Approved': p.photoApproved, Raised: p.raised, Goal: p.goal,
     };
     return strip(m);
   }
@@ -140,7 +142,7 @@ export class AirtableStore implements Store {
     const f = r.fields;
     return {
       id: r.id, sponsorshipId: f['Sponsorship ID'] ?? '', familyId: f['Family']?.[0] ?? '', sponsorId: f['Sponsor']?.[0] ?? '', status: (f['Status'] ?? 'Claimed') as SponsorshipStatus,
-      token: f['Token'] ?? '', claimedAt: f['Claimed At'] ?? r.createdTime, confirmedAt: f['Confirmed At'] ?? null, shoppingAt: f['Shopping At'] ?? null,
+      token: f['Token'] ?? '', claimedAt: f['Claimed At'] ?? r.createdTime, shoppingAt: f['Shopping At'] ?? null, purchasedAt: f['Purchased At'] ?? null, wrappedAt: f['Wrapped At'] ?? null,
       droppedOffAt: f['Dropped Off At'] ?? null, deliveredAt: f['Delivered At'] ?? null, releasedAt: f['Released At'] ?? null, nextFollowUpAt: f['Next Follow Up At'] ?? null,
       lastNudgedAt: f['Last Nudged At'] ?? null, lastResponseAt: f['Last Response At'] ?? null, followUpCount: Number(f['Follow Up Count'] ?? 0), flagged: !!f['Flagged'],
       flagReason: f['Flag Reason'] ?? '', releaseReason: f['Release Reason'] ?? '', sponsorNote: f['Sponsor Note'] ?? '', adminNotes: f['Admin Notes'] ?? '', createdAt: f['Created At'] ?? r.createdTime,
@@ -148,7 +150,7 @@ export class AirtableStore implements Store {
   }
   private sponsorshipTo(p: Partial<Sponsorship>) {
     return strip({
-      'Sponsorship ID': p.sponsorshipId, Status: p.status, Token: p.token, 'Claimed At': p.claimedAt, 'Confirmed At': p.confirmedAt, 'Shopping At': p.shoppingAt,
+      'Sponsorship ID': p.sponsorshipId, Status: p.status, Token: p.token, 'Claimed At': p.claimedAt, 'Shopping At': p.shoppingAt, 'Purchased At': p.purchasedAt, 'Wrapped At': p.wrappedAt,
       'Dropped Off At': p.droppedOffAt, 'Delivered At': p.deliveredAt, 'Released At': p.releasedAt, 'Next Follow Up At': p.nextFollowUpAt, 'Last Nudged At': p.lastNudgedAt,
       'Last Response At': p.lastResponseAt, 'Follow Up Count': p.followUpCount, Flagged: p.flagged, 'Flag Reason': p.flagReason, 'Release Reason': p.releaseReason,
       'Sponsor Note': p.sponsorNote, 'Admin Notes': p.adminNotes, Family: p.familyId ? [p.familyId] : undefined, Sponsor: p.sponsorId ? [p.sponsorId] : undefined,
@@ -202,6 +204,19 @@ export class AirtableStore implements Store {
     const f = await this.getFamily(id);
     if (!f) throw new Error('family not found');
     return f;
+  }
+  /** Uploads a data URL to the Photo attachment field via Airtable's content API. */
+  async storeFamilyPhoto(id: string, dataUrl: string) {
+    const m = /^data:(image\/(\w+));base64,(.*)$/s.exec(dataUrl);
+    if (!m) throw new Error('bad data url');
+    const res = await fetch(`https://content.airtable.com/v0/${this.baseId}/${id}/Photo/uploadAttachment`, {
+      method: 'POST', headers: { Authorization: `Bearer ${this.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contentType: m[1], filename: `family-photo.${m[2] === 'jpeg' ? 'jpg' : m[2]}`, file: m[3] }),
+    });
+    if (!res.ok) throw new Error(`Airtable photo upload failed: ${res.status} ${await res.text()}`);
+    const j = (await res.json()) as { fields?: Record<string, any> };
+    this.bust();
+    return j.fields?.['Photo']?.[0]?.url ?? '';
   }
   async incrementFamilyCounter(id: string, field: 'views' | 'claimStarts') {
     const f = await this.getFamily(id);

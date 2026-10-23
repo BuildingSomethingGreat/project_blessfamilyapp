@@ -25,7 +25,7 @@ test('catalog only exposes available families and no private data', async () => 
 test('register → admin approve → claim → sponsor dominoes → report', async () => {
   const reg = await json(await post('/api/register', {
     eligibilityConfirmed: true, guardianName: 'Test Parent', phone: '313-555-9999', email: 'parent@example.com', address: '9 Test St', city: 'Detroit', state: 'MI', zip: '48202',
-    transportation: 'No', familyStory: 'A story', children: [{ name: 'Kai Tester', age: 9, gender: 'Male', clothingCategory: 'Youth / Kids', shirtSize: '10', pantsSize: '10', shoeCategory: 'Youth / Kids', shoeSize: '3', favoriteColor: 'Blue', giftTypes: ['Books'], clothingWishlist: ['Winter Coat'] }],
+    transportation: 'No', familyStory: 'A story', children: [{ name: 'Kai Tester', age: 9, gender: 'Boy', clothingCategory: 'Youth / Kids', shirtSize: '10', pantsSize: '10', shoeCategory: 'Youth / Kids', shoeSize: '3', favoriteColor: 'Blue', giftTypes: ['Books'], clothingWishlist: ['Winter Coat'] }],
   }));
   assert.equal(reg.status, 200, JSON.stringify(reg.body));
   const fam = await store.getFamilyByCode(reg.body.familyId);
@@ -68,12 +68,14 @@ test('register → admin approve → claim → sponsor dominoes → report', asy
   assert.equal(portal.status, 200);
   assert.equal(portal.body.sponsorship.status, 'Claimed');
   assert.ok(!JSON.stringify(portal.body).includes('Test Parent'));
-  const conf = await json(await post(`/api/sponsor/${claim.body.token}/status`, { status: 'Confirmed' }));
-  assert.equal(conf.body.sponsorship.status, 'Confirmed');
+  const conf = await json(await post(`/api/sponsor/${claim.body.token}/status`, { status: 'Shopping' }));
+  assert.equal(conf.body.sponsorship.status, 'Shopping');
   const deliveredBySponsor = await post(`/api/sponsor/${claim.body.token}/status`, { status: 'Delivered' });
   assert.equal(deliveredBySponsor.status, 403);
-  const shop = await json(await post(`/api/sponsor/${claim.body.token}/status`, { status: 'Shopping', note: 'Got the coat!' }));
-  assert.equal(shop.body.sponsorship.status, 'Shopping');
+  const shop = await json(await post(`/api/sponsor/${claim.body.token}/status`, { status: 'Purchased', note: 'Got the coat!' }));
+  assert.equal(shop.body.sponsorship.status, 'Purchased');
+  const wrap = await json(await post(`/api/sponsor/${claim.body.token}/status`, { status: 'Wrapped' }));
+  assert.equal(wrap.body.sponsorship.status, 'Wrapped');
   const drop = await json(await post(`/api/sponsor/${claim.body.token}/status`, { status: 'Dropped Off' }));
   assert.equal(drop.body.sponsorship.status, 'Dropped Off');
 
@@ -97,6 +99,14 @@ test('register → admin approve → claim → sponsor dominoes → report', asy
   const csv = await app.request('/api/admin/export.csv', { headers: admin });
   assert.equal(csv.status, 200);
   assert.ok((await csv.text()).includes('Kai Tester'));
+
+  // chip-in records a pledge and returns the external checkout
+  const avail = (await json(await app.request('/api/families'))).body.families[0];
+  const chip = await json(await post(`/api/families/${avail.slug}/chip-in`, { amount: 50, coverFees: true, email: 'c@example.com' }));
+  assert.equal(chip.status, 200, JSON.stringify(chip.body));
+  assert.equal(chip.body.total, 51.2);
+  assert.ok(chip.body.checkoutUrl.includes('zeffy'));
+  assert.equal(chip.body.family.raised, avail.raised + 50);
 
   // assistant unavailable without key
   const a = await json(await post('/api/admin/assistant', { message: 'hi' }, admin));

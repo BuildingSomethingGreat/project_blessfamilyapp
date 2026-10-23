@@ -30,5 +30,11 @@ export const GIFT_OPTIONS = [
   'Sports Equipment', 'Puzzles', 'Educational Games', 'Music Items', 'Gift Card to a Store', 'Craft Kits', 'Other',
 ] as const;
 
-export const GENDERS = ['Male', 'Female'] as const;
+export const GENDERS = ['Girl', 'Boy', 'Prefer not to say'] as const;
 export const CONTACT_METHODS = ['Text', 'Call', 'Email'] as const;
+export const TRANSPORT_OPTIONS = ['I can pick up', 'Please deliver'] as const;
+export const FAVORITE_COLORS = ['Purple', 'Pink', 'Yellow', 'Black', 'Green', 'Rainbow', 'Red', 'Blue', 'Lavender', 'Teal', 'Orange', 'Gold', 'White'] as const;
+export const CHIP_IN_AMOUNTS = [25, 50, 100, 150, 250, 500] as const;
+export const CARD_FEE = 1.2;
+/** Default per-child wishlist budget used for chip-in goals. */
+export const GOAL_PER_CHILD = 150;

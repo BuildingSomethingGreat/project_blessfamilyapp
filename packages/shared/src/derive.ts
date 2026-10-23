@@ -1,12 +1,22 @@
 import type { Child, Family, PublicFamily, PublicChild } from './types.ts';
 
 export const COLOR_MAP: Record<string, string> = {
-  red: '#e34948', blue: '#2a78d6', green: '#1baf7a', yellow: '#eda100', orange: '#eb6834', purple: '#6250d6',
-  pink: '#e87ba4', black: '#2a2a2a', white: '#f2efe8', gray: '#9a9a9a', grey: '#9a9a9a', teal: '#1a9c9c', gold: '#d4a017',
-  silver: '#b8b8c0', brown: '#8a5a3c', navy: '#1f3a73', lavender: '#b39ddb', turquoise: '#30c4c4', lime: '#9ccc27',
-  magenta: '#d5338f', rainbow: '#eb6834', aqua: '#1baf7a', violet: '#6250d6', maroon: '#7a1f2b', mint: '#8fd3b6', peach: '#f7b48c',
-  coral: '#f26b5b', cyan: '#19b5d6', indigo: '#3f51b5', tan: '#d2b48c', beige: '#e2cfae', burgundy: '#7a1f2b', cream: '#f4e7c3',
+  purple: '#7c5cff', pink: '#ff7eb6', yellow: '#f5c542', black: '#1b1a17', green: '#2fa36b', rainbow: '#c17aff', red: '#e34948', blue: '#2a78d6',
+  lavender: '#b39ddb', teal: '#2aa8a8', orange: '#f08a3c', gold: '#e8b04b', white: '#f4f4f4', gray: '#9a9a9a', grey: '#9a9a9a', silver: '#b8b8c0',
+  brown: '#8a5a3c', navy: '#1f3a73', turquoise: '#30c4c4', lime: '#9ccc27', magenta: '#d5338f', aqua: '#2aa8a8', violet: '#7c5cff', maroon: '#7a1f2b',
+  mint: '#8fd3b6', peach: '#f7b48c', coral: '#f26b5b', cyan: '#19b5d6', indigo: '#3f51b5', tan: '#d2b48c', beige: '#e2cfae', burgundy: '#7a1f2b', cream: '#f4e7c3',
 };
+/** CSS background for a favorite-color swatch (Rainbow gets a gradient). */
+export function colorSwatch(name: string): string {
+  if (name.toLowerCase().trim() === 'rainbow') return 'linear-gradient(90deg,#ff5e5e,#ffb84d,#7ad67a,#5aa9ff,#c17aff)';
+  return colorToHex(name) ?? '#9a948a';
+}
+/** Card art: a two-stop gradient from the first two kids' favorite colors (purple/lavender fallback). */
+export function familyArt(colors: string[]): string {
+  const a = colors[0] ?? '#6c22dd';
+  const b = colors[1] ?? '#c9b8ff';
+  return `linear-gradient(135deg, ${a} 0%, ${b} 100%)`;
+}
 
 export function colorToHex(name: string): string | null {
   const key = name.toLowerCase().trim();
@@ -37,7 +47,8 @@ export function deriveTags(children: Child[]): string[] {
   const bands = new Set(children.map((c) => ageBand(c.age)));
   for (const b of ['Baby', 'Little kid', 'Kid', 'Tween', 'Teen']) if (bands.has(b)) tags.add(b === 'Baby' ? 'Babies' : b === 'Little kid' ? 'Little kids' : b + 's');
   if (children.some((c) => c.clothingWishlist.includes('Winter Coat'))) tags.add('Needs winter coats');
-  if (children.some((c) => c.clothingWishlist.includes('Boots') || c.clothingWishlist.includes('Shoes / Sneakers'))) tags.add('Needs shoes');
+  if (children.some((c) => c.clothingWishlist.includes('Boots'))) tags.add('Needs boots');
+  if (children.some((c) => c.clothingWishlist.includes('Shoes / Sneakers'))) tags.add('Needs shoes');
   if (children.some((c) => c.giftTypes.includes('Books'))) tags.add('Readers');
   if (children.some((c) => c.giftTypes.includes('Sports Equipment'))) tags.add('Athletes');
   if (children.some((c) => c.giftTypes.includes('Art Supplies') || c.giftTypes.includes('Craft Kits'))) tags.add('Creatives');
@@ -59,7 +70,7 @@ export function deriveNickname(children: Child[], seed: string): string {
   const hobby = children.map((c) => c.hobbies).find(Boolean);
   const word = top ? NICK_WORDS[top[0]] : hobby ? `${hobby.split(/[,\s]+/)[0].replace(/^\w/, (m) => m.toUpperCase())} Family` : 'Family';
   const hash = [...seed].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const adj = ['Bright', 'Sunny', 'Brave', 'Joyful', 'Kind', 'Curious', 'Cozy', 'Merry', 'Hopeful', 'Golden', 'Little', 'Mighty'][hash % 12];
+  const adj = ['Bright', 'Merry', 'Kind', 'Curious', 'Cozy', 'Hopeful', 'Golden', 'Brave'][hash % 8];
   return `The ${adj} ${word}`;
 }
 
@@ -76,6 +87,8 @@ export function toPublicFamily(f: Family, now = new Date()): PublicFamily {
   const ages = kids.map((k) => k.age);
   const since = f.approvedAt ? new Date(f.approvedAt) : new Date(f.createdAt);
   const colors = kids.map((k) => colorToHex(k.favoriteColor)).filter((x): x is string => !!x);
+  const daysWaiting = Math.max(0, Math.floor((now.getTime() - since.getTime()) / 86_400_000));
+  const n = kids.length;
   return {
     familyId: f.familyId,
     slug: f.slug,
@@ -83,11 +96,17 @@ export function toPublicFamily(f: Family, now = new Date()): PublicFamily {
     city: f.city,
     status: f.status,
     story: f.storyApproved ? f.familyStory : '',
-    childCount: kids.length,
+    photoUrl: f.photoApproved ? f.photoUrl : '',
+    raised: f.raised ?? 0,
+    goal: f.goal || n * 150,
+    childCount: n,
     ageRange: [Math.min(...ages), Math.max(...ages)],
     colors: colors.length ? colors : ['#eb6834'],
     tags: deriveTags(kids),
-    daysWaiting: Math.max(0, Math.floor((now.getTime() - since.getTime()) / 86_400_000)),
+    daysWaiting,
+    waitLabel: daysWaiting === 0 ? 'New today' : `Waiting ${daysWaiting} day${daysWaiting === 1 ? '' : 's'}`,
+    kidLine: n === 1 ? '1 child' : `${n} kids`,
+    kidNames: kids.map((k) => `${firstName(k.name)} (${k.age})`).join(', '),
     children: kids.map(toPublicChild),
   };
 }

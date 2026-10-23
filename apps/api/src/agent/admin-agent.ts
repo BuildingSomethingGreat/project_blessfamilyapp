@@ -23,7 +23,7 @@ export interface AgentTurn {
 
 const SYSTEM = `You are the operations assistant for The Konnection's Bless-A-Family holiday program. You help a small team of nonprofit admins make fast, confident decisions.
 
-What the program is: families in the organization submit a holiday wishlist per child. Approved families appear in a public catalog. Sponsors "claim" a whole family, buy the gifts, and drop them off by the deadline. The system follows up with sponsors automatically (the "dominoes": Claimed → Confirmed → Shopping → Dropped Off → Delivered). After unanswered follow-ups a sponsorship is flagged for a human.
+What the program is: families in the organization submit a holiday wishlist per child. Approved families appear in a public catalog. Sponsors "claim" a whole family, buy the gifts, and drop them off by the deadline. The system follows up with sponsors automatically (the "dominoes": Claimed → Shopping → Purchased → Wrapped → Dropped Off → Delivered). After unanswered follow-ups a sponsorship is flagged for a human.
 
 How to behave:
 - Lead with the answer. Use the tools to get real numbers; never guess. Keep replies short and skimmable — plain sentences, short lists, no headers for short answers.
@@ -39,7 +39,7 @@ const tools: BetaTool[] = [
   { name: 'list_sponsorships', description: 'List sponsorships (the dominoes tracker) with sponsor name, status, follow-up count, last response, flagged. Filter by status or onlyOverdue.', input_schema: { type: 'object', properties: { status: { type: 'array', items: { type: 'string', enum: [...SPONSORSHIP_STATUSES] } }, onlyOverdue: { type: 'boolean' } }, required: [], additionalProperties: false } },
   { name: 'send_nudge', description: 'Send a follow-up message to a sponsor now, on their preferred channel. Optionally provide a custom message body; otherwise the right template for their step is used.', input_schema: { type: 'object', properties: { sponsorshipId: { type: 'string' }, message: { type: 'string' } }, required: ['sponsorshipId'], additionalProperties: false } },
   { name: 'update_sponsorship', description: 'Move a sponsorship to a new step (e.g. mark Delivered after staff delivered gifts) or flag/unflag it with a reason. Releasing requires confirmed=true.', input_schema: { type: 'object', properties: { sponsorshipId: { type: 'string' }, status: { type: 'string', enum: [...SPONSORSHIP_STATUSES] }, flagged: { type: 'boolean' }, reason: { type: 'string' }, confirmed: { type: 'boolean' } }, required: ['sponsorshipId'], additionalProperties: false } },
-  { name: 'update_family', description: 'Approve a family (status Available), decline, mark needs info, approve its story for public display, or add admin notes.', input_schema: { type: 'object', properties: { familyId: { type: 'string' }, status: { type: 'string', enum: [...FAMILY_STATUSES] }, storyApproved: { type: 'boolean' }, adminNotes: { type: 'string' }, nickname: { type: 'string' } }, required: ['familyId'], additionalProperties: false } },
+  { name: 'update_family', description: 'Approve a family (status Available), decline, mark needs info, approve its story or photo for public display, or add admin notes.', input_schema: { type: 'object', properties: { familyId: { type: 'string' }, status: { type: 'string', enum: [...FAMILY_STATUSES] }, storyApproved: { type: 'boolean' }, photoApproved: { type: 'boolean' }, adminNotes: { type: 'string' }, nickname: { type: 'string' } }, required: ['familyId'], additionalProperties: false } },
   { name: 'draft_message', description: 'Draft (do not send) a message to a sponsor or family for the admin to review.', input_schema: { type: 'object', properties: { to: { type: 'string' }, intent: { type: 'string' } }, required: ['to', 'intent'], additionalProperties: false }, strict: true },
 ];
 
@@ -94,7 +94,7 @@ export class AdminAgent {
       case 'send_nudge': {
         const s = await store.getSponsorshipByCode(input.sponsorshipId);
         if (!s) return { result: 'No such sponsorship' };
-        const kind = s.status === 'Claimed' ? 'confirm_nudge' : s.status === 'Shopping' ? 'deadline_reminder' : 'shopping_checkin';
+        const kind = s.status === 'Claimed' ? 'confirm_nudge' : 'shopping_checkin';
         const res = await followUp.send(kind, s, { custom: input.message, actor: 'agent' });
         await store.updateSponsorship(s.id, { lastNudgedAt: nowIso(), followUpCount: s.followUpCount + 1 });
         await log(`Agent sent ${kind} to ${s.sponsorshipId}`, { sponsorshipId: s.id, familyId: s.familyId });
@@ -126,6 +126,7 @@ export class AdminAgent {
           if (input.status === 'Available' && !f.approvedAt) patch.approvedAt = nowIso();
         }
         if (typeof input.storyApproved === 'boolean') patch.storyApproved = input.storyApproved;
+        if (typeof input.photoApproved === 'boolean') patch.photoApproved = input.photoApproved;
         if (input.adminNotes) patch.adminNotes = (f.adminNotes ? f.adminNotes + '\n' : '') + `[${new Date().toLocaleDateString()}] ${input.adminNotes}`;
         if (input.nickname) patch.nickname = input.nickname;
         await store.updateFamily(f.id, patch);

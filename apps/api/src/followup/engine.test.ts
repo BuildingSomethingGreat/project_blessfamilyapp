@@ -16,12 +16,12 @@ test('claimed asks to confirm after 48h', () => {
   assert.equal(nextFollowUp('Claimed', settings, now)!.toISOString(), '2026-11-22T12:00:00.000Z');
 });
 
-test('shopping reminders land at deadline-7/-3/-1', () => {
-  const now = new Date('2026-11-20T12:00:00');
-  const n = nextFollowUp('Shopping', settings, now)!;
-  assert.equal(daysToDeadline(settings, n), 7);
-  const n2 = nextFollowUp('Shopping', settings, new Date('2026-12-06T12:00:00'))!;
-  assert.equal(daysToDeadline(settings, n2), 3);
+test('shopping check-ins every 5 days, daily inside the last week', () => {
+  const n = nextFollowUp('Shopping', settings, new Date('2026-11-20T12:00:00'))!;
+  assert.equal(daysToDeadline(settings, n), 17);
+  const n2 = nextFollowUp('Wrapped', settings, new Date('2026-12-06T12:00:00'))!;
+  assert.equal(daysToDeadline(settings, n2), 5);
+  assert.equal(nextFollowUp('Purchased', settings, new Date('2026-12-20T12:00:00')), null);
 });
 
 test('terminal steps schedule nothing', () => {
@@ -30,9 +30,10 @@ test('terminal steps schedule nothing', () => {
 });
 
 test('message kind follows the step and the deadline', () => {
-  const base: any = { status: 'Confirmed' };
+  const base: any = { status: 'Shopping' };
   assert.equal(messageKindFor(base, settings, new Date('2026-11-01T12:00:00')), 'shopping_checkin');
   assert.equal(messageKindFor(base, settings, new Date('2026-12-10T12:00:00')), 'deadline_reminder');
+  assert.equal(messageKindFor({ status: 'Wrapped' } as any, settings, new Date('2026-12-10T12:00:00')), 'deadline_reminder');
   assert.equal(messageKindFor({ status: 'Claimed' } as any, settings), 'confirm_nudge');
   assert.equal(messageKindFor({ status: 'Delivered' } as any, settings), null);
 });

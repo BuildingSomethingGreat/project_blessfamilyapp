@@ -46,6 +46,8 @@ export const FamilyApplicationSchema = z.object({
   zip: z.string().trim().regex(/^\d{5}(?:-\d{4})?$/, 'Enter a valid ZIP code'),
   transportation: z.enum(['Yes', 'No']),
   familyStory: trimmed(600).default(''),
+  /** Optional family photo as a data URL (client resizes to <= 1200px, <= 1.5MB). */
+  photoDataUrl: z.union([z.literal(''), z.string().regex(/^data:image\/(jpeg|png|webp);base64,/, 'Unsupported image').max(2_000_000, 'Photo is too large')]).default(''),
   notes: trimmed(1000).default(''),
   children: z.array(ChildInputSchema).min(1, 'Add at least one child').max(15, 'Please contact program staff for households with more than 15 children'),
 });
@@ -61,6 +63,14 @@ export const ClaimRequestSchema = z.object({
   agree: z.literal(true, { errorMap: () => ({ message: 'Please confirm you can support every child in this family' }) }),
 });
 export type ClaimRequest = z.infer<typeof ClaimRequestSchema>;
+
+export const ChipInSchema = z.object({
+  amount: z.coerce.number().int().min(5).max(5000),
+  coverFees: z.boolean().default(true),
+  name: trimmed(120).default(''),
+  email: z.union([z.literal(''), z.string().trim().email('Enter a valid email')]).default(''),
+});
+export type ChipIn = z.infer<typeof ChipInSchema>;
 
 export const SponsorUpdateSchema = z.object({
   status: z.enum(SPONSORSHIP_STATUSES),

@@ -77,7 +77,7 @@ export function adminRoutes(services: Services) {
     const activity = await store.listActivity({ familyId: f.id, limit: 50 });
     return c.json({ ...f, public: toPublicFamily(f), sponsorships: withSponsor, activity });
   });
-  const FamilyPatch = z.object({ status: FamilyStatusSchema.optional(), adminNotes: z.string().max(5000).optional(), storyApproved: z.boolean().optional(), nickname: z.string().max(80).optional(), familyStory: z.string().max(1000).optional() });
+  const FamilyPatch = z.object({ status: FamilyStatusSchema.optional(), adminNotes: z.string().max(5000).optional(), storyApproved: z.boolean().optional(), photoApproved: z.boolean().optional(), nickname: z.string().max(80).optional(), familyStory: z.string().max(1000).optional(), goal: z.number().int().min(0).max(100000).optional() });
   r.patch('/families/:id', async (c) => {
     const f = await store.getFamily(c.req.param('id'));
     if (!f) throw new HttpError(404, 'Not found');
@@ -119,7 +119,7 @@ export function adminRoutes(services: Services) {
     const s = await store.getSponsorship(c.req.param('id'));
     if (!s) throw new HttpError(404, 'Not found');
     const { message } = (await c.req.json().catch(() => ({}))) as { message?: string };
-    const kind = s.status === 'Claimed' ? 'confirm_nudge' : s.status === 'Shopping' ? 'deadline_reminder' : 'shopping_checkin';
+    const kind = s.status === 'Claimed' ? 'confirm_nudge' : 'shopping_checkin';
     const res = await followUp.send(kind, s, { custom: message?.trim() || undefined, actor: 'admin' });
     await store.updateSponsorship(s.id, { lastNudgedAt: nowIso(), followUpCount: s.followUpCount + 1 });
     return c.json(res);
@@ -130,7 +130,7 @@ export function adminRoutes(services: Services) {
   r.get('/settings', async (c) => c.json(await store.getSettings()));
   r.patch('/settings', async (c) => {
     const body = (await c.req.json()) as Partial<SeasonSettings>;
-    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl'];
+    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos'];
     const patch: Partial<SeasonSettings> = {};
     for (const k of allowed) if (k in body) (patch as any)[k] = body[k];
     return c.json(await store.updateSettings(patch));

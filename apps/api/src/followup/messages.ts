@@ -52,19 +52,19 @@ export function template(ctx: MessageContext): ComposedMessage {
     case 'claim_confirmation':
       return {
         subject: `You're blessing ${f.nickname} this holiday 🎁`,
-        text: `Hi ${name},\n\nThank you. You just claimed ${f.nickname} — ${f.childCount} ${f.childCount === 1 ? 'child' : 'children'}: ${kidLine(f)}.\n\nHere is your family page with every wishlist and size, plus one-tap status updates so we never have to chase you:\n${link}\n\nTwo quick things:\n1. Tap "I'm in" on that page so we know you've got this family covered.\n2. ${deadlineLine(s, ctx.daysToDeadline)}\n\n${s.perChildBudgetNote}${sign}`,
+        text: `Hi ${name},\n\nThank you. You're blessing ${f.nickname} — ${f.childCount} ${f.childCount === 1 ? 'child' : 'children'}: ${kidLine(f)}.\n\nHere is your private family page with every wishlist and size, plus one-tap status updates so we never have to chase you:\n${link}\n\nTwo quick things:\n1. When you start shopping, tap "I've started shopping" on that page so our team can plan deliveries.\n2. ${deadlineLine(s, ctx.daysToDeadline)} One bag per child with their first name on it.\n\n${s.perChildBudgetNote}${sign}`,
         sms: `The Konnection: thank you for claiming ${f.nickname} (${kidLine(f)}). Wishlists + status updates: ${link}. Drop-off by ${fmtDate(s.dropoffDeadline)}.`,
       };
     case 'confirm_nudge':
       return {
         subject: `Quick check-in: are you still in for ${f.nickname}?`,
-        text: `Hi ${name},\n\nJust making sure this didn't get buried. You claimed ${f.nickname} (${kidLine(f)}) and we haven't heard back yet.\n\nIf you're in, tap "I'm in" here and we'll stop pestering you:\n${link}\n\nIf plans changed, no judgment at all — tap "I can't do this anymore" on the same page so another sponsor can step in while there's still time.\n\n${deadlineLine(s, ctx.daysToDeadline)}${sign}`,
+        text: `Hi ${name},\n\nQuick check-in — still in for ${f.nickname} (${kidLine(f)})? When you start shopping, tap "I've started shopping" on your family page so we can plan deliveries:\n${link}\n\nIf plans changed, no judgment at all — tap "I can no longer sponsor this family" on the same page so another sponsor can step in while there's still time.\n\n${deadlineLine(s, ctx.daysToDeadline)}${sign}`,
         sms: `The Konnection: still in for ${f.nickname}? Tap to confirm or release so another sponsor can help: ${link}`,
       };
     case 'shopping_checkin':
       return {
         subject: `How's shopping going for ${f.nickname}?`,
-        text: `Hi ${name},\n\nA friendly check-in on ${f.nickname} (${kidLine(f)}). When you've started shopping, tap "I've started shopping" so our team can plan deliveries:\n${link}\n\n${deadlineLine(s, ctx.daysToDeadline)}\n\nQuestions about sizes or what the kids like? Everything is on that page, and you can reply to this email anytime.${sign}`,
+        text: `Hi ${name},\n\nHow's it going with ${f.nickname}'s list (${kidLine(f)})? Tap your progress on your family page — purchased, wrapped, dropped off — so our team can plan deliveries:\n${link}\n\n${deadlineLine(s, ctx.daysToDeadline)}\n\nQuestions about sizes or what the kids like? Everything is on that page, and you can reply to this email anytime.${sign}`,
         sms: `The Konnection: how's shopping going for ${f.nickname}? Update us in one tap: ${link}. Drop-off by ${fmtDate(s.dropoffDeadline)}.`,
       };
     case 'deadline_reminder':

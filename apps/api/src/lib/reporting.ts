@@ -110,6 +110,7 @@ export async function buildReport(store: Store, now = new Date()): Promise<Admin
       flagged: active.filter((s) => s.flagged).length,
       released: seasonSponsorships.filter((s) => s.status === 'Released').length,
       dueNext24h,
+      staffHoursSaved: Math.round((nudges.length * 10) / 60 * 10) / 10,
     },
     matching: {
       claimsByDay: [...byDay.entries()].map(([date, v]) => ({ date, ...v })),
@@ -120,11 +121,13 @@ export async function buildReport(store: Store, now = new Date()): Promise<Admin
       familyViews: activity.filter((a) => a.type === 'family_view').length,
       claimStarts: activity.filter((a) => a.type === 'claim_start').length,
       claimCompletes: claimsAll.length,
+      totalRaised: families.reduce((a, f) => a + (f.raised ?? 0), 0),
     },
     children: {
       total: kids.length,
       byAgeBand: bands.map(([band, fn]) => ({ band, count: kids.filter((k) => fn(k.age)).length })),
       needingCoats: kids.filter((k) => k.clothingWishlist.includes('Winter Coat')).length,
+      needingBoots: kids.filter((k) => k.clothingWishlist.includes('Boots')).length,
     },
     deadline: { dropoffDeadline: settings.dropoffDeadline, daysLeft: daysToDeadline(settings, now) },
   };

@@ -1,4 +1,4 @@
-import { ACTIVE_SPONSORSHIP_STATUSES, familyStatusFor, toPublicFamily, type Family, type SeasonSettings, type Sponsorship, type SponsorshipStatus, type Sponsor } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, SHOPPING_STATUSES, familyStatusFor, toPublicFamily, type Family, type SeasonSettings, type Sponsorship, type SponsorshipStatus, type Sponsor } from '@bless/shared';
 import { config } from '../config.ts';
 import { getNotifier } from '../notify/index.ts';
 import type { Store } from '../store/types.ts';
@@ -34,16 +34,14 @@ export function nextFollowUp(status: SponsorshipStatus, settings: SeasonSettings
   const at = (ms: number) => new Date(now.getTime() + ms);
   switch (status) {
     case 'Claimed':
+      // Claimed but not shopping: nudge after 48h.
       return at(config.followUp.confirmHours * H);
-    case 'Confirmed':
-      if (dl <= 2) return at(1 * D);
-      if (dl <= 7) return at(3 * D);
-      return at(5 * D);
-    case 'Shopping': {
-      // Reminders at deadline-7, -3, -1; otherwise weekly.
-      for (const k of [7, 3, 1]) if (dl > k) return at((dl - k) * D);
-      return dl >= 0 ? at(1 * D) : null;
-    }
+    case 'Shopping':
+    case 'Purchased':
+    case 'Wrapped':
+      // Working the list: every 5 days, daily inside the last week.
+      if (dl < 0) return null;
+      return at((dl <= 7 ? 1 : 5) * D);
     case 'Dropped Off':
     case 'Delivered':
     case 'Released':
@@ -54,8 +52,7 @@ export function nextFollowUp(status: SponsorshipStatus, settings: SeasonSettings
 export function messageKindFor(s: Sponsorship, settings: SeasonSettings, now = new Date()): MessageKind | null {
   const dl = daysToDeadline(settings, now);
   if (s.status === 'Claimed') return 'confirm_nudge';
-  if (s.status === 'Confirmed') return dl <= 3 ? 'deadline_reminder' : 'shopping_checkin';
-  if (s.status === 'Shopping') return 'deadline_reminder';
+  if (SHOPPING_STATUSES.includes(s.status)) return dl <= 7 ? 'deadline_reminder' : 'shopping_checkin';
   return null;
 }
 
@@ -103,7 +100,7 @@ export class FollowUpEngine {
     const settings = await this.store.getSettings();
     const now = nowIso();
     const patch: Partial<Sponsorship> = { status: to };
-    const stamp: Partial<Record<SponsorshipStatus, keyof Sponsorship>> = { Confirmed: 'confirmedAt', Shopping: 'shoppingAt', 'Dropped Off': 'droppedOffAt', Delivered: 'deliveredAt', Released: 'releasedAt' };
+    const stamp: Partial<Record<SponsorshipStatus, keyof Sponsorship>> = { Shopping: 'shoppingAt', Purchased: 'purchasedAt', Wrapped: 'wrappedAt', 'Dropped Off': 'droppedOffAt', Delivered: 'deliveredAt', Released: 'releasedAt' };
     const key = stamp[to];
     if (key) (patch as any)[key] = now;
     if (opts.actor === 'sponsor') {

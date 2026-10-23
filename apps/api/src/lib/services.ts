@@ -1,4 +1,4 @@
-import { deriveNickname, toPublicFamily, type ClaimRequest, type FamilyApplication, type Family, type PublicFamily, type SponsorPortalView } from '@bless/shared';
+import { deriveNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type FamilyApplication, type Family, type PublicFamily, type SponsorPortalView } from '@bless/shared';
 import type { Store } from '../store/types.ts';
 import { FollowUpEngine, nextFollowUp } from '../followup/engine.ts';
 import { familyCode, nowIso, shortId, token as newToken } from './ids.ts';
@@ -41,8 +41,17 @@ export class Services {
       familyId: code, season: settings.season, status: 'Submitted', slug: shortId(), nickname: deriveNickname(children.map((c) => ({ ...c, id: '', familyId: '' })), code),
       guardianName: app.guardianName, phone: app.phone, email: app.email, preferredContact: app.preferredContact, address: app.address, city: app.city, state: app.state.toUpperCase(),
       zip: app.zip, transportation: app.transportation, familyStory: app.familyStory, storyApproved: false, eligibilityConfirmed: true, notes: app.notes, adminNotes: '',
+      photoUrl: '', photoApproved: false, raised: 0, goal: GOAL_PER_CHILD * children.length,
       views: 0, claimStarts: 0, approvedAt: null, fulfilledAt: null, children,
     });
+    if (app.photoDataUrl) {
+      try {
+        const url = await this.store.storeFamilyPhoto(family.id, app.photoDataUrl);
+        family.photoUrl = url;
+      } catch (e) {
+        console.error('photo store failed', (e as Error).message);
+      }
+    }
     await this.store.logActivity({ type: 'status_change', channel: 'web', familyId: family.id, sponsorshipId: null, subject: `Application received: ${code}`, body: '', meta: { to: 'Submitted' }, occurredAt: nowIso() });
     this.followUp.sendToFamily('family_received', family).catch(() => {});
     return family;
@@ -96,7 +105,7 @@ export class Services {
       const next = nextFollowUp('Claimed', settings);
       const s = await this.store.createSponsorship({
         sponsorshipId: `SP-${settings.season}-${String(seq).padStart(3, '0')}`, familyId: f.id, sponsorId: sponsor.id, status: 'Claimed', token: newToken(), claimedAt: now,
-        confirmedAt: null, shoppingAt: null, droppedOffAt: null, deliveredAt: null, releasedAt: null, nextFollowUpAt: next ? next.toISOString() : null, lastNudgedAt: null,
+        shoppingAt: null, purchasedAt: null, wrappedAt: null, droppedOffAt: null, deliveredAt: null, releasedAt: null, nextFollowUpAt: next ? next.toISOString() : null, lastNudgedAt: null,
         lastResponseAt: null, followUpCount: 0, flagged: false, flagReason: '', releaseReason: '', sponsorNote: req.note, adminNotes: '',
       });
       await this.store.updateFamily(f.id, { status: 'Claimed' });
@@ -106,17 +115,30 @@ export class Services {
     });
   }
 
+  /** Records a chip-in pledge. Actual card processing happens on the external checkout (settings.chipInUrl). */
+  async chipIn(slug: string, req: ChipIn): Promise<{ checkoutUrl: string; total: number; family: PublicFamily }> {
+    const settings = await this.store.getSettings();
+    if (!settings.chipInsEnabled) throw new HttpError(403, 'Chip-ins are not open right now.');
+    const f = await this.store.getFamilyBySlug(slug);
+    if (!f || !['Available', 'Claimed'].includes(f.status)) throw new HttpError(404, 'Family not found');
+    const total = Math.round((req.amount + (req.coverFees ? CARD_FEE : 0)) * 100) / 100;
+    const updated = await this.store.updateFamily(f.id, { raised: (f.raised ?? 0) + req.amount });
+    await this.store.logActivity({ type: 'chip_in', channel: 'web', familyId: f.id, sponsorshipId: null, subject: `$${req.amount} chip-in toward ${f.familyId}`, body: req.name ? `${req.name} <${req.email}>` : '', meta: { amount: req.amount, total, coverFees: req.coverFees, email: req.email }, occurredAt: nowIso() });
+    const url = settings.chipInUrl ? `${settings.chipInUrl}${settings.chipInUrl.includes('?') ? '&' : '?'}amount=${encodeURIComponent(String(total))}&note=${encodeURIComponent(`Bless-A-Family ${f.familyId}`)}` : '';
+    return { checkoutUrl: url, total, family: toPublicFamily(updated) };
+  }
+
   async sponsorPortal(tok: string): Promise<SponsorPortalView> {
     const s = await this.store.getSponsorshipByToken(tok);
     if (!s) throw new HttpError(404, 'This link is not valid.');
     const [family, sponsor, settings, timeline] = await Promise.all([this.store.getFamily(s.familyId), this.store.getSponsor(s.sponsorId), this.store.getSettings(), this.store.listActivity({ sponsorshipId: s.id, limit: 30 })]);
     if (!family || !sponsor) throw new HttpError(404, 'This link is not valid.');
     return {
-      sponsorship: { sponsorshipId: s.sponsorshipId, status: s.status, claimedAt: s.claimedAt, confirmedAt: s.confirmedAt, shoppingAt: s.shoppingAt, droppedOffAt: s.droppedOffAt, deliveredAt: s.deliveredAt, releasedAt: s.releasedAt, sponsorNote: s.sponsorNote },
-      sponsor: { name: sponsor.name, email: sponsor.email },
+      sponsorship: { sponsorshipId: s.sponsorshipId, status: s.status, claimedAt: s.claimedAt, shoppingAt: s.shoppingAt, purchasedAt: s.purchasedAt, wrappedAt: s.wrappedAt, droppedOffAt: s.droppedOffAt, deliveredAt: s.deliveredAt, releasedAt: s.releasedAt, sponsorNote: s.sponsorNote, nextFollowUpAt: s.nextFollowUpAt, followUpCount: s.followUpCount, flagged: s.flagged },
+      sponsor: { name: sponsor.name, email: sponsor.email, preferredContact: sponsor.preferredContact },
       family: toPublicFamily(family),
       settings,
-      timeline: timeline.filter((a) => a.type !== 'family_view').map((a) => ({ type: a.type, subject: a.subject, occurredAt: a.occurredAt, channel: a.channel })),
+      timeline: timeline.filter((a) => a.type !== 'family_view').map((a) => ({ type: a.type, subject: a.subject, body: a.type === 'message_sent' ? a.body : '', occurredAt: a.occurredAt, channel: a.channel })),
     };
   }
 }

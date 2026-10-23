@@ -24,6 +24,8 @@ export interface Store {
   getFamilyByCode(familyId: string): Promise<Family | null>;
   createFamily(input: NewFamily): Promise<Family>;
   updateFamily(id: string, patch: Partial<Omit<Family, 'id' | 'children'>>): Promise<Family>;
+  /** Stores a family photo (data URL) and returns the URL to persist. */
+  storeFamilyPhoto(id: string, dataUrl: string): Promise<string>;
   incrementFamilyCounter(id: string, field: 'views' | 'claimStarts'): Promise<void>;
   nextFamilySequence(season: string): Promise<number>;
 
@@ -56,5 +58,8 @@ export const DEFAULT_SETTINGS: SeasonSettings = {
   catalogOpen: true,
   registrationOpen: true,
   perChildBudgetNote: 'Most sponsors spend $75–$150 per child. Every item under $100.',
-  orgDonateUrl: 'https://thekonnection.org',
+  orgDonateUrl: 'https://www.zeffy.com/en-US/donation-form/support-the-konnection-general-fund',
+  chipInsEnabled: true,
+  chipInUrl: 'https://www.zeffy.com/en-US/donation-form/support-the-konnection-general-fund',
+  showPhotos: true,
 };

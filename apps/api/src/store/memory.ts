@@ -91,6 +91,13 @@ export class MemoryStore implements Store {
     this.persist();
     return this.clone(f);
   }
+  async storeFamilyPhoto(id: string, dataUrl: string) {
+    const f = this.data.families.find((x) => x.id === id);
+    if (!f) throw new Error('family not found');
+    f.photoUrl = dataUrl;
+    this.persist();
+    return dataUrl;
+  }
   async incrementFamilyCounter(id: string, field: 'views' | 'claimStarts') {
     const f = this.data.families.find((x) => x.id === id);
     if (f) {
