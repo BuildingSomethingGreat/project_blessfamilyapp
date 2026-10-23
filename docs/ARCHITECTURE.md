@@ -3,7 +3,7 @@
 ```
 apps/web        Vite + React 19 + Tailwind v4 + motion   → Netlify (static PWA, /api proxied to Fly)
                 design: "Bless This Family v3" (Poppins, Konnection purple, loader, swipe deck)
-apps/api        Hono on Node 22                          → Fly.io (one machine, always on)
+apps/api        Hono on Node 22                          → Netlify Functions (default, same site as the PWA) or Fly.io (optional always-on)
 packages/shared types, zod schemas, size tables, state machines, public projection (used by both)
 ```
 

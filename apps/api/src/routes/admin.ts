@@ -26,9 +26,18 @@ export function adminRoutes(services: Services) {
     if (isAdminEmail(e)) {
       const link = `${config.webUrl}/admin/login?token=${encodeURIComponent(loginToken(e))}`;
       const res = await getNotifier().sendEmail({ to: e, subject: 'Your Bless-A-Family admin sign-in link', text: `Tap to sign in (valid 15 minutes):\n${link}\n\nIf you didn't request this, ignore it.` });
-      if (!config.isProd && config.notify.driver === 'console') return c.json({ ok: true, devLink: link, sent: res.ok });
+      if (!config.isProd && config.notify.driver === 'console') return c.json({ ok: true, devLink: link, sent: res.ok, passcodeEnabled: !!config.adminPasscode });
     }
-    return c.json({ ok: true });
+    return c.json({ ok: true, passcodeEnabled: !!config.adminPasscode, emailConfigured: config.notify.driver !== 'console' });
+  });
+  /** Fallback sign-in with a shared passcode (ADMIN_PASSCODE) for teams without an email provider yet. */
+  r.post('/auth/passcode', async (c) => {
+    const { email, passcode } = (await c.req.json()) as { email?: string; passcode?: string };
+    const e = String(email ?? '').trim().toLowerCase();
+    const ok = !!config.adminPasscode && String(passcode ?? '') === config.adminPasscode && isAdminEmail(e);
+    if (!ok) throw new HttpError(401, 'That email and passcode combination is not valid.');
+    setCookie(c, SESSION_COOKIE, sessionToken(e), { httpOnly: true, sameSite: 'Lax', secure: config.isProd, path: '/', maxAge: 14 * 86_400 });
+    return c.json({ ok: true, email: e });
   });
   r.post('/auth/verify', async (c) => {
     const { token } = (await c.req.json()) as { token?: string };

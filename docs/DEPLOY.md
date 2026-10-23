@@ -1,6 +1,25 @@
 # Deploying
 
-Two targets: the API on **Fly.io** (always-on process that also runs the follow-up scheduler and the admin assistant) and the PWA on **Netlify** (static, proxies `/api/*` to Fly).
+**Default: everything on Netlify.** The PWA is static and the API runs as Netlify Functions on the same site (`/api/*`), with a scheduled function running the follow-up engine every 15 minutes. One site, one set of environment variables, no second host.
+
+**Optional: Fly.io for the API.** Use it if you want an always-on process (sub-minute follow-up ticks, long admin-assistant runs beyond the function timeout). Then point the PWA at it by replacing the `/api/*` rewrite in `netlify.toml` with a proxy to the Fly URL.
+
+## Netlify (recommended path)
+1. In Netlify, **Add new site → Import from Git**, pick this repo and the branch. `netlify.toml` already holds the build command, publish dir and functions dir.
+2. **Site configuration → Environment variables**, add:
+
+| Variable | Value |
+|---|---|
+| `AIRTABLE_TOKEN` | personal access token scoped to base `apphUgu1q4Z7ya3Tw` (`data.records:read`, `data.records:write`, `schema.bases:read`). Without it the API serves in-memory demo data that resets on cold starts. |
+| `SESSION_SECRET` | `openssl rand -base64 48` |
+| `ADMIN_EMAILS` | comma-separated admin emails |
+| `ADMIN_PASSCODE` | a team passcode; lets admins sign in before an email provider exists |
+| `RESEND_API_KEY`, `EMAIL_FROM` | optional, turns on magic-link emails and sponsor follow-ups |
+| `ANTHROPIC_API_KEY` | optional, enables the admin assistant and message personalization |
+
+3. **Deploy**. The admin is at `https://<your-site>.netlify.app/admin/login`: enter an allowlisted email, then the passcode (or tap the emailed link once Resend is configured).
+
+Limits to know: Netlify Functions time out at 10 s (26 s on request), so very long assistant answers may be cut; the in-memory store is per-instance, so set `AIRTABLE_TOKEN` for anything beyond a demo.
 
 ## 0. One-time secrets
 | Where | Variable | Notes |
@@ -13,7 +32,7 @@ Two targets: the API on **Fly.io** (always-on process that also runs the follow-
 | Fly | `TWILIO_*` | optional; enables SMS follow-ups |
 | GitHub | `FLY_API_TOKEN`, `NETLIFY_AUTH_TOKEN`, `NETLIFY_SITE_ID` | for the deploy workflow |
 
-## 1. Fly.io (API)
+## Fly.io (optional, always-on API)
 ```bash
 fly auth login
 fly apps create bless-a-family-api            # name is referenced in netlify.toml and fly.toml
@@ -29,15 +48,18 @@ AIRTABLE_TOKEN=... pnpm --filter @bless/api seed:airtable          # settings on
 AIRTABLE_TOKEN=... pnpm --filter @bless/api seed:airtable -- --demo # + demo families (skips if the base has families)
 ```
 
-## 2. Netlify (PWA)
-```bash
-npx netlify-cli login
-npx netlify-cli sites:create --name bless-a-family   # or create in the dashboard, then `netlify link`
-npx netlify-cli deploy --prod --build
+## Pointing Netlify at Fly instead
+Replace the `/api/*` rewrite in `netlify.toml` with:
+```toml
+[[redirects]]
+  from = "/api/*"
+  to = "https://bless-a-family-api.fly.dev/api/:splat"
+  status = 200
+  force = true
 ```
-Or connect the GitHub repo in the Netlify dashboard; `netlify.toml` already holds the build command and the `/api/*` proxy to `https://bless-a-family-api.fly.dev`. If you rename either app, update that redirect and `WEB_URL` / `CORS_ORIGINS` on Fly.
+and set `WEB_URL` / `CORS_ORIGINS` on Fly to the Netlify domain.
 
-## 3. GitHub Actions
+## GitHub Actions
 `.github/workflows/ci.yml` runs typecheck, tests and the web build on every push. `.github/workflows/deploy.yml` deploys both targets on push to `main` once the three secrets above exist.
 
 ## Local development

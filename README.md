@@ -15,6 +15,6 @@ pnpm test && pnpm typecheck
 pnpm reset:data               # wipe the local demo data; it reseeds on the next pnpm dev
 ```
 
-Admin: http://localhost:5173/admin/login — enter `admin@example.com` (the default `ADMIN_EMAILS`); in local dev the sign-in link is shown right on the page. In production the admin lives at `https://<your-netlify-domain>/admin/login` and only emails listed in the API's `ADMIN_EMAILS` can sign in.
+Deployed: connect the repo to Netlify and set the env vars listed in `netlify.toml` (the API ships as Netlify Functions on the same site). Admin: http://localhost:5173/admin/login — enter `admin@example.com` (the default `ADMIN_EMAILS`); in local dev the sign-in link is shown right on the page. In production the admin lives at `https://<your-netlify-domain>/admin/login` and only emails listed in the API's `ADMIN_EMAILS` can sign in.
 
 Docs: [Architecture](docs/ARCHITECTURE.md) · [Deploy](docs/DEPLOY.md) · [Airtable](docs/AIRTABLE.md) · [Decisions & pushback](docs/DECISIONS.md)

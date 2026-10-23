@@ -41,7 +41,8 @@ export const api = {
     note: (token: string, note: string) => post<SponsorPortalView>(`/sponsor/${token}/note`, { note }),
   },
   admin: {
-    requestLink: (email: string) => post<{ ok: true; devLink?: string }>('/admin/auth/request', { email }),
+    requestLink: (email: string) => post<{ ok: true; devLink?: string; passcodeEnabled?: boolean; emailConfigured?: boolean }>('/admin/auth/request', { email }),
+    passcode: (email: string, passcode: string) => post<{ ok: true; email: string }>('/admin/auth/passcode', { email, passcode }),
     verify: (token: string) => post<{ ok: true; email: string }>('/admin/auth/verify', { token }),
     logout: () => post<{ ok: true }>('/admin/auth/logout'),
     me: () => req<{ email: string; assistantEnabled: boolean; store: string }>('/admin/me'),

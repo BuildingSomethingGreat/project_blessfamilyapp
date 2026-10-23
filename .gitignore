@@ -7,3 +7,4 @@ dist
 .DS_Store
 apps/api/data/*.json
 .netlify
+apps/web/netlify/functions/*.mjs

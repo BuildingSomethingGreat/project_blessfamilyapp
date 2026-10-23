@@ -1,20 +1,30 @@
-# Netlify config for the Bless-A-Family PWA (apps/web).
-# The API lives on Fly.io; /api/* is proxied so cookies and the PWA stay same-origin.
+# Netlify config: the PWA (apps/web) plus the API as Netlify Functions, all on one site.
+# Set these environment variables in the Netlify UI (Site configuration → Environment variables):
+#   AIRTABLE_TOKEN   personal access token for base apphUgu1q4Z7ya3Tw (without it the API runs on
+#                    in-memory demo data that resets whenever the function cold-starts)
+#   SESSION_SECRET   long random string (admin sessions)
+#   ADMIN_EMAILS     comma-separated admin emails
+#   ADMIN_PASSCODE   team passcode for admin sign-in until an email provider exists
+#   RESEND_API_KEY   optional, enables magic-link emails and sponsor follow-ups
+#   ANTHROPIC_API_KEY optional, enables the admin assistant and message personalization
 [build]
   base = "."
-  command = "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @bless/web build"
+  command = "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @bless/api build:netlify && pnpm --filter @bless/web build"
   publish = "apps/web/dist"
 
 [build.environment]
   NODE_VERSION = "22"
-  PNPM_FLAGS = "--frozen-lockfile"
 
-# Proxy the API (change the host if you rename the Fly app).
+[functions]
+  directory = "apps/web/netlify/functions"
+  node_bundler = "esbuild"
+
+# The API function declares its own path (/api/*). This rewrite is a safety net for
+# platforms that evaluate redirects first; the function normalizes the prefix.
 [[redirects]]
   from = "/api/*"
-  to = "https://bless-a-family-api.fly.dev/api/:splat"
+  to = "/.netlify/functions/api/:splat"
   status = 200
-  force = true
 
 # SPA fallback
 [[redirects]]

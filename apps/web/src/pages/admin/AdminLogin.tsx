@@ -11,6 +11,11 @@ export default function AdminLogin() {
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'verifying' | 'error'>(token ? 'verifying' : 'idle');
   const [devLink, setDevLink] = useState<string | null>(null);
+  const [passcodeEnabled, setPasscodeEnabled] = useState(false);
+  const [emailConfigured, setEmailConfigured] = useState(true);
+  const [passcode, setPasscode] = useState('');
+  const [passcodeBusy, setPasscodeBusy] = useState(false);
+  const [passcodeError, setPasscodeError] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -28,10 +33,25 @@ export default function AdminLogin() {
     try {
       const r = await api.admin.requestLink(email);
       setDevLink(r.devLink ?? null);
+      setPasscodeEnabled(!!r.passcodeEnabled);
+      setEmailConfigured(r.emailConfigured !== false);
       setState('sent');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not send the link.');
       setState('error');
+    }
+  };
+
+  const submitPasscode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasscodeBusy(true); setPasscodeError('');
+    try {
+      await api.admin.passcode(email, passcode);
+      nav(loc.state?.from && loc.state.from !== '/admin/login' ? loc.state.from : '/admin', { replace: true });
+    } catch (err) {
+      setPasscodeError(err instanceof ApiError ? err.message : 'Could not sign in.');
+    } finally {
+      setPasscodeBusy(false);
     }
   };
 
@@ -48,7 +68,14 @@ export default function AdminLogin() {
           <div className="mt-7">
             <Kicker>Check your inbox</Kicker>
             <h1 className="mt-1.5 text-[30px] font-extrabold leading-[1.05] tracking-[-.045em]">Your link is on its way.</h1>
-            <p className="mt-3 text-[15px] leading-[1.5] text-ink-2">If <b className="text-ink">{email}</b> is an admin, a sign-in link just went out. It works for 15 minutes.</p>
+            <p className="mt-3 text-[15px] leading-[1.5] text-ink-2">{emailConfigured ? <>If <b className="text-ink">{email}</b> is an admin, a sign-in link just went out. It works for 15 minutes.</> : <>Email sign-in isn't set up on this deployment yet{passcodeEnabled ? ', so use the team passcode below.' : '. Ask whoever runs the API to add an email provider or an admin passcode.'}</>}</p>
+            {passcodeEnabled && (
+              <form onSubmit={submitPasscode} className="mt-5 rounded-2xl bg-soft p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[.08em] text-pri-dark">Or use the team passcode</div>
+                <div className="mt-2.5"><Input type="password" autoComplete="current-password" placeholder="Passcode" value={passcode} onChange={(e) => setPasscode(e.target.value)} error={passcodeError || undefined} /></div>
+                <Button type="submit" className="mt-3" size="sm" variant="dark" loading={passcodeBusy} disabled={!passcode}>Sign in</Button>
+              </form>
+            )}
             {devLink && (
               <div className="mt-5 rounded-2xl bg-soft p-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[.08em] text-pri-dark">Local development only</div>

@@ -9,7 +9,8 @@
     "start": "node dist/server.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "tsx --test \"src/**/*.test.ts\"",
-    "seed:airtable": "tsx src/scripts/seed-airtable.ts"
+    "seed:airtable": "tsx src/scripts/seed-airtable.ts",
+    "build:netlify": "esbuild api=src/netlify.ts followups=src/netlify-followups.ts --bundle --platform=node --target=node22 --format=esm --outdir=../web/netlify/functions --out-extension:.js=.mjs --banner:js=\"import { createRequire as __cr } from 'node:module'; const require = __cr(import.meta.url);\" --log-level=warning"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.1.0",

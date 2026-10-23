@@ -3,12 +3,15 @@ const env = (k: string, d = ''): string => process.env[k] ?? d;
 export const config = {
   port: Number(env('PORT', '8787')),
   nodeEnv: env('NODE_ENV', 'development'),
-  isProd: env('NODE_ENV') === 'production',
-  /** Public URL of the PWA (used in emails / magic links). */
-  webUrl: env('WEB_URL', 'http://localhost:5173').replace(/\/$/, ''),
+  /** Netlify sets NETLIFY=true (and URL) at build and runtime. */
+  isNetlify: !!process.env.NETLIFY,
+  isProd: env('NODE_ENV') === 'production' || !!process.env.NETLIFY,
+  /** Public URL of the PWA (used in emails / magic links). On Netlify this defaults to the site URL. */
+  webUrl: env('WEB_URL', env('URL', 'http://localhost:5173')).replace(/\/$/, ''),
   /** Comma separated allowed origins for CORS. */
   corsOrigins: env('CORS_ORIGINS', 'http://localhost:5173').split(',').map((s) => s.trim()).filter(Boolean),
-  store: env('STORE', 'memory') as 'memory' | 'airtable',
+  /** Airtable whenever a token is present, unless STORE=memory is forced. */
+  store: (env('STORE') || (env('AIRTABLE_TOKEN') ? 'airtable' : 'memory')) as 'memory' | 'airtable',
   dataDir: env('DATA_DIR', './data'),
   airtable: {
     token: env('AIRTABLE_TOKEN'),
@@ -17,6 +20,8 @@ export const config = {
   /** Secret used to sign admin sessions and magic links. */
   sessionSecret: env('SESSION_SECRET', 'dev-secret-change-me'),
   adminEmails: env('ADMIN_EMAILS', 'admin@example.com').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+  /** Optional shared passcode so admins can sign in before an email provider is configured. */
+  adminPasscode: env('ADMIN_PASSCODE'),
   notify: {
     driver: env('NOTIFY_DRIVER', 'console') as 'console' | 'resend',
     resendKey: env('RESEND_API_KEY'),
