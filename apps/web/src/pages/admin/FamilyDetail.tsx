@@ -1,23 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'motion/react';
-import type { Activity, FamilyStatus, Sponsor, Sponsorship, SponsorshipStatus } from '@bless/shared';
+import { familyArt, colorSwatch, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
 import { api } from '@/lib/api';
-import { Button, Card, Chip, Dominoes, EmptyState, FamilyArt, Input, Label, Select, Sheet, Skeleton, Textarea, Toggle, useToast } from '@/components/ui';
-import { fmtDate, fmtDateTime, plural, timeAgo } from '@/lib/format';
-import { RELEASE_REASONS, SectionTitle, SpStatusChip, StatusChip, copyText , stagger, rise } from './shared.tsx';
+import { Button, Chip, Dominoes, FamilyArt, Input, Kicker, Label, Select, Sheet, Skeleton, Textarea, Toggle, useToast } from '@/components/ui';
+import { cx, fmtDate, fmtDateTime, plural, timeAgo } from '@/lib/format';
+import { Panel, PanelTitle, RELEASE_REASONS, SpStatusChip, StatusChip, copyText } from './shared.tsx';
 
-type Sp = Sponsorship & { sponsor: Sponsor | null };
+type Sp = Sponsorship & { sponsor: Sponsor | null; family?: { nickname: string } | null };
+type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
-const FAMILY_ACTIONS: Record<FamilyStatus, { label: string; to: FamilyStatus; variant: 'pine' | 'secondary' | 'danger' | 'ghost' }[]> = {
-  Submitted: [{ label: 'Approve & list', to: 'Available', variant: 'pine' }, { label: 'Needs info', to: 'Needs Info', variant: 'secondary' }, { label: 'Decline', to: 'Declined', variant: 'danger' }],
-  'Needs Info': [{ label: 'Approve & list', to: 'Available', variant: 'pine' }, { label: 'Decline', to: 'Declined', variant: 'danger' }],
+const FAMILY_ACTIONS: Record<FamilyStatus, { label: string; to: FamilyStatus; variant: Variant }[]> = {
+  Submitted: [{ label: 'Approve & publish', to: 'Available', variant: 'primary' }, { label: 'Needs info', to: 'Needs Info', variant: 'secondary' }, { label: 'Decline', to: 'Declined', variant: 'danger' }],
+  'Needs Info': [{ label: 'Approve & publish', to: 'Available', variant: 'primary' }, { label: 'Decline', to: 'Declined', variant: 'danger' }],
   Available: [{ label: 'Withdraw', to: 'Withdrawn', variant: 'danger' }, { label: 'Needs info', to: 'Needs Info', variant: 'ghost' }],
   Claimed: [],
   Fulfilled: [],
-  Withdrawn: [{ label: 'Reopen', to: 'Available', variant: 'pine' }],
-  Declined: [{ label: 'Reopen', to: 'Available', variant: 'pine' }],
+  Withdrawn: [{ label: 'Reopen', to: 'Available', variant: 'primary' }],
+  Declined: [{ label: 'Reopen', to: 'Available', variant: 'primary' }],
 };
 
 export default function FamilyDetail() {
@@ -30,11 +30,12 @@ export default function FamilyDetail() {
   const [nick, setNick] = useState('');
   const [editingNick, setEditingNick] = useState(false);
   const [notes, setNotes] = useState('');
+  const [goal, setGoal] = useState('');
   const [nudgeOpen, setNudgeOpen] = useState<Sp | null>(null);
   const [releaseOpen, setReleaseOpen] = useState<Sp | null>(null);
   const [showOld, setShowOld] = useState(false);
 
-  useEffect(() => { if (q.data) { setNick(q.data.public.nickname); setNotes(q.data.adminNotes); } }, [q.data]);
+  useEffect(() => { if (q.data) { setNick(q.data.public.nickname); setNotes(q.data.adminNotes); setGoal(String(q.data.public.goal)); } }, [q.data]);
 
   const patchFamily = useMutation({
     mutationFn: (body: Parameters<typeof api.admin.patchFamily>[1]) => api.admin.patchFamily(id, body),
@@ -47,217 +48,209 @@ export default function FamilyDetail() {
     onError: (e: Error) => toast(e.message, 'bad'),
   });
 
-  if (q.isPending) return <div className="space-y-4"><Skeleton className="h-10 w-72" /><div className="grid gap-5 lg:grid-cols-5"><Skeleton className="h-96 lg:col-span-3" /><Skeleton className="h-96 lg:col-span-2" /></div></div>;
-  if (q.isError) return <EmptyState title="Family not found" action={<Link to="/admin/families"><Button variant="secondary">Back to families</Button></Link>} />;
+  if (q.isPending) return <div className="space-y-4"><Skeleton className="h-10 w-72" /><div className="grid gap-3.5 lg:grid-cols-5"><Skeleton className="h-96 lg:col-span-3" /><Skeleton className="h-96 lg:col-span-2" /></div></div>;
+  if (q.isError) return <Panel className="text-center"><div className="font-bold">Family not found</div><Link to="/admin/families" className="mt-4 inline-block"><Button variant="secondary">Back to families</Button></Link></Panel>;
   const f = q.data;
+  const art = familyArt(f.public.colors);
   const active = f.sponsorships.filter((s) => s.status !== 'Released').sort((a, b) => b.claimedAt.localeCompare(a.claimedAt))[0] ?? null;
   const old = f.sponsorships.filter((s) => s !== active);
   const publicUrl = `${window.location.origin}/families/${f.slug}`;
-
   const move = (s: Sp, status: SponsorshipStatus, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return;
     patchSp.mutate({ spId: s.id, body: { status } });
   };
+  const inShopping = ['Claimed', 'Shopping', 'Purchased', 'Wrapped'].includes(active?.status ?? '');
 
   return (
-    <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-5">
-      <motion.div variants={rise}>
-        <Link to="/admin/families" className="text-sm font-medium text-ink-3 hover:text-ink">← Families</Link>
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            <FamilyArt colors={f.public.colors} seed={f.children.length} className="size-16 shrink-0 rounded-2xl" />
-            <div className="min-w-0">
-              {editingNick ? (
-                <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); patchFamily.mutate({ nickname: nick.trim() }); setEditingNick(false); }}>
-                  <Input value={nick} onChange={(e) => setNick(e.target.value)} className="py-2 text-xl font-bold" autoFocus maxLength={80} />
-                  <Button type="submit" size="sm" variant="dark">Save</Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingNick(false); setNick(f.public.nickname); }}>Cancel</Button>
-                </form>
-              ) : (
-                <button onClick={() => setEditingNick(true)} className="group flex items-center gap-2 text-left" title="Rename">
-                  <h1 className="display-tight text-3xl sm:text-4xl">{f.public.nickname}</h1>
-                  <svg viewBox="0 0 20 20" className="size-4 text-ink-3 opacity-0 transition-opacity group-hover:opacity-100" fill="currentColor"><path d="M13.6 2.6a2 2 0 0 1 2.8 2.8l-8.5 8.5-3.7.9.9-3.7 8.5-8.5Z" /></svg>
-                </button>
-              )}
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-3">
-                <span className="font-mono">{f.familyId}</span><span>·</span><span>{f.city}, {f.state}</span><span>·</span><span>{plural(f.children.length, 'child', 'children')}</span>
-                <StatusChip status={f.status} />
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {FAMILY_ACTIONS[f.status].map((a) => (
-              <Button key={a.to} size="sm" variant={a.variant} onClick={() => { if (a.to === 'Declined' || a.to === 'Withdrawn' ? window.confirm(`${a.label} ${f.familyId}? Sponsors will no longer see this family.`) : true) patchFamily.mutate({ status: a.to }); }} loading={patchFamily.isPending && patchFamily.variables?.status === a.to}>{a.label}</Button>
-            ))}
-            {(f.status === 'Available' || f.status === 'Claimed' || f.status === 'Fulfilled') && (
-              <Button size="sm" variant="secondary" onClick={() => { copyText(publicUrl); toast('Public link copied', 'ok'); }}>Copy public link</Button>
+    <div className="anim-rise">
+      <Link to="/admin/families" className="inline-flex h-9 items-center rounded-full border border-line bg-white px-3.5 text-[13px] font-semibold hover:border-ink">‹ Families</Link>
+      <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-center gap-4">
+          <FamilyArt art={art} photoUrl={f.photoApproved ? f.photoUrl : ''} className="size-16 flex-none rounded-2xl" />
+          <div className="min-w-0">
+            <Kicker>{f.familyId} · {f.city}, {f.state}</Kicker>
+            {editingNick ? (
+              <form className="mt-1 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); patchFamily.mutate({ nickname: nick.trim() }); setEditingNick(false); }}>
+                <Input value={nick} onChange={(e) => setNick(e.target.value)} className="h-11 text-xl font-bold" autoFocus maxLength={80} />
+                <Button type="submit" size="sm" variant="dark">Save</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingNick(false); setNick(f.public.nickname); }}>Cancel</Button>
+              </form>
+            ) : (
+              <button onClick={() => setEditingNick(true)} className="group mt-0.5 flex items-center gap-2 text-left" title="Rename">
+                <h1 className="text-[30px] font-extrabold tracking-[-.045em] sm:text-[36px]">{f.public.nickname}</h1>
+                <span className="text-[12px] text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">edit</span>
+              </button>
             )}
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-ink-3"><span>{plural(f.children.length, 'child', 'children')}</span><StatusChip status={f.status} /><span>submitted {fmtDate(f.createdAt)}</span></div>
           </div>
         </div>
-      </motion.div>
+        <div className="flex flex-wrap gap-2">
+          {FAMILY_ACTIONS[f.status].map((a) => (
+            <Button key={a.to} size="sm" variant={a.variant} onClick={() => { if (a.to === 'Declined' || a.to === 'Withdrawn' ? window.confirm(`${a.label} ${f.familyId}? Sponsors will no longer see this family.`) : true) patchFamily.mutate({ status: a.to }); }} loading={patchFamily.isPending && patchFamily.variables?.status === a.to}>{a.label}</Button>
+          ))}
+          {(f.status === 'Available' || f.status === 'Claimed' || f.status === 'Fulfilled') && <Button size="sm" variant="secondary" onClick={() => { copyText(publicUrl); toast('Public link copied', 'ok'); }}>Copy public link</Button>}
+        </div>
+      </div>
 
-      <div className="grid gap-5 lg:grid-cols-5">
-        <div className="space-y-5 lg:col-span-3">
-          <motion.div variants={rise}>
-            <Card className="p-5">
-              <SectionTitle right={<Chip tone="neutral">Private</Chip>}>Household</SectionTitle>
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                <Row k="Guardian" v={f.guardianName} />
-                <Row k="Phone" v={<a className="font-medium text-ember hover:underline" href={`tel:${f.phone}`}>{f.phone}</a>} />
-                <Row k="Email" v={f.email ? <a className="font-medium text-ember hover:underline" href={`mailto:${f.email}`}>{f.email}</a> : '—'} />
-                <Row k="Prefers" v={f.preferredContact} />
-                <Row k="Address" v={`${f.address}, ${f.city}, ${f.state} ${f.zip}`} />
-                <Row k="Transportation" v={f.transportation === 'Yes' ? 'Has reliable transportation' : 'No reliable transportation'} />
-                <Row k="Eligibility" v={f.eligibilityConfirmed ? 'Confirmed by guardian' : 'Not confirmed'} />
-                <Row k="Submitted" v={`${fmtDate(f.createdAt, { month: 'short', day: 'numeric', year: 'numeric' })}${f.approvedAt ? ` · approved ${fmtDate(f.approvedAt)}` : ''}`} />
-              </dl>
-              {f.notes && <div className="mt-4 rounded-2xl bg-cream-2/70 p-4 text-sm"><div className="text-xs font-semibold uppercase tracking-wider text-ink-3">Family's notes / special requests</div><p className="mt-1 whitespace-pre-wrap">{f.notes}</p></div>}
-            </Card>
-          </motion.div>
+      <div className="mt-5 grid gap-3.5 lg:grid-cols-5">
+        <div className="space-y-3.5 lg:col-span-3">
+          <Panel>
+            <PanelTitle right={<Chip tone="outline" size="sm">Private</Chip>}>Household</PanelTitle>
+            <dl className="mt-3.5 grid grid-cols-1 gap-x-6 gap-y-2.5 text-[13px] sm:grid-cols-2">
+              <Row k="Guardian" v={f.guardianName} />
+              <Row k="Phone" v={<a className="text-pri hover:underline" href={`tel:${f.phone}`}>{f.phone}</a>} />
+              <Row k="Email" v={f.email ? <a className="text-pri hover:underline" href={`mailto:${f.email}`}>{f.email}</a> : '—'} />
+              <Row k="Prefers" v={f.preferredContact} />
+              <Row k="Address" v={`${f.address}, ${f.city}, ${f.state} ${f.zip}`} />
+              <Row k="Gifts" v={f.transportation === 'Yes' ? 'Can pick up from the office' : 'Needs delivery'} />
+              <Row k="Eligibility" v={f.eligibilityConfirmed ? 'Confirmed by guardian' : 'Not confirmed'} />
+              <Row k="Approved" v={f.approvedAt ? fmtDate(f.approvedAt) : '—'} />
+            </dl>
+            {f.notes && <div className="mt-4 rounded-[14px] bg-bg p-3.5 text-[13px]"><div className="text-[10px] font-semibold uppercase tracking-[.08em] text-ink-3">Family's notes / special requests</div><p className="mt-1 whitespace-pre-wrap">{f.notes}</p></div>}
+          </Panel>
 
-          <motion.div variants={rise}>
-            <Card className="p-5">
-              <SectionTitle right={<Toggle checked={f.storyApproved} onChange={(v) => patchFamily.mutate({ storyApproved: v })} label="Show publicly" />}>Family story</SectionTitle>
-              {f.familyStory ? <p className="whitespace-pre-wrap text-[15px] leading-relaxed">{f.familyStory}</p> : <p className="text-sm text-ink-3">The family didn't write a story.</p>}
-              <p className="mt-3 text-xs text-ink-3">Stories are only visible on the public page after you approve them. Check for full names, addresses, or anything the family wouldn't want strangers to read.</p>
-            </Card>
-          </motion.div>
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <Panel>
+              <PanelTitle right={<Toggle checked={f.storyApproved} onChange={(v) => patchFamily.mutate({ storyApproved: v })} label="Show publicly" />}>Family story</PanelTitle>
+              {f.familyStory ? <p className="mt-3 whitespace-pre-wrap text-[14px] leading-[1.5]">“{f.familyStory}”</p> : <p className="mt-3 text-[13px] text-ink-3">The family didn't write a story.</p>}
+              <p className="mt-3 text-[12px] text-ink-3">Only visible on the public page after approval. Check for full names or addresses.</p>
+            </Panel>
+            <Panel>
+              <PanelTitle right={<Toggle checked={f.photoApproved} onChange={(v) => patchFamily.mutate({ photoApproved: v })} label="Show publicly" />}>Family photo</PanelTitle>
+              <FamilyArt art={art} photoUrl={f.photoUrl} className="mt-3 h-[160px] rounded-[16px]" />
+              <p className="mt-3 text-[12px] text-ink-3">{f.photoUrl ? (f.photoApproved ? 'Will show on the public card.' : 'Check: no faces of minors unless consent box was ticked.') : 'No photo submitted. The card uses the gradient from the kids\' favorite colors.'}</p>
+            </Panel>
+          </div>
 
-          <motion.div variants={rise}>
-            <Card className="p-5">
-              <SectionTitle>Admin notes</SectionTitle>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Calls made, context, anything the next admin should know…" />
+          <div className="grid gap-3.5 sm:grid-cols-2">
+            <Panel>
+              <PanelTitle>Admin notes</PanelTitle>
+              <Textarea className="mt-3 min-h-24" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Calls made, context, anything the next admin should know…" />
               <div className="mt-3 flex justify-end"><Button size="sm" variant="dark" disabled={notes === f.adminNotes} loading={patchFamily.isPending && patchFamily.variables?.adminNotes !== undefined} onClick={() => patchFamily.mutate({ adminNotes: notes })}>Save notes</Button></div>
-            </Card>
-          </motion.div>
+            </Panel>
+            <Panel>
+              <PanelTitle right={<span className="text-[12px] text-ink-3">${f.raised} pledged</span>}>Chip-in goal</PanelTitle>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-soft"><div className="h-full rounded-full bg-pri" style={{ width: `${Math.min(100, (f.raised / Math.max(1, f.public.goal)) * 100)}%` }} /></div>
+              <div className="mt-3.5 flex items-end gap-2">
+                <div className="flex-1"><Label htmlFor="goal" hint="dollars">Wishlist goal</Label><Input id="goal" type="number" min={0} step={10} value={goal} onChange={(e) => setGoal(e.target.value)} /></div>
+                <Button size="md" variant="dark" className="h-[50px]" disabled={Number(goal) === f.public.goal} onClick={() => patchFamily.mutate({ goal: Number(goal) })}>Save</Button>
+              </div>
+              <p className="mt-3 text-[12px] text-ink-3">Defaults to $150 per child. Konnection staff shop whatever a sponsor doesn't cover.</p>
+            </Panel>
+          </div>
 
-          <motion.div variants={rise} className="space-y-4">
-            <h2 className="text-lg">Children</h2>
+          <div className="space-y-3.5">
+            <h2 className="text-[20px]">Children</h2>
             {f.children.map((c, i) => (
-              <Card key={c.id} className="p-5">
+              <Panel key={c.id}>
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-9 place-items-center rounded-full text-sm font-bold text-white" style={{ background: f.public.colors[i % f.public.colors.length] ?? '#eb6834' }}>{i + 1}</span>
-                    <div><div className="text-lg font-semibold">{c.name}</div><div className="text-sm text-ink-3">{c.gender} · age {c.age}{c.favoriteColor ? ` · loves ${c.favoriteColor.toLowerCase()}` : ''}</div></div>
-                  </div>
+                  <div><Kicker>Child {i + 1}</Kicker><div className="mt-0.5 text-[22px] font-extrabold tracking-[-.03em]">{c.name}, {c.age}</div><div className="text-[13px] text-ink-3">{c.gender}{c.hobbies ? ` · ${c.hobbies}` : ''}</div></div>
+                  {c.favoriteColor && <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2.5 py-1 text-[12px] font-semibold"><span className="inline-block size-2.5 rounded-full" style={{ background: colorSwatch(c.favoriteColor) }} />{c.favoriteColor}</span>}
                 </div>
-                <div className="mt-4 grid grid-cols-3 gap-2 text-sm">
-                  <Size k="Shirt / top" v={`${c.clothingCategory} ${c.shirtSize}`} />
-                  <Size k="Pants / bottom" v={`${c.clothingCategory} ${c.pantsSize}`} />
-                  <Size k="Shoes" v={`${c.shoeCategory} ${c.shoeSize}`} />
+                <div className="mt-3.5 grid grid-cols-3 gap-2">
+                  <Size k="Shirt" v={c.shirtSize} cat={c.clothingCategory} />
+                  <Size k="Pants" v={c.pantsSize} cat={c.clothingCategory} />
+                  <Size k="Shoes" v={c.shoeSize} cat={c.shoeCategory} />
                 </div>
-                {c.sizeNotes && <p className="mt-2 rounded-xl bg-gold-soft px-3 py-2 text-sm text-[#8a5f10]"><span className="font-semibold">Size notes:</span> {c.sizeNotes}</p>}
-                <dl className="mt-4 space-y-2.5 text-sm">
-                  {c.hobbies && <Row k="Interests" v={c.hobbies} />}
-                  <Row k="Clothing" v={c.clothingWishlist.length ? <span className="flex flex-wrap gap-1.5">{c.clothingWishlist.map((x) => <Chip key={x}>{x}</Chip>)}</span> : '—'} />
-                  {c.otherClothing && <Row k="Other clothing" v={c.otherClothing} />}
-                  <Row k="Fun gifts" v={c.giftTypes.length ? <span className="flex flex-wrap gap-1.5">{c.giftTypes.map((x) => <Chip key={x} tone="ember">{x}</Chip>)}</span> : '—'} />
-                  {c.specificGifts && <Row k="Specific gifts" v={c.specificGifts} />}
-                </dl>
-              </Card>
+                {c.sizeNotes && <p className="mt-2.5 rounded-[14px] bg-amber-50 px-3 py-2 text-[13px] text-warn"><b>Size notes:</b> {c.sizeNotes}</p>}
+                <div className="mt-3.5 text-[12px] font-semibold text-ink-2">Clothing</div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">{c.clothingWishlist.map((x) => <Chip key={x} tone="soft">{x}</Chip>)}{c.otherClothing && <Chip tone="outline">{c.otherClothing}</Chip>}{!c.clothingWishlist.length && !c.otherClothing && <span className="text-[13px] text-ink-3">—</span>}</div>
+                <div className="mt-3 text-[12px] font-semibold text-ink-2">Fun gifts</div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">{c.giftTypes.map((x) => <Chip key={x} tone="outline">{x}</Chip>)}{c.specificGifts && <Chip tone="outline">{c.specificGifts}</Chip>}{!c.giftTypes.length && !c.specificGifts && <span className="text-[13px] text-ink-3">—</span>}</div>
+              </Panel>
             ))}
-          </motion.div>
+          </div>
         </div>
 
-        <div className="space-y-5 lg:col-span-2">
-          <motion.div variants={rise}>
-            <Card className="p-5">
-              <SectionTitle right={active ? <SpStatusChip status={active.status} /> : undefined}>Sponsorship</SectionTitle>
-              {!active ? (
+        <div className="space-y-3.5 lg:col-span-2">
+          <Panel>
+            <PanelTitle right={active ? <SpStatusChip status={active.status} /> : undefined}>Sponsorship</PanelTitle>
+            {!active ? (
+              <div className="mt-3">
+                <p className="text-[13px] text-ink-3">{f.status === 'Available' ? 'Listed and waiting for a sponsor.' : f.status === 'Submitted' || f.status === 'Needs Info' ? 'Not listed yet. Approve the family to make it visible to sponsors.' : 'No active sponsor.'}</p>
+                {f.status === 'Available' && (
+                  <div className="mt-3.5 flex items-center gap-2 rounded-[14px] bg-bg p-3 text-[13px]">
+                    <span className="min-w-0 flex-1 truncate font-mono text-[11px]">{publicUrl}</span>
+                    <Button size="xs" variant="dark" onClick={() => { copyText(publicUrl); toast('Copied', 'ok'); }}>Copy</Button>
+                  </div>
+                )}
+                <div className="mt-3 text-[13px] text-ink-3">{f.views} views · {f.claimStarts} started a claim · waiting {plural(f.public.daysWaiting, 'day')}</div>
+              </div>
+            ) : (
+              <div className="mt-3.5 space-y-5">
+                {active.flagged && <div className="rounded-2xl bg-bad-soft px-4 py-3 text-[13px] text-bad"><b>Flagged:</b> {active.flagReason || 'needs a human decision'}</div>}
                 <div>
-                  <p className="text-sm text-ink-3">{f.status === 'Available' ? 'Listed and waiting for a sponsor.' : f.status === 'Submitted' || f.status === 'Needs Info' ? 'Not listed yet. Approve the family to make it visible to sponsors.' : 'No active sponsor.'}</p>
-                  {f.status === 'Available' && (
-                    <div className="mt-4 flex items-center gap-2 rounded-2xl bg-cream-2/70 p-3 text-sm">
-                      <span className="min-w-0 flex-1 truncate font-mono text-xs">{publicUrl}</span>
-                      <Button size="sm" variant="dark" onClick={() => { copyText(publicUrl); toast('Copied', 'ok'); }}>Copy</Button>
-                    </div>
-                  )}
-                  <div className="mt-3 text-sm text-ink-3">{f.views} views · {f.claimStarts} started a claim · waiting {plural(f.public.daysWaiting, 'day')}</div>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {active.flagged && <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-bad"><span className="font-semibold">Flagged:</span> {active.flagReason || 'needs a human decision'}</div>}
-                  <div>
-                    <div className="text-lg font-semibold">{active.sponsor?.name ?? 'Unknown sponsor'}</div>
-                    <div className="text-sm text-ink-2">
-                      {active.sponsor?.organization && <div>{active.sponsor.organization}</div>}
-                      {active.sponsor?.email && <a className="block text-ember hover:underline" href={`mailto:${active.sponsor.email}`}>{active.sponsor.email}</a>}
-                      {active.sponsor?.phone && <a className="block text-ember hover:underline" href={`tel:${active.sponsor.phone}`}>{active.sponsor.phone}</a>}
-                      <div className="text-ink-3">Prefers {active.sponsor?.preferredContact?.toLowerCase() ?? 'email'} · {active.sponsorshipId}</div>
-                    </div>
-                    {active.sponsorNote && <p className="mt-2 rounded-xl bg-cream-2/70 px-3 py-2 text-sm italic">“{active.sponsorNote}”</p>}
+                  <div className="text-[17px] font-bold">{active.sponsor?.name ?? 'Unknown sponsor'}</div>
+                  <div className="text-[13px] text-ink-2">
+                    {active.sponsor?.organization && <div>{active.sponsor.organization}</div>}
+                    {active.sponsor?.email && <a className="block text-pri hover:underline" href={`mailto:${active.sponsor.email}`}>{active.sponsor.email}</a>}
+                    {active.sponsor?.phone && <a className="block text-pri hover:underline" href={`tel:${active.sponsor.phone}`}>{active.sponsor.phone}</a>}
+                    <div className="text-ink-3">Prefers {active.sponsor?.preferredContact?.toLowerCase() ?? 'email'} · {active.sponsorshipId}</div>
                   </div>
-                  <div className="[&_li_span.block]:leading-tight [&_li_span.text-sm]:text-xs"><Dominoes status={active.status} dates={{ Claimed: active.claimedAt, Confirmed: active.confirmedAt, Shopping: active.shoppingAt, 'Dropped Off': active.droppedOffAt, Delivered: active.deliveredAt }} /></div>
-                  <dl className="grid grid-cols-2 gap-2 text-sm">
-                    <Cell k="Last heard" v={active.lastResponseAt ? timeAgo(active.lastResponseAt) : 'never'} />
-                    <Cell k="Next follow-up" v={active.nextFollowUpAt ? fmtDateTime(active.nextFollowUpAt) : '—'} />
-                    <Cell k="Nudges sent" v={active.followUpCount} />
-                    <Cell k="Last nudged" v={active.lastNudgedAt ? timeAgo(active.lastNudgedAt) : '—'} />
-                  </dl>
-                  <div className="grid grid-cols-2 gap-2">
-                    {active.status !== 'Delivered' && <Button size="sm" variant="secondary" onClick={() => setNudgeOpen(active)}>Send nudge</Button>}
-                    <Button size="sm" variant="secondary" onClick={() => { copyText(`${window.location.origin}/s/${active.token}`); toast('Sponsor portal link copied', 'ok'); }}>Copy portal link</Button>
-                    {['Claimed', 'Confirmed', 'Shopping'].includes(active.status) && <Button size="sm" variant="dark" onClick={() => move(active, 'Dropped Off', 'Record that gifts were dropped off at The Konnection?')}>Mark dropped off</Button>}
-                    {active.status === 'Dropped Off' && <Button size="sm" variant="pine" onClick={() => move(active, 'Delivered', `Mark gifts delivered to ${f.public.nickname}? The sponsor gets a thank-you.`)}>Mark delivered</Button>}
-                    {active.status !== 'Delivered' && <Button size="sm" variant="danger" onClick={() => setReleaseOpen(active)}>Release family</Button>}
-                    {active.flagged && <Button size="sm" variant="ghost" onClick={() => patchSp.mutate({ spId: active.id, body: { flagged: false } })}>Clear flag</Button>}
-                  </div>
+                  {active.sponsorNote && <p className="mt-2 rounded-[14px] bg-bg px-3 py-2 text-[13px] italic">“{active.sponsorNote}”</p>}
                 </div>
-              )}
-              {old.length > 0 && (
-                <div className="mt-5 border-t border-line/70 pt-4">
-                  <button className="text-sm font-medium text-ink-3 hover:text-ink" onClick={() => setShowOld((v) => !v)}>{showOld ? 'Hide' : 'Show'} {plural(old.length, 'earlier sponsorship')}</button>
-                  {showOld && (
-                    <ul className="mt-3 space-y-2 text-sm">
-                      {old.map((s) => <li key={s.id} className="rounded-xl bg-cream-2/70 px-3 py-2"><span className="font-medium">{s.sponsor?.name ?? '—'}</span> · {s.status}{s.releaseReason ? ` · ${s.releaseReason}` : ''} · {fmtDate(s.claimedAt)}</li>)}
-                    </ul>
-                  )}
+                <Dominoes status={active.status} dates={{ Claimed: active.claimedAt, Shopping: active.shoppingAt, Purchased: active.purchasedAt, Wrapped: active.wrappedAt, 'Dropped Off': active.droppedOffAt, Delivered: active.deliveredAt }} />
+                <dl className="grid grid-cols-2 gap-2 text-[13px]">
+                  <Cell k="Last heard" v={active.lastResponseAt ? timeAgo(active.lastResponseAt) : 'never'} bad={!active.lastResponseAt} />
+                  <Cell k="Next follow-up" v={active.flagged ? 'Flagged → human' : active.nextFollowUpAt ? fmtDateTime(active.nextFollowUpAt) : '—'} />
+                  <Cell k="Unanswered" v={active.followUpCount} bad={active.flagged} />
+                  <Cell k="Last nudged" v={active.lastNudgedAt ? timeAgo(active.lastNudgedAt) : '—'} />
+                </dl>
+                <div className="grid grid-cols-2 gap-2">
+                  {active.status !== 'Delivered' && <Button size="sm" variant="secondary" onClick={() => setNudgeOpen(active)}>Send nudge</Button>}
+                  <Button size="sm" variant="secondary" onClick={() => { copyText(`${window.location.origin}/s/${active.token}`); toast('Sponsor portal link copied', 'ok'); }}>Copy portal link</Button>
+                  {inShopping && <Button size="sm" variant="dark" onClick={() => move(active, 'Dropped Off', 'Record that gifts were dropped off at The Konnection?')}>Mark dropped off</Button>}
+                  {active.status === 'Dropped Off' && <Button size="sm" onClick={() => move(active, 'Delivered', `Mark gifts delivered to ${f.public.nickname}? The sponsor gets a thank-you.`)}>Mark delivered</Button>}
+                  {active.status !== 'Delivered' && <Button size="sm" variant="danger" onClick={() => setReleaseOpen(active)}>Release family</Button>}
+                  {active.flagged && <Button size="sm" variant="ghost" onClick={() => patchSp.mutate({ spId: active.id, body: { flagged: false } })}>Clear flag</Button>}
                 </div>
-              )}
-            </Card>
-          </motion.div>
+              </div>
+            )}
+            {old.length > 0 && (
+              <div className="mt-5 border-t border-soft pt-4">
+                <button className="text-[13px] font-semibold text-ink-3 hover:text-ink" onClick={() => setShowOld((v) => !v)}>{showOld ? 'Hide' : 'Show'} {plural(old.length, 'earlier sponsorship')}</button>
+                {showOld && <ul className="mt-3 space-y-2 text-[13px]">{old.map((s) => <li key={s.id} className="rounded-[14px] bg-bg px-3 py-2"><b>{s.sponsor?.name ?? '—'}</b> · {STATUS_LABEL[s.status]}{s.releaseReason ? ` · ${s.releaseReason}` : ''} · {fmtDate(s.claimedAt)}</li>)}</ul>}
+              </div>
+            )}
+          </Panel>
 
-          <motion.div variants={rise}>
-            <Card className="p-5">
-              <SectionTitle>Activity</SectionTitle>
-              {f.activity.length === 0 ? <p className="text-sm text-ink-3">Nothing yet.</p> : (
-                <ul className="space-y-3">{f.activity.filter((a) => a.type !== 'family_view').slice(0, 30).map((a) => <ActivityRow key={a.id} a={a} />)}</ul>
-              )}
-              {f.activity.some((a) => a.type === 'family_view') && <p className="mt-3 text-xs text-ink-3">{f.activity.filter((a) => a.type === 'family_view').length} page views in the log are hidden.</p>}
-            </Card>
-          </motion.div>
+          <Panel>
+            <PanelTitle>Activity</PanelTitle>
+            {f.activity.length === 0 ? <p className="mt-3 text-[13px] text-ink-3">Nothing yet.</p> : <ul className="mt-3.5 space-y-3">{f.activity.filter((a) => a.type !== 'family_view').slice(0, 30).map((a) => <ActivityRow key={a.id} a={a} />)}</ul>}
+            {f.activity.some((a) => a.type === 'family_view') && <p className="mt-3 text-[12px] text-ink-3">{f.activity.filter((a) => a.type === 'family_view').length} page views in the log are hidden.</p>}
+          </Panel>
         </div>
       </div>
 
       <NudgeSheet sp={nudgeOpen} onClose={() => setNudgeOpen(null)} onDone={invalidate} />
       <ReleaseSheet sp={releaseOpen} familyName={f.public.nickname} onClose={() => setReleaseOpen(null)} pending={patchSp.isPending} onConfirm={(reason) => releaseOpen && patchSp.mutate({ spId: releaseOpen.id, body: { status: 'Released', reason } })} />
-    </motion.div>
+    </div>
   );
 }
 
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
-  return <div className="flex gap-3"><dt className="w-28 shrink-0 text-ink-3">{k}</dt><dd className="min-w-0 flex-1 break-words font-medium text-ink">{v}</dd></div>;
+  return <div className="flex gap-3"><dt className="w-24 shrink-0 text-ink-3">{k}</dt><dd className="min-w-0 flex-1 break-words font-semibold text-ink">{v}</dd></div>;
 }
-function Cell({ k, v }: { k: string; v: React.ReactNode }) {
-  return <div className="rounded-xl bg-cream-2/70 px-3 py-2"><dt className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">{k}</dt><dd className="mt-0.5 font-semibold tabular-nums">{v}</dd></div>;
+function Cell({ k, v, bad }: { k: string; v: React.ReactNode; bad?: boolean }) {
+  return <div className="rounded-[14px] bg-bg px-3 py-2"><dt className="text-[10px] font-semibold uppercase tracking-[.08em] text-ink-3">{k}</dt><dd className={cx('mt-0.5 font-bold tabular', bad && 'text-bad')}>{v}</dd></div>;
 }
-function Size({ k, v }: { k: string; v: string }) {
-  return <div className="rounded-xl bg-cream-2/70 px-3 py-2"><div className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">{k}</div><div className="font-semibold">{v}</div></div>;
+function Size({ k, v, cat }: { k: string; v: string; cat: string }) {
+  return <div className="rounded-[14px] bg-bg px-3 py-2.5"><div className="text-[10px] font-semibold uppercase tracking-[.08em] text-ink-3">{k}</div><div className="mt-0.5 text-[17px] font-bold">{v}</div><div className="text-[11px] text-ink-3">{cat}</div></div>;
 }
 
-const ICONS: Partial<Record<Activity['type'], string>> = { message_sent: '✉️', sponsor_response: '💬', claim_complete: '🎁', claim_start: '👀', status_change: '➡️', admin_action: '🛠️', agent_action: '✨', flag: '🚩', release: '↩️', catalog_view: '👀' };
+const ICONS: Partial<Record<Activity['type'], string>> = { message_sent: '✉️', sponsor_response: '💬', claim_complete: '🎁', claim_start: '👀', status_change: '➡️', admin_action: '🛠️', agent_action: '✨', flag: '🚩', release: '↩️', catalog_view: '👀', chip_in: '💜' };
 export function ActivityRow({ a }: { a: Activity }) {
   const [open, setOpen] = useState(false);
   return (
-    <li className="flex gap-3 text-sm">
-      <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-cream-2 text-xs">{ICONS[a.type] ?? '•'}</span>
+    <li className="flex gap-3 text-[13px]">
+      <span className="mt-0.5 grid size-7 flex-none place-items-center rounded-full bg-soft-2 text-[12px]">{ICONS[a.type] ?? '•'}</span>
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline justify-between gap-2"><span className="font-medium">{a.subject || a.type.replace('_', ' ')}</span><span className="shrink-0 text-xs text-ink-3" title={fmtDateTime(a.occurredAt)}>{timeAgo(a.occurredAt)}</span></div>
-        <div className="text-xs text-ink-3">{a.type.replace('_', ' ')}{a.channel !== 'system' ? ` · ${a.channel}` : ''}{a.meta?.ok === false ? ' · failed to send' : ''}</div>
+        <div className="flex items-baseline justify-between gap-2"><span className="font-semibold">{a.subject || a.type.replace('_', ' ')}</span><span className="flex-none text-[11px] text-ink-3" title={fmtDateTime(a.occurredAt)}>{timeAgo(a.occurredAt)}</span></div>
+        <div className="text-[11px] text-ink-3">{a.type.replace('_', ' ')}{a.channel !== 'system' ? ` · ${a.channel}` : ''}{a.meta?.ok === false ? ' · failed to send' : ''}</div>
         {a.body && (
           <div>
-            <button className="mt-1 text-xs font-medium text-ember hover:underline" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Show'} message</button>
-            {open && <pre className="mt-2 whitespace-pre-wrap rounded-xl bg-cream-2/70 p-3 font-sans text-xs text-ink-2">{a.body}</pre>}
+            <button className="mt-1 text-[12px] font-semibold text-pri hover:underline" onClick={() => setOpen((v) => !v)}>{open ? 'Hide' : 'Show'} message</button>
+            {open && <pre className="mt-2 whitespace-pre-wrap rounded-[14px] bg-bg p-3 font-sans text-[12px] text-ink-2">{a.body}</pre>}
           </div>
         )}
       </div>
@@ -277,12 +270,12 @@ export function NudgeSheet({ sp, onClose, onDone }: { sp: Sp | null; onClose: ()
     <Sheet open={!!sp} onClose={onClose} title="Send a nudge">
       {sp && (
         <div className="space-y-4">
-          <p className="text-sm text-ink-2">To <span className="font-semibold">{sp.sponsor?.name}</span> via {sp.sponsor?.preferredContact === 'Text' && sp.sponsor.phone ? 'text (if SMS is configured, otherwise email)' : 'email'}. Leave the message empty to send the right template for their step ({sp.status}).</p>
+          <p className="text-[14px] text-ink-2">To <b>{sp.sponsor?.name}</b> via {sp.sponsor?.preferredContact === 'Text' && sp.sponsor.phone ? 'text (if SMS is configured, otherwise email)' : 'email'}. Leave the message empty to send the right template for their step ({STATUS_LABEL[sp.status]}).</p>
           <div>
             <Label htmlFor="nudge" hint="(optional)">Custom message</Label>
             <Textarea id="nudge" value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Hi! Quick check-in from The Konnection…" />
           </div>
-          <Button full size="lg" onClick={() => m.mutate()} loading={m.isPending}>{msg.trim() ? 'Send custom message' : 'Send template'}</Button>
+          <Button full size="xl" onClick={() => m.mutate()} loading={m.isPending}>{msg.trim() ? 'Send custom message' : 'Send template'}</Button>
         </div>
       )}
     </Sheet>
@@ -296,7 +289,7 @@ export function ReleaseSheet({ sp, familyName, onClose, onConfirm, pending }: { 
     <Sheet open={!!sp} onClose={onClose} title="Release this family">
       {sp && (
         <div className="space-y-4">
-          <p className="text-sm text-ink-2"><span className="font-semibold">{familyName}</span> goes back into the public catalog immediately and <span className="font-semibold">{sp.sponsor?.name}</span> gets a short notice. This can't be undone.</p>
+          <p className="text-[14px] text-ink-2"><b>{familyName}</b> goes back into the public catalog immediately and <b>{sp.sponsor?.name}</b> gets a short notice. This can't be undone.</p>
           <div>
             <Label htmlFor="reason">Reason</Label>
             <Select id="reason" value={reason} onChange={(e) => setReason(e.target.value)}>{RELEASE_REASONS.map((r) => <option key={r}>{r}</option>)}</Select>
