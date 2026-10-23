@@ -1,16 +1,12 @@
 import { Link } from 'react-router-dom';
-import { Button, Page } from '@/components/ui';
 
 export default function NotFound() {
   return (
-    <Page className="flex min-h-[70dvh] flex-col items-center justify-center py-16 text-center">
-      <p className="text-sm font-semibold uppercase tracking-wider text-ember">404</p>
-      <h1 className="display-tight mt-3 text-5xl sm:text-7xl">That page wandered off.</h1>
-      <p className="mt-4 max-w-md text-ink-2">The link may be old, or it was never here. The families are still waiting, though.</p>
-      <div className="mt-8 flex gap-3">
-        <Link to="/families"><Button size="lg">Find a family</Button></Link>
-        <Link to="/"><Button size="lg" variant="secondary">Home</Button></Link>
-      </div>
-    </Page>
+    <div className="anim-rise mx-auto my-20 max-w-[520px] px-4 text-center">
+      <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">404</div>
+      <h1 className="mt-2 text-[40px] font-extrabold tracking-[-.045em]">That page wandered off.</h1>
+      <p className="mt-2.5 text-[15px] text-ink-2">The link may be old, or the family may already be blessed.</p>
+      <Link to="/families" className="mt-[22px] inline-flex h-[50px] items-center rounded-full bg-ink px-6 text-[15px] font-semibold text-white hover:bg-pri">Find a family</Link>
+    </div>
   );
 }

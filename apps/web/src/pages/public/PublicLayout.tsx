@@ -1,90 +1,53 @@
-import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { Logo } from '@/components/ui';
+import { api, getSponsorToken } from '@/lib/api';
+import { useBoot } from '@/lib/boot';
 import { cx } from '@/lib/format';
 
-const nav = [
-  { to: '/families', label: 'Find a family' },
-  { to: '/register', label: 'Register my family' },
-];
-
-function TabIcon({ name }: { name: 'home' | 'families' | 'register' }) {
-  const d = {
-    home: 'M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1v-8.5Z',
-    families: 'M4 6h16v12H4zM4 10h16M9 6v12',
-    register: 'M12 5v14M5 12h14',
-  }[name];
-  return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d={d} />
-    </svg>
-  );
-}
-
+/** v3 app nav: a floating white pill with the Konnection logo, three links and the purple CTA. */
 export function PublicLayout() {
-  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: api.settings });
+  const { justLoaded } = useBoot();
   const { pathname } = useLocation();
-  const isPortal = pathname.startsWith('/s/');
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings, staleTime: 5 * 60_000 });
+  const onFamilies = pathname.startsWith('/families');
+  const onTracker = pathname.startsWith('/my-family') || pathname.startsWith('/s/');
+  const hasToken = !!getSponsorToken();
+  const pill = (active: boolean) => cx('rounded-full px-3.5 py-2 text-[14px] font-medium transition-all duration-200', active ? 'bg-ink text-white' : 'text-ink hover:bg-soft-2');
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-40 border-b border-line/60 bg-cream/80 backdrop-blur-md pt-safe">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Logo />
-          <nav className="hidden items-center gap-1 sm:flex">
-            {nav.map((n) => (
-              <NavLink key={n.to} to={n.to} className={({ isActive }) => cx('rounded-full px-4 py-2 text-sm font-semibold transition-colors', isActive ? 'bg-ink text-cream' : 'text-ink-2 hover:bg-cream-2')}>
-                {n.label}
-              </NavLink>
-            ))}
-          </nav>
-          <Link to="/families" className="rounded-full bg-ember px-4 py-2 text-sm font-semibold text-white shadow-soft hover:bg-ember-2 sm:hidden">
-            Find a family
+    <div className="flex min-h-dvh flex-col" style={{ ['--hd' as string]: justLoaded ? '1.75s' : '0s' }}>
+      <div className="anim-nav-in sticky top-0 z-40 px-3 pt-3.5 sm:px-8 pt-safe">
+        <div className="mx-auto flex max-w-[1180px] items-center justify-between gap-3 rounded-full border border-line-2 bg-white/82 py-2 pl-4 pr-2 shadow-soft backdrop-blur-[14px]">
+          <Link to="/" className="flex items-center gap-2.5 text-ink no-underline">
+            <img src="/brand/konnection-logo.png" alt="The Konnection" className="block h-[30px] w-auto" />
+            <span className="hidden h-[18px] w-px bg-line sm:block" />
+            <span className="hidden text-[14px] font-semibold sm:block">Bless This Family</span>
           </Link>
+          <nav className="flex items-center gap-0.5">
+            <NavLink to="/families" className={cx(pill(onFamilies), 'hidden sm:block')}>Families</NavLink>
+            <NavLink to="/register" className={cx(pill(false), 'hidden md:block')}>Register</NavLink>
+            <NavLink to="/my-family" className={cx(pill(onTracker), 'hidden sm:block')}>{hasToken ? 'My family page' : 'My family page'}</NavLink>
+            <Link to="/families" className="ml-1 inline-flex h-10 items-center rounded-full bg-pri px-[18px] text-[14px] font-semibold text-white transition-colors hover:bg-pri-dark">Bless a family</Link>
+          </nav>
         </div>
-      </header>
-
-      <div className="flex-1 pb-20 sm:pb-0">
+      </div>
+      <div className="flex-1">
         <Outlet />
       </div>
-
-      <footer className="border-t border-line/60 bg-cream-2/50">
-        <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-10 sm:grid-cols-3 sm:px-6">
-          <div>
-            <Logo />
-            <p className="mt-3 text-sm text-ink-3">The Konnection · Building Relationships. Connecting Futures.</p>
-          </div>
-          <div className="text-sm">
-            <p className="font-semibold">Questions?</p>
-            <p className="mt-1 text-ink-3">
-              {settings?.contactEmail ? <a className="underline-offset-2 hover:underline" href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a> : '—'}
-              {settings?.contactPhone ? <> · {settings.contactPhone}</> : null}
-            </p>
-            <p className="mt-3 text-ink-3">Drop-off: {settings?.dropoffLocation ?? '—'}{settings?.dropoffHours ? `, ${settings.dropoffHours}` : ''}</p>
-          </div>
-          <div className="text-sm text-ink-3">
-            <p>Families are shown by first names and ages only. Parent names, addresses and phone numbers are never published, and no photos of children appear anywhere on this site.</p>
-            <p className="mt-3"><Link to="/admin" className="text-xs text-ink-3/70 hover:text-ink">Admin</Link></p>
-          </div>
-        </div>
-      </footer>
-
-      {!isPortal && (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line/70 bg-paper/95 backdrop-blur-md sm:hidden" aria-label="Primary">
-          <div className="grid grid-cols-3 pb-safe">
-            {([
-              { to: '/', label: 'Home', icon: 'home' },
-              { to: '/families', label: 'Families', icon: 'families' },
-              { to: '/register', label: 'Register', icon: 'register' },
-            ] as const).map((t) => (
-              <NavLink key={t.to} to={t.to} end={t.to === '/'} className={({ isActive }) => cx('flex flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition-colors', isActive ? 'text-ember' : 'text-ink-3')}>
-                <TabIcon name={t.icon} />
-                {t.label}
-              </NavLink>
-            ))}
-          </div>
-        </nav>
+      {pathname !== '/' && (
+        <footer className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-4 px-4 pb-24 pt-10 text-[13px] text-ink-3 sm:px-8 sm:pb-10">
+          <div className="flex items-center gap-3"><img src="/brand/konnection-logo.png" alt="" className="h-[22px] w-auto" /><span>© {settings.data?.season ?? new Date().getFullYear()} The Konnection · Detroit, MI</span></div>
+          <span>First names and ages only. Parent names, addresses and phone numbers are never published.</span>
+        </footer>
       )}
+      {/* Mobile tab bar */}
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-line-2 bg-white/90 backdrop-blur-[14px] sm:hidden pb-safe" aria-label="Primary">
+        <div className="grid grid-cols-4 text-[11px] font-semibold">
+          {[['/', 'Home'], ['/families', 'Families'], ['/register', 'Register'], ['/my-family', 'My family']].map(([to, label]) => {
+            const active = to === '/' ? pathname === '/' : pathname.startsWith(to) || (to === '/my-family' && pathname.startsWith('/s/'));
+            return <Link key={to} to={to} className={cx('flex flex-col items-center gap-1 py-2.5', active ? 'text-pri' : 'text-ink-3')}><span className={cx('block h-1.5 w-5 rounded-full', active ? 'bg-pri' : 'bg-line')} />{label}</Link>;
+          })}
+        </div>
+      </nav>
     </div>
   );
 }

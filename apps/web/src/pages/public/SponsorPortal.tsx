@@ -1,12 +1,11 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'motion/react';
 import type { SponsorshipStatus } from '@bless/shared';
-import { api, ApiError } from '@/lib/api';
-import { Button, Dominoes, Page, Select, Sheet, Skeleton, Textarea, useToast } from '@/components/ui';
-import { fmtDate, timeAgo, plural } from '@/lib/format';
-import { ChildWishlist } from './ChildWishlist.tsx';
+import { api, ApiError, setSponsorToken } from '@/lib/api';
+import { Dominoes, Select, Sheet, Skeleton, useToast } from '@/components/ui';
+import { cx, fmtDate, fmtDateTime } from '@/lib/format';
+import { KidMini, shell, wrap } from './shared.tsx';
 
 const REASONS = ["Can't afford it right now", 'Travel or timing', 'Other'];
 
@@ -14,142 +13,115 @@ export default function SponsorPortal() {
   const { token = '' } = useParams();
   const qc = useQueryClient();
   const toast = useToast();
-  const [release, setRelease] = useState(false);
-  const [reason, setReason] = useState(REASONS[0]);
-  const [releaseNote, setReleaseNote] = useState('');
-  const [note, setNote] = useState('');
   const q = useQuery({ queryKey: ['portal', token], queryFn: () => api.sponsor.get(token), retry: false });
-
-  const status = useMutation({
-    mutationFn: (v: { status: SponsorshipStatus; note?: string; reason?: string }) => api.sponsor.status(token, v.status, v.note ?? '', v.reason ?? ''),
-    onSuccess: (data) => { qc.setQueryData(['portal', token], data); setRelease(false); toast(data.sponsorship.status === 'Released' ? 'Family reopened. Thank you for letting us know.' : 'Updated. Thank you!', 'ok'); },
-    onError: (e) => toast(e instanceof Error ? e.message : 'Could not update', 'bad'),
+  const [releaseOpen, setReleaseOpen] = useState(false);
+  const [reason, setReason] = useState(REASONS[0]);
+  const [note, setNote] = useState('');
+  const advance = useMutation({
+    mutationFn: (to: SponsorshipStatus) => api.sponsor.status(token, to),
+    onSuccess: (data) => { qc.setQueryData(['portal', token], data); toast('Updated. Our reminders reset.', 'ok'); },
+    onError: (e) => toast(e instanceof ApiError ? e.message : 'Could not update', 'bad'),
+  });
+  const release = useMutation({
+    mutationFn: () => api.sponsor.status(token, 'Released', '', reason),
+    onSuccess: (data) => { qc.setQueryData(['portal', token], data); setSponsorToken(null); setReleaseOpen(false); toast('Family reopened. Thank you for telling us.'); },
+    onError: (e) => toast(e instanceof ApiError ? e.message : 'Could not update', 'bad'),
   });
   const sendNote = useMutation({
     mutationFn: () => api.sponsor.note(token, note),
-    onSuccess: (data) => { qc.setQueryData(['portal', token], data); setNote(''); toast('Note sent to the team', 'ok'); },
-    onError: (e) => toast(e instanceof Error ? e.message : 'Could not send', 'bad'),
+    onSuccess: (data) => { qc.setQueryData(['portal', token], data); setNote(''); toast('Note sent to the team.', 'ok'); },
   });
 
-  if (q.error) {
-    const nf = q.error instanceof ApiError && q.error.status === 404;
+  if (q.error instanceof ApiError && q.error.status === 404) {
     return (
-      <Page className="py-20 text-center">
-        <h1 className="display-tight text-4xl sm:text-6xl">{nf ? "That link isn't valid." : 'Something went wrong.'}</h1>
-        <p className="mx-auto mt-4 max-w-md text-ink-2">{nf ? 'Check the link in your email, or reach out and we will resend it.' : 'Please try again in a moment.'}</p>
-        <Link to="/families" className="mt-8 inline-block"><Button size="lg">See families</Button></Link>
-      </Page>
+      <div className={`${shell} anim-rise`}><div className="mx-auto my-16 max-w-[520px] text-center"><h1 className="text-[40px] font-extrabold tracking-[-.045em]">That link isn't valid.</h1><p className="mt-2.5 text-[15px] text-ink-2">Check the email we sent you, or claim a family to get a new one.</p><Link to="/families" className="mt-[22px] inline-flex h-[50px] items-center rounded-full bg-pri px-6 text-[15px] font-semibold text-white">Find a family</Link></div></div>
     );
   }
-  if (!q.data) {
-    return <Page className="py-8"><Skeleton className="h-10 w-2/3" /><Skeleton className="mt-6 h-32 w-full" /><Skeleton className="mt-4 h-48 w-full" /></Page>;
-  }
+  const v = q.data;
+  if (!v) return <div className={shell}><div className={wrap}><Skeleton className="mt-6 h-14 w-2/3" /><div className="mt-7 grid gap-5 md:grid-cols-2"><Skeleton className="h-[420px]" /><Skeleton className="h-[420px]" /></div></div></div>;
 
-  const { sponsorship: s, sponsor, family: f, settings, timeline } = q.data;
-  const firstName = sponsor.name.split(/\s+/)[0];
-  const deadline = fmtDate(settings.dropoffDeadline, { weekday: 'long', month: 'long', day: 'numeric' });
-  const dates = { Claimed: s.claimedAt, Confirmed: s.confirmedAt, Shopping: s.shoppingAt, 'Dropped Off': s.droppedOffAt, Delivered: s.deliveredAt } as const;
-
-  const action: { title: string; body: React.ReactNode; cta?: { label: string; to: SponsorshipStatus; variant?: 'primary' | 'pine' } } = (() => {
-    switch (s.status) {
-      case 'Claimed': return { title: 'First things first: are you in?', body: <>Tap below so we know {f.nickname} is covered and we can stop checking in. No payment, just a yes.</>, cta: { label: "I'm in", to: 'Confirmed' } };
-      case 'Confirmed': return { title: 'Shop at your own pace.', body: <>Every size and wish is below. When you've started shopping, tap once so our team can plan deliveries. Drop-off is by <span className="font-semibold text-ink">{deadline}</span>.</>, cta: { label: "I've started shopping", to: 'Shopping' } };
-      case 'Shopping': return { title: 'Ready to drop off?', body: <>Bring gifts to <span className="font-semibold text-ink">{settings.dropoffLocation}</span>, {settings.dropoffHours}, by <span className="font-semibold text-ink">{deadline}</span>. One bag per child with their first name. Then tap below.</>, cta: { label: 'Gifts dropped off', to: 'Dropped Off', variant: 'pine' } };
-      case 'Dropped Off': return { title: "We've got them. Thank you.", body: <>Delivery to {f.nickname} is being scheduled. We'll let you know the moment it lands.</> };
-      case 'Delivered': return { title: 'Delivered. You did that.', body: <>{f.nickname} received the gifts you chose for {f.children.map((c) => c.name).join(', ')}. Thank you for being part of Bless-A-Family.</> };
-      case 'Released': return { title: 'This family was reopened.', body: <>{f.nickname} is back in the catalog so another sponsor can step in. If that was a mistake, reply to any of our emails and we'll sort it out.</> };
-    }
-  })();
-
-  const terminal = s.status === 'Delivered' || s.status === 'Released';
+  const { sponsorship: sp, family: f, settings: s, sponsor } = v;
+  const first = sponsor.name.split(' ')[0];
+  const deadline = fmtDate(s.dropoffDeadline, { weekday: 'short', month: 'short', day: 'numeric' });
+  const daysLeft = Math.max(0, Math.round((new Date(s.dropoffDeadline + 'T00:00:00').getTime() - new Date(new Date().toDateString()).getTime()) / 86_400_000));
+  const actions: Record<SponsorshipStatus, { title: string; body: string; cta?: string; to?: SponsorshipStatus }> = {
+    Claimed: { title: 'Shop at your own pace.', body: `Every size and wish is on this page. When you start shopping, tap once so our team can plan deliveries. Drop-off is by ${deadline}.`, cta: "I've started shopping", to: 'Shopping' },
+    Shopping: { title: 'How is the list coming?', body: `Tap when everything for ${f.kidNames} is bought. No rush — ${daysLeft} days to go.`, cta: 'Gifts purchased', to: 'Purchased' },
+    Purchased: { title: 'Bag it up.', body: "Please don't wrap individual gifts. One bag per child with their first name on it is perfect.", cta: 'Wrapped & labeled', to: 'Wrapped' },
+    Wrapped: { title: 'Ready to drop off?', body: `${s.dropoffLocation}, ${s.dropoffHours}, by ${deadline}. Then tap below and you're done.`, cta: 'Gifts dropped off', to: 'Dropped Off' },
+    'Dropped Off': { title: "We've got them. Thank you.", body: `Delivery to ${f.nickname} is being scheduled. We'll let you know the moment it lands.` },
+    Delivered: { title: 'Delivered. You did that.', body: `${f.nickname} received the gifts you chose. Thank you for being part of Bless-A-Family.` },
+    Released: { title: 'This family was reopened.', body: `${f.nickname} is back in the catalog so another sponsor can step in. Thank you for letting us know.` },
+  };
+  const act = actions[sp.status];
+  const terminal = sp.status === 'Dropped Off' || sp.status === 'Delivered' || sp.status === 'Released';
+  const canRelease = !terminal;
+  const thread = [...v.timeline].filter((m) => m.type === 'message_sent' || m.type === 'sponsor_response').reverse();
 
   return (
-    <Page className="py-8 sm:py-12">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}>
-        <p className="text-sm font-semibold uppercase tracking-wider text-ember">Your family page · {s.sponsorshipId}</p>
-        <h1 className="display-tight mt-2 text-4xl sm:text-6xl">Hi {firstName}, you're blessing <span className="text-ember">{f.nickname}</span>.</h1>
-        <p className="mt-3 text-ink-2">{f.childCount === 1 ? '1 child' : `${f.childCount} kids`}: {f.children.map((c) => `${c.name} (${c.age})`).join(', ')} · {f.city}</p>
-      </motion.div>
-
-      <div className="mt-8 rounded-xl3 border border-line/70 bg-paper p-5 shadow-soft sm:p-8">
-        <Dominoes status={s.status} dates={dates} />
-      </div>
-
-      <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, duration: 0.45 }} className={`mt-5 rounded-xl3 p-6 sm:p-8 ${terminal ? 'bg-pine-soft' : 'bg-ink text-cream'}`}>
-        <h2 className={`text-2xl sm:text-3xl ${terminal ? 'text-pine' : 'text-cream'}`}>{action.title}</h2>
-        <p className={`mt-2 text-[16px] leading-relaxed ${terminal ? 'text-ink-2' : 'text-cream/80 [&_span]:!text-gold'}`}>{action.body}</p>
-        {action.cta && (
-          <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Button size="xl" variant={action.cta.variant === 'pine' ? 'pine' : 'primary'} loading={status.isPending} onClick={() => status.mutate({ status: action.cta!.to })}>{action.cta.label}</Button>
-            {s.status === 'Claimed' && <span className="text-sm text-cream/60">Takes one tap. We'll stop emailing reminders.</span>}
+    <div className={`${shell} anim-rise`}>
+      <div className={wrap}>
+        <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">Your family page · {sp.sponsorshipId}</div>
+        <h1 className="mt-2 max-w-[900px] text-[clamp(34px,5vw,60px)] font-extrabold leading-none tracking-[-.045em]">Hi {first}, you're blessing <span className="text-pri">{f.nickname}</span>.</h1>
+        <div className="mt-2.5 text-[15px] text-ink-2">{f.kidLine}: {f.kidNames} · {f.city}</div>
+        <div className="mt-7 grid items-start gap-5 md:grid-cols-2">
+          <div className="grid gap-3.5">
+            <div className="rounded-xl3 border border-line bg-white p-6">
+              <Dominoes status={sp.status} deadlineLabel={deadline} dates={{ Claimed: sp.claimedAt, Shopping: sp.shoppingAt, Purchased: sp.purchasedAt, Wrapped: sp.wrappedAt, 'Dropped Off': sp.droppedOffAt, Delivered: sp.deliveredAt }} />
+            </div>
+            <div className={cx('rounded-xl3 p-7', terminal ? 'bg-soft text-pri-dark' : 'bg-ink text-white')} style={{ animation: 'rise .5s .1s both cubic-bezier(.16,1,.3,1)' }}>
+              <h2 className={cx('text-[28px] tracking-[-.04em]', terminal ? 'text-pri-dark' : 'text-white')}>{act.title}</h2>
+              <p className="mt-2.5 text-[15px] leading-[1.5] opacity-85">{act.body}</p>
+              {act.cta && act.to && (
+                <>
+                  <button onClick={() => advance.mutate(act.to!)} disabled={advance.isPending} className="mt-[18px] h-[54px] w-full rounded-full bg-lav text-base font-bold text-ink transition-colors hover:bg-white disabled:opacity-60">{advance.isPending ? 'Saving…' : act.cta}</button>
+                  <div className="mt-2.5 text-center text-[12px] opacity-60">One tap. Resets our reminders.</div>
+                </>
+              )}
+              {sp.status === 'Released' && <Link to="/families" className="mt-[18px] inline-flex h-12 items-center rounded-full bg-pri px-5 text-[15px] font-semibold text-white">Find a family</Link>}
+            </div>
+            {canRelease && <div className="text-center text-[13px] text-ink-3">Something changed? <button onClick={() => setReleaseOpen(true)} className="font-semibold text-ink">I can no longer sponsor this family</button></div>}
           </div>
-        )}
-      </motion.section>
-
-      {!terminal && s.status !== 'Dropped Off' && (
-        <p className="mt-4 text-center text-sm text-ink-3">
-          Something changed? <button onClick={() => setRelease(true)} className="font-semibold text-ink underline-offset-2 hover:underline">I can no longer sponsor this family</button>
-        </p>
-      )}
-
-      <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_20rem]">
-        <div>
-          <h2 className="text-2xl sm:text-3xl">The wishlists</h2>
-          <p className="mt-1 text-sm text-ink-3">{settings.perChildBudgetNote}</p>
-          <div className="mt-4 grid gap-4">
-            {f.children.map((c, i) => <ChildWishlist key={c.name + i} c={c} index={i} />)}
+          <div className="grid gap-3.5">
+            <div className="rounded-xl3 border border-line bg-white p-6">
+              <div className="flex items-baseline justify-between"><h2 className="text-[20px]">Check-ins</h2><span className="text-[12px] text-ink-3">via {sponsor.preferredContact === 'Text' ? 'SMS' : 'Email'}</span></div>
+              <div className="mt-3.5 grid gap-2.5">
+                {thread.length === 0 && <div className="text-[13px] text-ink-3">Your first check-in lands shortly after claiming.</div>}
+                {thread.map((m, i) => {
+                  const mine = m.type === 'sponsor_response';
+                  return (
+                    <div key={i} className={cx('anim-bubble flex flex-col', mine ? 'items-end' : 'items-start')}>
+                      <div className={cx('max-w-[92%] px-3.5 py-3 text-[14px] leading-[1.5] whitespace-pre-line', mine ? 'rounded-[18px_18px_4px_18px] bg-lav text-ink' : 'rounded-[18px_18px_18px_4px] bg-bg text-ink')}>{mine ? m.subject.replace(/^Sponsor marked: /, '') + (m.body ? ` — ${m.body}` : '') : m.body || m.subject}</div>
+                      <div className="mt-1 text-[11px] text-ink-3">{fmtDateTime(m.occurredAt)} · {m.channel} · {mine ? 'you' : 'automated'}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="rounded-xl3 bg-soft p-6">
+              <h3 className="text-[17px]">Drop-off</h3>
+              <div className="mt-3 grid grid-cols-2 gap-3 text-[14px]">
+                {[['Deadline', deadline, true], ['Where', s.dropoffLocation, true], ['Hours', s.dropoffHours, false], ['Label', 'One bag per child, first name', false]].map(([l, v2, b]) => <div key={String(l)}><div className="text-[10px] font-semibold uppercase tracking-[.08em] text-pri-dark">{l}</div><div className={b ? 'font-semibold' : ''}>{v2}</div></div>)}
+              </div>
+            </div>
+            <div className="grid gap-3">{f.children.map((k, i) => <KidMini key={k.name + i} k={k} />)}</div>
+            <div className="rounded-xl3 border border-line bg-white p-5">
+              <h3 className="text-[15px]">Leave a note for the team</h3>
+              <textarea value={note} onChange={(e) => setNote(e.target.value.slice(0, 1000))} placeholder="Running a few days late, dropping off Monday." className="mt-2.5 min-h-20 w-full resize-none rounded-[14px] border border-line bg-bg px-3.5 py-3 text-[14px] outline-none focus:border-pri focus:bg-white" />
+              <button onClick={() => sendNote.mutate()} disabled={!note.trim() || sendNote.isPending} className="mt-2.5 h-9 rounded-full border border-line bg-white px-3.5 text-[13px] font-semibold disabled:opacity-50">Send note</button>
+            </div>
+            <div className="text-[12px] text-ink-3">Tip: add this page to your home screen (Share → Add to Home Screen) so it's one tap away. Your link stays private.</div>
           </div>
         </div>
-        <aside className="space-y-4">
-          <div className="rounded-xl3 border border-line/70 bg-paper p-5 shadow-soft">
-            <h3 className="text-lg">Drop-off</h3>
-            <dl className="mt-2 space-y-2 text-[15px]">
-              <div><dt className="text-xs font-semibold uppercase tracking-wider text-ink-3">Deadline</dt><dd className="font-semibold">{deadline}</dd></div>
-              <div><dt className="text-xs font-semibold uppercase tracking-wider text-ink-3">Where</dt><dd>{settings.dropoffLocation}</dd></div>
-              <div><dt className="text-xs font-semibold uppercase tracking-wider text-ink-3">Hours</dt><dd>{settings.dropoffHours}</dd></div>
-              <div><dt className="text-xs font-semibold uppercase tracking-wider text-ink-3">Questions</dt><dd><a className="underline-offset-2 hover:underline" href={`mailto:${settings.contactEmail}`}>{settings.contactEmail}</a>{settings.contactPhone ? ` · ${settings.contactPhone}` : ''}</dd></div>
-            </dl>
-            <p className="mt-3 text-xs text-ink-3">Please don't wrap individual gifts. One bag per child with their first name is perfect.</p>
-          </div>
-
-          <div className="rounded-xl3 border border-line/70 bg-paper p-5 shadow-soft">
-            <h3 className="text-lg">Leave a note for the team</h3>
-            <Textarea value={note} onChange={(e) => setNote(e.target.value)} className="mt-2 min-h-24" placeholder="Running a few days late, dropping off Monday." />
-            <Button className="mt-2" variant="secondary" size="sm" disabled={!note.trim()} loading={sendNote.isPending} onClick={() => sendNote.mutate()}>Send note</Button>
-            {s.sponsorNote && <p className="mt-3 text-xs text-ink-3">Last note: “{s.sponsorNote}”</p>}
-          </div>
-
-          <div className="rounded-xl3 border border-line/70 bg-paper p-5 shadow-soft">
-            <h3 className="text-lg">Activity</h3>
-            <ul className="mt-3 space-y-3">
-              {timeline.length === 0 && <li className="text-sm text-ink-3">Nothing yet.</li>}
-              {timeline.map((t, i) => (
-                <li key={i} className="flex gap-3 text-sm">
-                  <span className={`mt-1.5 size-2 shrink-0 rounded-full ${t.type === 'sponsor_response' ? 'bg-pine' : t.type === 'message_sent' ? 'bg-ember' : 'bg-ink-3'}`} />
-                  <span className="min-w-0 flex-1"><span className="block text-ink">{t.subject || t.type.replace('_', ' ')}</span><span className="text-xs text-ink-3">{timeAgo(t.occurredAt)}{t.channel !== 'web' && t.channel !== 'system' ? ` · ${t.channel}` : ''}</span></span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          <p className="px-1 text-xs text-ink-3">Tip: add this page to your home screen (Share → Add to Home Screen) to find it fast. Waiting {plural(f.daysWaiting, 'day')} before you came along.</p>
-        </aside>
       </div>
-
-      <Sheet open={release} onClose={() => setRelease(false)} title="Release this family?">
-        <div className="space-y-4 pt-1">
-          <p className="text-[15px] text-ink-2">No judgment at all. We'll reopen {f.nickname} so another sponsor can step in while there's still time.</p>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold text-ink-2">What changed?</label>
-            <Select value={reason} onChange={(e) => setReason(e.target.value)}>{REASONS.map((r) => <option key={r}>{r}</option>)}</Select>
-          </div>
-          <Textarea value={releaseNote} onChange={(e) => setReleaseNote(e.target.value)} className="min-h-20" placeholder="Anything you want us to know (optional)" />
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button variant="secondary" onClick={() => setRelease(false)}>Keep the family</Button>
-            <Button variant="danger" loading={status.isPending} onClick={() => status.mutate({ status: 'Released', note: releaseNote, reason })}>Release the family</Button>
-          </div>
+      <Sheet open={releaseOpen} onClose={() => setReleaseOpen(false)} title="Release this family?">
+        <p className="text-[15px] leading-[1.5] text-ink-2">No judgment at all. We'll reopen {f.nickname} right away so another sponsor can step in while there's still time.</p>
+        <div className="mt-4"><span className="text-[13px] font-semibold text-ink-2">What changed?</span><div className="mt-1.5"><Select value={reason} onChange={(e) => setReason(e.target.value)}>{REASONS.map((r) => <option key={r}>{r}</option>)}</Select></div></div>
+        <div className="mt-5 flex gap-2">
+          <button onClick={() => setReleaseOpen(false)} className="h-12 flex-1 rounded-full border border-line bg-white font-semibold">Keep the family</button>
+          <button onClick={() => release.mutate()} disabled={release.isPending} className="h-12 flex-1 rounded-full bg-bad-soft font-semibold text-bad">{release.isPending ? 'Releasing…' : 'Release'}</button>
         </div>
       </Sheet>
-    </Page>
+    </div>
   );
 }

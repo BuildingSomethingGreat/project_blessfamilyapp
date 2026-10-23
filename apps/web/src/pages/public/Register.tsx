@@ -1,547 +1,270 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { AnimatePresence, motion } from 'motion/react';
-import {
-  ChildInputSchema, FamilyApplicationSchema, CLOTHING_CATEGORIES, CLOTHING_OPTIONS, CLOTHING_SIZES, CONTACT_METHODS, GENDERS, GIFT_OPTIONS, OTHER_SIZE, SHOE_SIZES,
-  type ClothingCategory, type FamilyApplication,
-} from '@bless/shared';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { CLOTHING_CATEGORIES, CLOTHING_OPTIONS, CLOTHING_SIZES, CONTACT_METHODS, FAVORITE_COLORS, GENDERS, GIFT_OPTIONS, OTHER_SIZE, SHOE_SIZES, TRANSPORT_OPTIONS, FamilyApplicationSchema, colorSwatch, type ChildInput, type ClothingCategory } from '@bless/shared';
 import { api, ApiError } from '@/lib/api';
-import { Button, Input, Label, Logo, Option, Progress, Select, Textarea, useToast } from '@/components/ui';
+import { Checkbox, KMark, Seg, Select, UnderlineInput } from '@/components/ui';
 import { cx } from '@/lib/format';
 
-/* ------------------------------------------------------------------ */
-/* Draft model                                                         */
-/* ------------------------------------------------------------------ */
-type ChildDraft = {
-  name: string; age: string; gender: '' | 'Male' | 'Female'; clothingCategory: '' | ClothingCategory; shirtSize: string; pantsSize: string; shoeCategory: '' | ClothingCategory; shoeSize: string;
-  sizeNotes: string; favoriteColor: string; hobbies: string; clothingWishlist: string[]; otherClothing: string; giftTypes: string[]; specificGifts: string;
-};
-type Draft = {
-  eligibilityConfirmed: boolean; guardianName: string; phone: string; preferredContact: 'Text' | 'Call' | 'Email'; email: string; address: string; city: string; state: string; zip: string;
-  transportation: '' | 'Yes' | 'No'; children: ChildDraft[]; familyStory: string; notes: string;
-};
-const blankChild = (): ChildDraft => ({ name: '', age: '', gender: '', clothingCategory: '', shirtSize: '', pantsSize: '', shoeCategory: '', shoeSize: '', sizeNotes: '', favoriteColor: '', hobbies: '', clothingWishlist: [], otherClothing: '', giftTypes: [], specificGifts: '' });
-const blankDraft = (): Draft => ({ eligibilityConfirmed: false, guardianName: '', phone: '', preferredContact: 'Text', email: '', address: '', city: '', state: 'MI', zip: '', transportation: '', children: [blankChild()], familyStory: '', notes: '' });
-const KEY = 'baf-register-draft';
+type Kid = { name: string; age: string; gender: string; cat: ClothingCategory; shirt: string; pants: string; shoe: string; sizeNotes: string; hobbies: string; color: string; clothing: string[]; clothingExtra: string; gifts: string[]; giftsExtra: string };
+type Ans = { guardian: string; phone: string; contact: string; email: string; city: string; address: string; zip: string; transport: string; kidCount: string; kids: Kid[]; story: string; photo: string; photoDataUrl: string; eligible: boolean };
+type Step = { t: 'welcome' | 'text' | 'choice' | 'address' | 'who' | 'sizes' | 'interests' | 'multi' | 'story' | 'photo' | 'confirm' | 'done'; key?: keyof Ans | 'clothing' | 'gifts'; i?: number; kicker?: string; title: string; help?: string; ph?: string; type?: string; opts?: readonly string[]; extraPh?: string };
 
-type StepKind = 'intro' | 'name' | 'phone' | 'contact' | 'email' | 'address' | 'cityzip' | 'transport' | 'child-basics' | 'child-sizes' | 'child-likes' | 'child-clothes' | 'child-gifts' | 'add-child' | 'story' | 'notes' | 'review';
-type Step = { kind: StepKind; child?: number };
+const DRAFT = 'baf-register-draft';
+const blankKid = (): Kid => ({ name: '', age: '', gender: '', cat: 'Youth / Kids', shirt: '', pants: '', shoe: '', sizeNotes: '', hobbies: '', color: '', clothing: [], clothingExtra: '', gifts: [], giftsExtra: '' });
+const fresh = (): Ans => ({ guardian: '', phone: '', contact: '', email: '', city: '', address: '', zip: '', transport: '', kidCount: '', kids: [], story: '', photo: '', photoDataUrl: '', eligible: false });
+const field = 'mt-1.5 h-[50px] w-full rounded-2xl border border-line bg-bg px-4 text-base outline-none focus:border-pri focus:bg-white';
+const label = 'text-[13px] font-semibold text-ink-2';
 
-function buildSteps(d: Draft): Step[] {
-  const s: Step[] = [{ kind: 'intro' }, { kind: 'name' }, { kind: 'phone' }, { kind: 'contact' }, { kind: 'email' }, { kind: 'address' }, { kind: 'cityzip' }, { kind: 'transport' }];
-  d.children.forEach((_, i) => s.push({ kind: 'child-basics', child: i }, { kind: 'child-sizes', child: i }, { kind: 'child-likes', child: i }, { kind: 'child-clothes', child: i }, { kind: 'child-gifts', child: i }));
-  s.push({ kind: 'add-child' }, { kind: 'story' }, { kind: 'notes' }, { kind: 'review' });
+function buildSteps(a: Ans): Step[] {
+  const s: Step[] = [
+    { t: 'welcome', title: 'Tell us about your family.', help: "Bless-A-Family matches Konnection households with holiday sponsors. Answer a few questions and we'll take it from there." },
+    { t: 'text', key: 'guardian', kicker: 'About you', title: "What's your name?", help: 'Parent or guardian. Donors never see this.', ph: 'First and last name' },
+    { t: 'text', key: 'phone', kicker: 'About you', title: 'Best number to reach you?', help: "We'll text when your family is reviewed and when a sponsor steps up.", ph: '(313) 555-0100', type: 'tel' },
+    { t: 'choice', key: 'contact', kicker: 'About you', title: 'How do you prefer we reach you?', opts: CONTACT_METHODS },
+  ];
+  if (a.contact === 'Email') s.push({ t: 'text', key: 'email', kicker: 'About you', title: "What's your email?", help: "We'll only use it for updates about your application.", ph: 'you@example.com', type: 'email' });
+  s.push(
+    { t: 'text', key: 'city', kicker: 'Your household', title: 'What city do you live in?', help: 'Donors see the city only — never your street address.', ph: 'Detroit' },
+    { t: 'address', kicker: 'Your household', title: "What's your home address?", help: 'Private. Only our delivery team sees it.' },
+    { t: 'choice', key: 'transport', kicker: 'Your household', title: 'Can you pick gifts up from our office, or should we deliver?', opts: TRANSPORT_OPTIONS },
+    { t: 'choice', key: 'kidCount', kicker: 'Your children', title: 'How many children are in your household?', help: 'Under 18, living with you.', opts: ['1', '2', '3', '4', '5', '6'] },
+  );
+  const n = Math.min(15, Number(a.kidCount) || 0);
+  for (let i = 0; i < n; i++) {
+    const nm = a.kids[i]?.name || `Child ${i + 1}`;
+    s.push(
+      { t: 'who', i, kicker: `Child ${i + 1} of ${n}`, title: i === 0 ? 'Tell us about your first child.' : `And child ${i + 1}?` },
+      { t: 'sizes', i, kicker: `Child ${i + 1} · ${nm}`, title: `What sizes does ${nm} wear?`, help: 'Category first, then the exact size.' },
+      { t: 'interests', i, kicker: `Child ${i + 1} · ${nm}`, title: `What does ${nm} love?`, help: 'Hobbies, characters, sports — this is what makes a gift feel chosen.' },
+      { t: 'multi', i, key: 'clothing', kicker: `Child ${i + 1} · ${nm}`, title: `Clothing ${nm} needs`, opts: CLOTHING_OPTIONS, extraPh: 'Anything else? (optional)' },
+      { t: 'multi', i, key: 'gifts', kicker: `Child ${i + 1} · ${nm}`, title: `Fun gifts for ${nm}`, help: 'Pick a few kinds. Sponsors choose within them.', opts: GIFT_OPTIONS, extraPh: 'A specific wish, e.g. a sketchbook and markers' },
+    );
+  }
+  s.push(
+    { t: 'story', key: 'story', kicker: 'Your story', title: 'Tell donors a little about your family.', help: 'Two or three sentences. What makes your kids who they are? Optional, but families with a story are chosen sooner.' },
+    { t: 'photo', key: 'photo', kicker: 'Your story', title: 'Would you like to share a family photo?', help: 'Optional. Photos are reviewed by our team and shown only with your approval.' },
+    { t: 'confirm', kicker: 'Last step', title: 'Does this look right?' },
+    { t: 'done', kicker: 'Submitted', title: `Thank you, ${(a.guardian || 'friend').split(' ')[0]}.` },
+  );
   return s;
 }
 
-const Child = ChildInputSchema.innerType().shape;
-const Fam = FamilyApplicationSchema.shape;
-type Errors = Record<string, string | undefined>;
-const first = (r: { success: boolean; error?: { issues: { message: string }[] } }) => (r.success ? undefined : r.error?.issues[0]?.message);
-
-function validateStep(step: Step, d: Draft): Errors {
-  const e: Errors = {};
-  const c = step.child !== undefined ? d.children[step.child] : undefined;
-  switch (step.kind) {
-    case 'intro': if (!d.eligibilityConfirmed) e.eligibilityConfirmed = 'Please confirm household eligibility to continue'; break;
-    case 'name': e.guardianName = first(Fam.guardianName.safeParse(d.guardianName)); break;
-    case 'phone': e.phone = first(Fam.phone.safeParse(d.phone)); break;
-    case 'email': e.email = first(Fam.email.safeParse(d.email)); break;
-    case 'address': e.address = first(Fam.address.safeParse(d.address)); break;
-    case 'cityzip': e.city = first(Fam.city.safeParse(d.city)); e.state = first(Fam.state.safeParse(d.state)); e.zip = first(Fam.zip.safeParse(d.zip)); break;
-    case 'transport': if (!d.transportation) e.transportation = 'Pick one'; break;
-    case 'child-basics':
-      e.name = first(Child.name.safeParse(c!.name));
-      e.age = c!.age === '' ? 'How old is this child?' : first(Child.age.safeParse(c!.age));
-      if (!c!.gender) e.gender = 'Pick one';
-      break;
-    case 'child-sizes': {
-      if (!c!.clothingCategory) e.clothingCategory = 'Pick a clothing category';
-      if (!c!.shirtSize) e.shirtSize = 'Pick a shirt size';
-      if (!c!.pantsSize) e.pantsSize = 'Pick a pants size';
-      if (!c!.shoeCategory) e.shoeCategory = 'Pick a shoe category';
-      if (!c!.shoeSize) e.shoeSize = 'Pick a shoe size';
-      if ([c!.shirtSize, c!.pantsSize, c!.shoeSize].includes(OTHER_SIZE) && !c!.sizeNotes.trim()) e.sizeNotes = 'Tell us a little more about sizing so a sponsor can shop confidently';
-      break;
-    }
-    case 'story': e.familyStory = first(Fam.familyStory.safeParse(d.familyStory)); break;
-    case 'notes': e.notes = first(Fam.notes.safeParse(d.notes)); break;
-    default: break;
-  }
-  return Object.fromEntries(Object.entries(e).filter(([, v]) => v));
-}
-
-function toApplication(d: Draft): unknown {
+function toApplication(a: Ans) {
   return {
-    ...d, children: d.children.map((c) => ({ ...c, age: Number(c.age) })),
+    eligibilityConfirmed: a.eligible as true, guardianName: a.guardian, phone: a.phone, email: a.email, preferredContact: (a.contact || 'Text') as 'Text' | 'Call' | 'Email',
+    address: a.address, city: a.city, state: 'MI', zip: a.zip, transportation: (a.transport === 'I can pick up' ? 'Yes' : 'No') as 'Yes' | 'No', familyStory: a.story, photoDataUrl: a.photo === 'Yes, share a photo' ? a.photoDataUrl : '', notes: '',
+    children: a.kids.slice(0, Math.min(15, Number(a.kidCount) || 0)).map((k): ChildInput => ({
+      name: k.name, age: Number(k.age), gender: (k.gender || 'Prefer not to say') as ChildInput['gender'], clothingCategory: k.cat, shirtSize: k.shirt, pantsSize: k.pants, shoeCategory: k.cat, shoeSize: k.shoe,
+      sizeNotes: k.sizeNotes, favoriteColor: k.color, hobbies: k.hobbies, clothingWishlist: k.clothing as ChildInput['clothingWishlist'], otherClothing: k.clothingExtra, giftTypes: k.gifts as ChildInput['giftTypes'], specificGifts: k.giftsExtra,
+    })),
   };
 }
 
-/* ------------------------------------------------------------------ */
-/* Screen chrome                                                       */
-/* ------------------------------------------------------------------ */
-function Screen({ eyebrow, title, hint, children }: { eyebrow?: string; title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <div className="mx-auto w-full max-w-xl">
-      {eyebrow && <p className="text-sm font-semibold uppercase tracking-wider text-ember">{eyebrow}</p>}
-      <h1 className="display-tight mt-2 text-3xl leading-tight sm:text-5xl">{title}</h1>
-      {hint && <p className="mt-3 text-[16px] text-ink-2">{hint}</p>}
-      <div className="mt-7">{children}</div>
-    </div>
-  );
+async function resizeImage(file: File): Promise<string> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.82);
+  } finally { URL.revokeObjectURL(url); }
 }
 
-function ChipGroup({ options, value, onChange }: { options: readonly string[]; value: string[]; onChange: (v: string[]) => void }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => {
-        const on = value.includes(o);
-        return (
-          <button key={o} type="button" role="checkbox" aria-checked={on} onClick={() => onChange(on ? value.filter((x) => x !== o) : [...value, o])}
-            className={cx('rounded-full border px-4 py-2.5 text-[15px] font-medium transition-all duration-200 active:scale-[0.97]', on ? 'border-ink bg-ink text-cream shadow-soft' : 'border-line bg-paper text-ink hover:border-ink-3')}>
-            {o}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* Page                                                                */
-/* ------------------------------------------------------------------ */
 export default function Register() {
-  const { data: settings } = useQuery({ queryKey: ['settings'], queryFn: api.settings });
-  const toast = useToast();
-  const [draft, setDraft] = useState<Draft>(blankDraft);
-  const [idx, setIdx] = useState(0);
-  const [dir, setDir] = useState(1);
-  const [errors, setErrors] = useState<Errors>({});
-  const [resume, setResume] = useState<{ draft: Draft; idx: number } | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-  const steps = useMemo(() => buildSteps(draft), [draft]);
-  const step = steps[Math.min(idx, steps.length - 1)];
-  const screenRef = useRef<HTMLDivElement>(null);
+  const nav = useNavigate();
+  const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings, staleTime: 5 * 60_000 });
+  const [a, setA] = useState<Ans>(fresh);
+  const [step, setStep] = useState(0);
+  const [resume, setResume] = useState<{ ans: Ans; step: number } | null>(null);
+  const [submitted, setSubmitted] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [more, setMore] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { try { const raw = localStorage.getItem(DRAFT); if (raw) { const d = JSON.parse(raw); if (d?.ans?.guardian || d?.step > 0) setResume(d); } } catch { /* ignore */ } }, []);
+  useEffect(() => { if (submitted) return; try { if (step > 0) localStorage.setItem(DRAFT, JSON.stringify({ ans: { ...a, photoDataUrl: '' }, step })); } catch { /* ignore */ } }, [a, step, submitted]);
 
-  // Resume prompt
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as { draft: Draft; idx: number };
-        if (saved?.draft && (saved.draft.guardianName || saved.idx > 0)) setResume(saved);
-      }
-    } catch { /* ignore */ }
-  }, []);
-  // Persist
-  useEffect(() => {
-    if (done || resume) return;
-    try { localStorage.setItem(KEY, JSON.stringify({ draft, idx })); } catch { /* ignore */ }
-  }, [draft, idx, done, resume]);
-  // Autofocus first field on each screen
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const el = screenRef.current?.querySelector<HTMLElement>('input:not([type=checkbox]), textarea, select');
-      if (el && window.matchMedia('(min-width: 640px)').matches) el.focus();
-    }, 260);
-    return () => clearTimeout(t);
-  }, [idx]);
+  const steps = useMemo(() => buildSteps(a), [a]);
+  const q = steps[Math.min(step, steps.length - 1)];
+  const kid = a.kids[q.i ?? 0] ?? blankKid();
+  const setKid = (i: number, patch: Partial<Kid>) => setA((s) => { const kids = [...s.kids]; kids[i] = { ...(kids[i] ?? blankKid()), ...patch }; return { ...s, kids }; });
+  const set = (k: keyof Ans, v: Ans[keyof Ans]) => setA((s) => ({ ...s, [k]: v }));
 
-  const update = (patch: Partial<Draft>) => { setDraft((d) => ({ ...d, ...patch })); setErrors({}); };
-  const updateChild = (i: number, patch: Partial<ChildDraft>) => { setDraft((d) => ({ ...d, children: d.children.map((c, j) => (j === i ? { ...c, ...patch } : c)) })); setErrors({}); };
+  const valid = (() => {
+    switch (q.t) {
+      case 'text': { const v = String(a[q.key as keyof Ans] ?? '').trim(); if (q.key === 'phone') return /^[+()\-.\s\d]{10,20}$/.test(v); if (q.key === 'email') return /\S+@\S+\.\S+/.test(v); return v.length >= 2; }
+      case 'choice': return !!a[q.key as keyof Ans];
+      case 'address': return a.address.trim().length >= 3 && /^\d{5}(?:-\d{4})?$/.test(a.zip.trim());
+      case 'who': return !!kid.name.trim() && Number.isInteger(Number(kid.age)) && kid.age !== '' && Number(kid.age) >= 0 && Number(kid.age) <= 17;
+      case 'sizes': return !!kid.shirt && !!kid.pants && !!kid.shoe && !([kid.shirt, kid.pants, kid.shoe].includes(OTHER_SIZE) && !kid.sizeNotes.trim());
+      case 'interests': return !!kid.hobbies.trim();
+      case 'multi': return (kid[q.key as 'clothing' | 'gifts'] ?? []).length > 0;
+      case 'confirm': return a.eligible;
+      default: return true;
+    }
+  })();
 
-  const go = useCallback((to: number) => { setDir(to > idx ? 1 : -1); setIdx(Math.max(0, Math.min(steps.length - 1, to))); setErrors({}); }, [idx, steps.length]);
-  const next = useCallback(() => {
-    const e = validateStep(step, draft);
-    if (Object.keys(e).length) { setErrors(e); return; }
-    go(idx + 1);
-  }, [step, draft, idx, go]);
-  const back = () => go(idx - 1);
-
-  // Keyboard: Enter on inputs, ⌘/Ctrl+Enter anywhere
-  useEffect(() => {
-    const h = (ev: KeyboardEvent) => {
-      if (ev.key !== 'Enter') return;
-      const t = ev.target as HTMLElement;
-      const inTextarea = t.tagName === 'TEXTAREA';
-      if ((ev.metaKey || ev.ctrlKey) || (!inTextarea && ['INPUT', 'SELECT'].includes(t.tagName))) {
-        if (step.kind === 'review') return;
-        ev.preventDefault();
-        next();
-      }
-    };
-    document.addEventListener('keydown', h);
-    return () => document.removeEventListener('keydown', h);
-  }, [next, step.kind]);
-
-  const submit = useMutation({
-    mutationFn: () => api.register(toApplication(draft) as FamilyApplication),
-    onSuccess: (r) => { setDone(r.familyId); try { localStorage.removeItem(KEY); } catch { /* ignore */ } },
-    onError: (e) => {
-      if (e instanceof ApiError && e.issues) {
-        const fe = (e.issues as { fieldErrors?: Record<string, string[]> }).fieldErrors ?? {};
-        const key = Object.keys(fe)[0];
-        const map: Record<string, StepKind> = { eligibilityConfirmed: 'intro', guardianName: 'name', phone: 'phone', email: 'email', address: 'address', city: 'cityzip', state: 'cityzip', zip: 'cityzip', transportation: 'transport', children: 'child-basics', familyStory: 'story', notes: 'notes' };
-        const target = steps.findIndex((s) => s.kind === (map[key] ?? 'review'));
-        if (target >= 0) go(target);
-        toast(fe[key]?.[0] ?? e.message, 'bad');
-        return;
-      }
-      toast(e instanceof Error ? e.message : 'Something went wrong', 'bad');
-    },
-  });
-
-  const doSubmit = () => {
-    const parsed = FamilyApplicationSchema.safeParse(toApplication(draft));
-    if (!parsed.success) {
-      const issue = parsed.error.issues[0];
-      const path = issue.path;
-      if (path[0] === 'children' && typeof path[1] === 'number') {
-        const f = String(path[2] ?? '');
-        const kind: StepKind = ['name', 'age', 'gender'].includes(f) ? 'child-basics' : ['clothingCategory', 'shirtSize', 'pantsSize', 'shoeCategory', 'shoeSize', 'sizeNotes'].includes(f) ? 'child-sizes' : ['favoriteColor', 'hobbies'].includes(f) ? 'child-likes' : ['clothingWishlist', 'otherClothing'].includes(f) ? 'child-clothes' : 'child-gifts';
-        go(steps.findIndex((s) => s.kind === kind && s.child === path[1]));
-      } else {
-        const map: Record<string, StepKind> = { eligibilityConfirmed: 'intro', guardianName: 'name', phone: 'phone', email: 'email', address: 'address', city: 'cityzip', state: 'cityzip', zip: 'cityzip', transportation: 'transport', familyStory: 'story', notes: 'notes', children: 'add-child' };
-        go(steps.findIndex((s) => s.kind === map[String(path[0])]));
-      }
-      toast(issue.message, 'bad');
+  const next = async () => {
+    if (!valid || busy) return;
+    if (q.t === 'confirm') {
+      const parsed = FamilyApplicationSchema.safeParse(toApplication(a));
+      if (!parsed.success) { const issue = parsed.error.issues[0]; setError(`${issue.path.join(' › ') || 'Form'}: ${issue.message}`); const idx = issue.path[0] === 'children' ? steps.findIndex((s) => s.t === 'who' && s.i === Number(issue.path[1])) : 1; if (idx >= 0) setStep(idx); return; }
+      setBusy(true); setError('');
+      try {
+        const res = await api.register(parsed.data);
+        setSubmitted(res.familyId);
+        try { localStorage.removeItem(DRAFT); } catch { /* ignore */ }
+        setStep(steps.length - 1);
+      } catch (e) { setError(e instanceof ApiError ? e.message : 'Something went wrong. Please try again.'); } finally { setBusy(false); }
       return;
     }
-    submit.mutate();
+    if (q.t === 'done') { nav('/'); return; }
+    setStep((s) => Math.min(s + 1, steps.length - 1));
   };
+  const onKey = (e: React.KeyboardEvent) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') { e.preventDefault(); next(); } };
+  const progress = Math.round((step / (steps.length - 1)) * 100);
+  const titleSize = q.t === 'welcome' || q.t === 'done' ? 'text-[36px] sm:text-[44px]' : 'text-[30px] sm:text-[36px]';
+  const nextLabel = q.t === 'welcome' ? 'Start' : q.t === 'confirm' ? (busy ? 'Submitting…' : 'Submit application') : q.t === 'done' ? 'Done' : 'Continue';
+  const sizeOpts = [...CLOTHING_SIZES[kid.cat], OTHER_SIZE];
+  const shoeOpts = [...SHOE_SIZES[kid.cat], OTHER_SIZE];
+  const pub = (b: boolean) => (b ? 'bg-soft' : 'bg-bg');
+  const recordRows: [string, string, boolean][] = [['Family ID', submitted ?? 'auto-assigned', false], ['Status', 'Submitted', true], ['Guardian', a.guardian, false], ['Phone', a.phone, false], ['Preferred contact', a.contact, false], ['City', a.city, true], ['Address', a.address ? `${a.address}, ${a.zip}` : '', false], ['Pick-up / delivery', a.transport, false], ['Children', a.kids.map((k) => k.name && `${k.name}, ${k.age}`).filter(Boolean).join(' · '), true], ['Story', a.story, true], ['Photo', a.photo, true]];
 
-  const progress = done ? 1 : idx / (steps.length - 1);
-
-  /* ---------- closed / resume / success ---------- */
-  if (settings && !settings.registrationOpen) {
-    return (
-      <Shell progress={0}>
-        <Screen eyebrow="Bless-A-Family" title="Registration is closed for this season." hint="Thank you for your interest. Reach out to The Konnection and we'll let you know when applications open again.">
-          <Link to="/"><Button size="lg">Back home</Button></Link>
-        </Screen>
-      </Shell>
-    );
+  if (settings.data && !settings.data.registrationOpen) {
+    return <div className="mx-auto my-16 max-w-[520px] px-4 text-center anim-rise"><KMark size={40} className="mx-auto" /><h1 className="mt-5 text-[36px] font-extrabold tracking-[-.045em]">Applications are closed for this season.</h1><p className="mt-3 text-[15px] text-ink-2">Questions? Email <a className="text-pri" href={`mailto:${settings.data.contactEmail}`}>{settings.data.contactEmail}</a>.</p><Link to="/" className="mt-6 inline-flex h-12 items-center rounded-full bg-ink px-6 font-semibold text-white">Back home</Link></div>;
   }
-  if (done) {
-    return (
-      <Shell progress={1}>
-        <div className="mx-auto w-full max-w-xl text-center">
-          <motion.div initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 18 }} className="mx-auto grid size-20 place-items-center rounded-full bg-pine text-white">
-            <svg viewBox="0 0 24 24" className="size-10" fill="none" stroke="currentColor" strokeWidth="2.5"><motion.path d="m5 12.5 4.5 4.5L19 7.5" strokeLinecap="round" strokeLinejoin="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.5, delay: 0.2 }} /></svg>
-          </motion.div>
-          <p className="mt-6 text-sm font-semibold uppercase tracking-wider text-pine">Application received</p>
-          <h1 className="display-tight mt-2 text-4xl sm:text-6xl">You're all set.</h1>
-          <p className="mt-4 text-lg text-ink-2">Your family number is</p>
-          <p className="display mt-1 text-4xl text-ember">{done}</p>
-          <div className="mt-8 rounded-xl3 border border-line bg-paper p-6 text-left shadow-soft">
-            <h2 className="text-xl">What happens next</h2>
-            <ol className="mt-3 space-y-2 text-[15px] text-ink-2">
-              <li><span className="font-semibold text-ink">1.</span> Our team reviews your application, usually within a few days.</li>
-              <li><span className="font-semibold text-ink">2.</span> Once approved, your family is listed for sponsors by first names and ages only.</li>
-              <li><span className="font-semibold text-ink">3.</span> When a sponsor chooses your family, we'll reach you by {draft.preferredContact.toLowerCase()} to arrange delivery.</li>
-            </ol>
-          </div>
-          <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
-            <Link to="/"><Button size="lg" variant="secondary">Back home</Button></Link>
-            <Button size="lg" variant="ghost" onClick={() => { setDraft(blankDraft()); setIdx(0); setDone(null); }}>Start another application</Button>
-          </div>
+
+  return (
+    <div className="mx-auto grid w-full max-w-[1240px] items-start gap-6 px-4 pb-16 pt-6 sm:px-8 lg:grid-cols-3">
+      <div onKeyDown={onKey} className="flex min-h-[640px] flex-col overflow-hidden rounded-[32px] border border-line bg-white lg:col-span-2">
+        <div className="flex items-center justify-between px-7 pt-[22px]">
+          <div className="flex items-center gap-2.5"><KMark /><span className="text-[15px] font-bold">Bless-A-Family application</span></div>
+          <Link to="/" className="text-[13px] font-semibold text-ink-2">Save & exit</Link>
         </div>
-      </Shell>
-    );
-  }
-  if (resume) {
-    return (
-      <Shell progress={resume.idx / Math.max(1, buildSteps(resume.draft).length - 1)}>
-        <Screen eyebrow="Welcome back" title="Resume where you left off?" hint="We saved your answers on this device.">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button size="lg" onClick={() => { setDraft(resume.draft); setIdx(Math.min(resume.idx, buildSteps(resume.draft).length - 1)); setResume(null); }}>Resume</Button>
-            <Button size="lg" variant="secondary" onClick={() => { try { localStorage.removeItem(KEY); } catch { /* ignore */ } setResume(null); }}>Start over</Button>
-          </div>
-        </Screen>
-      </Shell>
-    );
-  }
-
-  /* ---------- screens ---------- */
-  const c = step.child !== undefined ? draft.children[step.child] : null;
-  const ci = step.child ?? 0;
-  const childLabel = c ? `Child ${ci + 1}${c.name ? ` · ${c.name.split(' ')[0]}` : ''}` : '';
-  const sizeList = (cat: '' | ClothingCategory) => (cat ? [...CLOTHING_SIZES[cat], OTHER_SIZE] : []);
-  const shoeList = (cat: '' | ClothingCategory) => (cat ? [...SHOE_SIZES[cat], OTHER_SIZE] : []);
-
-  let body: React.ReactNode = null;
-  switch (step.kind) {
-    case 'intro':
-      body = (
-        <Screen eyebrow={`Bless-A-Family ${settings?.season ?? ''}`} title="Let's get your family on the list." hint="About 10 minutes. One application per household. You can stop and come back any time on this device.">
-          <div className="rounded-xl3 bg-gold-soft p-5 text-[15px] text-[#4d3607]">
-            <p className="font-semibold">Who can be included</p>
-            <p className="mt-1">Only children under 18 who currently live in your immediate household. Please don't include children who live elsewhere, including nieces, nephews, grandchildren or cousins. Each child may only appear on one application.</p>
-          </div>
-          <div className="mt-4">
-            <Option multi selected={draft.eligibilityConfirmed} onClick={() => update({ eligibilityConfirmed: !draft.eligibilityConfirmed })} className="items-start">
-              <span className="block text-[15px] leading-snug">I confirm that every child listed is under 18, lives in my immediate household, and has not been included on another Bless-A-Family application to my knowledge.</span>
-            </Option>
-            {errors.eligibilityConfirmed && <p className="mt-2 text-sm text-bad" role="alert">{errors.eligibilityConfirmed}</p>}
-          </div>
-        </Screen>
-      );
-      break;
-    case 'name':
-      body = (
-        <Screen eyebrow="About you" title="What's your full name?" hint="Parent or guardian completing this application.">
-          <Input autoComplete="name" value={draft.guardianName} onChange={(e) => update({ guardianName: e.target.value })} error={errors.guardianName} placeholder="First and last name" className="!text-xl !py-4" />
-        </Screen>
-      );
-      break;
-    case 'phone':
-      body = (
-        <Screen eyebrow="About you" title="Best phone number to reach you?" hint="We'll use it to coordinate delivery once a sponsor chooses your family.">
-          <Input type="tel" inputMode="tel" autoComplete="tel" value={draft.phone} onChange={(e) => update({ phone: e.target.value })} error={errors.phone} placeholder="(313) 555-0100" className="!text-xl !py-4" />
-        </Screen>
-      );
-      break;
-    case 'contact':
-      body = (
-        <Screen eyebrow="About you" title="How do you prefer we contact you?">
-          <div className="grid gap-2">
-            {CONTACT_METHODS.map((m) => <Option key={m} selected={draft.preferredContact === m} onClick={() => update({ preferredContact: m })}>{m}</Option>)}
-          </div>
-        </Screen>
-      );
-      break;
-    case 'email':
-      body = (
-        <Screen eyebrow="About you" title="Email address?" hint="Optional. We'll send a confirmation and updates here if you add one.">
-          <Input type="email" inputMode="email" autoComplete="email" value={draft.email} onChange={(e) => update({ email: e.target.value })} error={errors.email} placeholder="you@example.com" className="!text-xl !py-4" />
-        </Screen>
-      );
-      break;
-    case 'address':
-      body = (
-        <Screen eyebrow="Your home" title="What's your home address?" hint="Street address only on this screen. Your address is never shown publicly and sponsors never receive it.">
-          <Input autoComplete="street-address" value={draft.address} onChange={(e) => update({ address: e.target.value })} error={errors.address} placeholder="123 Main St, Apt 4" className="!text-xl !py-4" />
-        </Screen>
-      );
-      break;
-    case 'cityzip':
-      body = (
-        <Screen eyebrow="Your home" title="City, state and ZIP?">
-          <div className="grid gap-4">
-            <div><Label htmlFor="r-city">City</Label><Input id="r-city" autoComplete="address-level2" value={draft.city} onChange={(e) => update({ city: e.target.value })} error={errors.city} /></div>
-            <div className="grid grid-cols-[6rem_1fr] gap-3">
-              <div><Label htmlFor="r-state">State</Label><Input id="r-state" autoComplete="address-level1" maxLength={2} value={draft.state} onChange={(e) => update({ state: e.target.value.toUpperCase() })} error={errors.state} className="uppercase" /></div>
-              <div><Label htmlFor="r-zip">ZIP code</Label><Input id="r-zip" inputMode="numeric" autoComplete="postal-code" value={draft.zip} onChange={(e) => update({ zip: e.target.value })} error={errors.zip} placeholder="48201" /></div>
+        <div className="mx-7 mt-4 h-1 overflow-hidden rounded-full bg-soft"><div className="h-full bg-pri transition-[width] duration-500 ease-[cubic-bezier(.16,1,.3,1)]" style={{ width: `${progress}%` }} /></div>
+        <div className="max-w-[720px] flex-1 px-6 pb-6 pt-9 sm:px-14">
+          {resume && (
+            <div className="anim-rise mb-5 flex flex-wrap items-center gap-3 rounded-2xl bg-soft px-4 py-3 text-[14px] text-ink-2">
+              <span className="flex-1">Resume where you left off?</span>
+              <button onClick={() => { setA(resume.ans); setStep(resume.step); setResume(null); }} className="h-9 rounded-full bg-ink px-4 text-[13px] font-semibold text-white">Resume</button>
+              <button onClick={() => { setResume(null); try { localStorage.removeItem(DRAFT); } catch { /* ignore */ } }} className="h-9 rounded-full border border-line bg-white px-4 text-[13px] font-semibold">Start fresh</button>
             </div>
-          </div>
-        </Screen>
-      );
-      break;
-    case 'transport':
-      body = (
-        <Screen eyebrow="Your home" title="Do you have reliable transportation?" hint="This helps us plan how gifts get to you.">
-          <div className="grid grid-cols-2 gap-2">
-            {(['Yes', 'No'] as const).map((v) => <Option key={v} selected={draft.transportation === v} onClick={() => update({ transportation: v })} className="justify-center py-5 text-lg">{v}</Option>)}
-          </div>
-          {errors.transportation && <p className="mt-2 text-sm text-bad" role="alert">{errors.transportation}</p>}
-        </Screen>
-      );
-      break;
-    case 'child-basics':
-      body = (
-        <Screen eyebrow={childLabel} title={ci === 0 ? "Let's start with your first child." : 'Tell us about this child.'} hint="Only their first name and age are ever shown to sponsors.">
-          <div className="grid gap-4">
-            <div><Label htmlFor="k-name">Child's full name</Label><Input id="k-name" value={c!.name} onChange={(e) => updateChild(ci, { name: e.target.value })} error={errors.name} placeholder="First and last name" /></div>
-            <div className="grid grid-cols-[7rem_1fr] gap-3 items-start">
-              <div><Label htmlFor="k-age">Age</Label><Input id="k-age" type="number" inputMode="numeric" min={0} max={17} value={c!.age} onChange={(e) => updateChild(ci, { age: e.target.value })} error={errors.age} /></div>
-              <div>
-                <Label>Gender</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {GENDERS.map((g) => <Option key={g} selected={c!.gender === g} onClick={() => updateChild(ci, { gender: g })} className="justify-center py-3.5">{g === 'Male' ? 'Boy' : 'Girl'}</Option>)}
+          )}
+          <div key={step} className="anim-rise" style={{ animationDuration: '.4s' }}>
+            {q.kicker && <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">{q.kicker}</div>}
+            <h1 className={cx('mt-2 font-extrabold leading-[1.05] tracking-[-.04em]', titleSize)}>{q.title}</h1>
+            {q.help && <p className="mt-3 text-base leading-[1.5] text-ink-2">{q.help}</p>}
+
+            {q.t === 'welcome' && (
+              <div className="mt-7 grid gap-2.5">
+                <div className="flex items-center gap-3.5 rounded-[18px] bg-bg px-[18px] py-4"><div className="grid size-10 flex-none place-items-center rounded-xl bg-soft text-[13px] font-extrabold text-pri-dark">6m</div><div><div className="text-[14px] font-semibold">About 6 minutes</div><div className="text-[13px] text-ink-3">One question at a time. Your progress saves on this device.</div></div></div>
+                <div className="flex items-center gap-3.5 rounded-[18px] bg-bg px-[18px] py-4"><div className="grid size-10 flex-none place-items-center rounded-xl bg-soft font-extrabold text-pri-dark">●</div><div><div className="text-[14px] font-semibold">Private by default</div><div className="text-[13px] text-ink-3">Donors see first names, ages, sizes and your story. Never your address or phone.</div></div></div>
+              </div>
+            )}
+            {q.t === 'text' && <div className="mt-7"><UnderlineInput autoFocus type={q.type ?? 'text'} value={String(a[q.key as keyof Ans] ?? '')} onChange={(e) => set(q.key as keyof Ans, e.target.value.slice(0, 200))} placeholder={q.ph} /></div>}
+            {q.t === 'choice' && (
+              <div className="mt-7 flex flex-wrap gap-2">
+                {q.opts!.map((o) => <Seg key={o} active={a[q.key as keyof Ans] === o} onClick={() => { set(q.key as keyof Ans, o); if (q.key === 'kidCount') setMore(false); }} className={cx('h-[50px] px-5 text-[15px]', q.key === 'kidCount' && 'min-w-[60px]')}>{o}</Seg>)}
+                {q.key === 'kidCount' && (more ? <input autoFocus type="number" min={7} max={15} value={Number(a.kidCount) > 6 ? a.kidCount : ''} onChange={(e) => set('kidCount', String(Math.min(15, Math.max(0, Number(e.target.value)))))} placeholder="7–15" className="h-[50px] w-24 rounded-full border border-line bg-bg px-4 text-[15px] font-semibold outline-none focus:border-pri" /> : <Seg active={Number(a.kidCount) > 6} onClick={() => setMore(true)} className="h-[50px] px-5 text-[15px]">More</Seg>)}
+              </div>
+            )}
+            {q.t === 'address' && (
+              <div className="mt-7 grid gap-2.5 sm:grid-cols-[1fr_140px]">
+                <label><span className={label}>Street address</span><input autoFocus value={a.address} onChange={(e) => set('address', e.target.value.slice(0, 200))} placeholder="100 Main St, Apt 2" className={field} /></label>
+                <label><span className={label}>ZIP</span><input value={a.zip} onChange={(e) => set('zip', e.target.value.slice(0, 10))} inputMode="numeric" placeholder="48201" className={field} /></label>
+              </div>
+            )}
+            {q.t === 'who' && (
+              <>
+                <div className="mt-7 grid grid-cols-[1fr_100px] gap-2.5">
+                  <label><span className={label}>First name</span><input autoFocus value={kid.name} onChange={(e) => setKid(q.i!, { name: e.target.value.slice(0, 80) })} placeholder="Jordan" className={field} /></label>
+                  <label><span className={label}>Age</span><input value={kid.age} onChange={(e) => setKid(q.i!, { age: e.target.value })} type="number" min={0} max={17} placeholder="8" className={field} /></label>
                 </div>
-                {errors.gender && <p className="mt-1.5 text-sm text-bad" role="alert">{errors.gender}</p>}
+                <div className="mt-3.5 flex flex-wrap gap-2">{GENDERS.map((g) => <Seg key={g} grow active={kid.gender === g} onClick={() => setKid(q.i!, { gender: g })} className="min-w-[120px]">{g}</Seg>)}</div>
+              </>
+            )}
+            {q.t === 'sizes' && (
+              <>
+                <div className={cx(label, 'mt-[26px]')}>Clothing category</div>
+                <div className="mt-2 flex flex-wrap gap-2">{CLOTHING_CATEGORIES.map((c) => <Seg key={c} active={kid.cat === c} onClick={() => setKid(q.i!, { cat: c, shirt: '', pants: '', shoe: '' })} className="h-[42px] px-3.5">{c}</Seg>)}</div>
+                <div className="mt-4 grid grid-cols-3 gap-2">
+                  {([['Shirt / top', 'shirt', sizeOpts], ['Pants', 'pants', sizeOpts], ['Shoes', 'shoe', shoeOpts]] as const).map(([l, k, opts]) => (
+                    <label key={k}><span className={label}>{l}</span><div className="mt-1.5"><Select value={kid[k]} onChange={(e) => setKid(q.i!, { [k]: e.target.value })}><option value="">Select</option>{opts.map((s) => <option key={s} value={s}>{s}</option>)}</Select></div></label>
+                  ))}
+                </div>
+                <input value={kid.sizeNotes} onChange={(e) => setKid(q.i!, { sizeNotes: e.target.value.slice(0, 500) })} placeholder={[kid.shirt, kid.pants, kid.shoe].includes(OTHER_SIZE) ? 'Tell us what you know, e.g. between a 10 and 12, runs tall' : 'Size notes, e.g. runs tall, wide feet (optional)'} className={cx('mt-3 h-12 w-full rounded-[14px] border bg-bg px-3.5 text-[14px] outline-none focus:border-pri', [kid.shirt, kid.pants, kid.shoe].includes(OTHER_SIZE) && !kid.sizeNotes.trim() ? 'border-pri' : 'border-line')} />
+              </>
+            )}
+            {q.t === 'interests' && (
+              <>
+                <div className="mt-7"><UnderlineInput autoFocus value={kid.hobbies} onChange={(e) => setKid(q.i!, { hobbies: e.target.value.slice(0, 200) })} placeholder="Drawing, dinosaurs, volleyball…" className="text-[24px] sm:text-[26px]" /></div>
+                <div className={cx(label, 'mt-6')}>Favorite color</div>
+                <div className="mt-2 flex flex-wrap gap-2">{FAVORITE_COLORS.map((c) => <Seg key={c} active={kid.color === c} onClick={() => setKid(q.i!, { color: c })} swatch={colorSwatch(c)} className="h-10 pl-2 pr-3 text-[13px]">{c}</Seg>)}</div>
+              </>
+            )}
+            {q.t === 'multi' && (
+              <>
+                <div className="mt-[26px] flex flex-wrap gap-2">{q.opts!.map((o) => { const list = kid[q.key as 'clothing' | 'gifts']; const on = list.includes(o); return <Seg key={o} active={on} onClick={() => setKid(q.i!, { [q.key as 'clothing' | 'gifts']: on ? list.filter((x) => x !== o) : [...list, o] })} className="h-[42px] px-3.5">{o}</Seg>; })}</div>
+                <input value={q.key === 'clothing' ? kid.clothingExtra : kid.giftsExtra} onChange={(e) => setKid(q.i!, q.key === 'clothing' ? { clothingExtra: e.target.value.slice(0, 500) } : { giftsExtra: e.target.value.slice(0, 500) })} placeholder={q.extraPh} className="mt-3.5 h-12 w-full rounded-[14px] border border-line bg-bg px-3.5 text-[14px] outline-none focus:border-pri" />
+              </>
+            )}
+            {q.t === 'story' && (
+              <>
+                <textarea autoFocus value={a.story} onChange={(e) => set('story', e.target.value.slice(0, 400))} placeholder="We moved twice this year and the kids have been so brave about it…" className="mt-[26px] min-h-[170px] w-full resize-none rounded-[18px] border border-line bg-bg px-4 py-3.5 text-base leading-[1.5] outline-none focus:border-pri focus:bg-white" />
+                <div className="mt-1.5 flex justify-between text-[12px] text-ink-3"><span>Our team reads it before it goes public.</span><span>{a.story.length}/400</span></div>
+              </>
+            )}
+            {q.t === 'photo' && (
+              <>
+                <div className="mt-[26px] flex gap-2">{['Yes, share a photo', 'No photo'].map((o) => <Seg key={o} grow active={a.photo === o} onClick={() => set('photo', o)}>{o}</Seg>)}</div>
+                {a.photo === 'Yes, share a photo' && (
+                  <>
+                    <button type="button" onClick={() => fileRef.current?.click()} className="mt-3.5 block h-[220px] w-full overflow-hidden rounded-[20px] border border-line bg-bg">
+                      {a.photoDataUrl ? <img src={a.photoDataUrl} alt="Your family photo" className="size-full object-cover" /> : <span className="grid size-full place-items-center text-[14px] font-semibold text-ink-3">Tap to add a photo</span>}
+                    </button>
+                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) set('photoDataUrl', await resizeImage(f)); }} />
+                    <p className="mt-2.5 text-[13px] leading-[1.5] text-ink-3">Only what you're comfortable with — a doorway, hands, a holiday table. Faces are optional. You can remove it any time.</p>
+                  </>
+                )}
+              </>
+            )}
+            {q.t === 'confirm' && (
+              <>
+                <div className="mt-6 rounded-[20px] bg-bg px-[18px] py-1">
+                  {[['Guardian', a.guardian || '—'], ['Contact', `${a.contact || '—'} · ${a.contact === 'Email' ? a.email : a.phone}`], ['Children', a.kids.slice(0, Number(a.kidCount) || 0).map((k) => `${k.name}, ${k.age}`).join(' · ') || '—'], ['Public story', a.story ? 'Yes' : 'None']].map(([k, v], i, arr) => (
+                    <div key={k} className={cx('flex justify-between gap-4 py-3 text-[14px]', i < arr.length - 1 && 'border-b border-line')}><span className="text-ink-3">{k}</span><b className="text-right">{v}</b></div>
+                  ))}
+                </div>
+                <div className="mt-4"><Checkbox checked={a.eligible} onChange={(v) => set('eligible', v)}>I confirm all children live in my household and that we're part of The Konnection's programs.</Checkbox></div>
+                {error && <p className="mt-3 text-[13px] text-bad">{error}</p>}
+              </>
+            )}
+            {q.t === 'done' && (
+              <div className="anim-pop mt-7 rounded-xl2 bg-ink p-7 text-bg">
+                <div className="text-[11px] font-semibold uppercase tracking-[.1em] text-lav">Your family ID</div>
+                <div className="mt-1 text-[40px] font-extrabold tracking-[-.04em] text-white">{submitted}</div>
+                <p className="mt-3 text-[14px] leading-[1.55] text-bg/75">We'll text you when it's reviewed — usually within 2 days — and again when a sponsor steps up. Keep this ID handy.</p>
               </div>
-            </div>
+            )}
           </div>
-        </Screen>
-      );
-      break;
-    case 'child-sizes':
-      body = (
-        <Screen eyebrow={childLabel} title={`What sizes does ${c!.name.split(' ')[0] || 'this child'} wear?`} hint="Please select the category and exact size, e.g. Youth / Kids 12, Toddler 3T, Women's 2X, Men's 2XL.">
-          <div className="grid gap-4">
-            <div>
-              <Label>Clothing category</Label>
-              <div className="flex flex-wrap gap-2">
-                {CLOTHING_CATEGORIES.map((cat) => (
-                  <button key={cat} type="button" onClick={() => updateChild(ci, { clothingCategory: cat, shirtSize: '', pantsSize: '', shoeCategory: c!.shoeCategory || cat, shoeSize: c!.shoeCategory ? c!.shoeSize : '' })}
-                    className={cx('rounded-full border px-4 py-2.5 text-[15px] font-medium transition-all active:scale-[0.97]', c!.clothingCategory === cat ? 'border-ink bg-ink text-cream' : 'border-line bg-paper hover:border-ink-3')}>{cat}</button>
-                ))}
-              </div>
-              {errors.clothingCategory && <p className="mt-1.5 text-sm text-bad" role="alert">{errors.clothingCategory}</p>}
-            </div>
-            <AnimatePresence initial={false}>
-              {c!.clothingCategory && (
-                <motion.div key="sizes" initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="grid grid-cols-2 gap-3 overflow-hidden">
-                  <div><Label htmlFor="k-shirt">Shirt / top</Label>
-                    <Select id="k-shirt" value={c!.shirtSize} onChange={(e) => updateChild(ci, { shirtSize: e.target.value })} error={errors.shirtSize}><option value="">Select</option>{sizeList(c!.clothingCategory).map((s) => <option key={s}>{s}</option>)}</Select></div>
-                  <div><Label htmlFor="k-pants">Pants / bottom</Label>
-                    <Select id="k-pants" value={c!.pantsSize} onChange={(e) => updateChild(ci, { pantsSize: e.target.value })} error={errors.pantsSize}><option value="">Select</option>{sizeList(c!.clothingCategory).map((s) => <option key={s}>{s}</option>)}</Select></div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <div className="grid grid-cols-2 gap-3">
-              <div><Label htmlFor="k-shoecat">Shoe category</Label>
-                <Select id="k-shoecat" value={c!.shoeCategory} onChange={(e) => updateChild(ci, { shoeCategory: e.target.value as ClothingCategory, shoeSize: '' })} error={errors.shoeCategory}><option value="">Select</option>{CLOTHING_CATEGORIES.map((s) => <option key={s}>{s}</option>)}</Select></div>
-              <div><Label htmlFor="k-shoe">Shoe size</Label>
-                <Select id="k-shoe" value={c!.shoeSize} onChange={(e) => updateChild(ci, { shoeSize: e.target.value })} error={errors.shoeSize} disabled={!c!.shoeCategory}><option value="">Select</option>{shoeList(c!.shoeCategory).map((s) => <option key={s}>{s}</option>)}</Select></div>
-            </div>
-            <div>
-              <Label htmlFor="k-sizenotes" hint={[c!.shirtSize, c!.pantsSize, c!.shoeSize].includes(OTHER_SIZE) ? '(required)' : '(if needed)'}>Size clarifications</Label>
-              <Textarea id="k-sizenotes" value={c!.sizeNotes} onChange={(e) => updateChild(ci, { sizeNotes: e.target.value })} error={errors.sizeNotes} className="min-h-20" placeholder="e.g. Between a 10 and 12, runs tall. Wide feet." />
-            </div>
-          </div>
-        </Screen>
-      );
-      break;
-    case 'child-likes':
-      body = (
-        <Screen eyebrow={childLabel} title={`What does ${c!.name.split(' ')[0] || 'this child'} love?`} hint="Sponsors use this to pick something that feels personal.">
-          <div className="grid gap-4">
-            <div><Label htmlFor="k-color">Favorite color</Label><Input id="k-color" value={c!.favoriteColor} onChange={(e) => updateChild(ci, { favoriteColor: e.target.value })} placeholder="Purple" /></div>
-            <div><Label htmlFor="k-hobbies">Interests and hobbies</Label><Input id="k-hobbies" value={c!.hobbies} onChange={(e) => updateChild(ci, { hobbies: e.target.value })} placeholder="Drawing, basketball, dinosaurs" /></div>
-          </div>
-        </Screen>
-      );
-      break;
-    case 'child-clothes':
-      body = (
-        <Screen eyebrow={childLabel} title="Which clothing items are needed?" hint="Select all that apply.">
-          <ChipGroup options={CLOTHING_OPTIONS} value={c!.clothingWishlist} onChange={(v) => updateChild(ci, { clothingWishlist: v })} />
-          <div className="mt-5"><Label htmlFor="k-otherclothes" hint="(optional)">Other clothing needs or specific preferences</Label><Textarea id="k-otherclothes" value={c!.otherClothing} onChange={(e) => updateChild(ci, { otherClothing: e.target.value })} className="min-h-20" placeholder="A warm coat with a hood. No pink, please." /></div>
-        </Screen>
-      );
-      break;
-    case 'child-gifts':
-      body = (
-        <Screen eyebrow={childLabel} title="And for fun?" hint="Select all that apply. Each item should be under $100.">
-          <ChipGroup options={GIFT_OPTIONS} value={c!.giftTypes} onChange={(v) => updateChild(ci, { giftTypes: v })} />
-          <div className="mt-5"><Label htmlFor="k-gifts" hint="(optional)">Specific gifts or store gift card preferences</Label><Textarea id="k-gifts" value={c!.specificGifts} onChange={(e) => updateChild(ci, { specificGifts: e.target.value })} className="min-h-20" placeholder="A sketchbook and markers. Target gift card." /></div>
-        </Screen>
-      );
-      break;
-    case 'add-child':
-      body = (
-        <Screen eyebrow="Children" title={`${draft.children.length === 1 ? 'One child so far.' : `${draft.children.length} children so far.`} Add another?`} hint="Add every eligible child in your household now so a sponsor can cover the whole family.">
-          <ul className="mb-5 space-y-2">
-            {draft.children.map((k, i) => (
-              <li key={i} className="flex items-center justify-between rounded-2xl border border-line bg-paper px-4 py-3">
-                <span className="font-medium">{k.name || 'Unnamed child'}{k.age ? `, ${k.age}` : ''}</span>
-                <span className="flex gap-3 text-sm">
-                  <button className="font-semibold text-ember" onClick={() => go(steps.findIndex((s) => s.kind === 'child-basics' && s.child === i))}>Edit</button>
-                  {draft.children.length > 1 && <button className="text-ink-3 hover:text-bad" onClick={() => update({ children: draft.children.filter((_, j) => j !== i) })}>Remove</button>}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {draft.children.length >= 15 ? (
-            <p className="rounded-2xl bg-gold-soft px-4 py-3 text-sm text-[#6b4a0a]">Please contact program staff for households with more than 15 children.</p>
-          ) : (
-            <Button size="lg" variant="secondary" full onClick={() => { const n = draft.children.length; update({ children: [...draft.children, blankChild()] }); setDir(1); setIdx(steps.findIndex((s) => s.kind === 'add-child') + 0); setTimeout(() => setIdx(8 + n * 5), 0); }}>
-              + Add another child
-            </Button>
-          )}
-        </Screen>
-      );
-      break;
-    case 'story':
-      body = (
-        <Screen eyebrow="Almost done" title="Tell sponsors a little about your family." hint="Optional. Sponsors say this is what helps them choose. It's shown publicly only after our team approves it, and never with names or addresses.">
-          <Textarea value={draft.familyStory} maxLength={600} onChange={(e) => update({ familyStory: e.target.value })} error={errors.familyStory} className="min-h-40 !text-[17px]" placeholder="We moved twice this year and the kids have been so brave about it. Jordan draws every day…" />
-          <div className="mt-1 text-right text-xs text-ink-3">{draft.familyStory.length}/600</div>
-        </Screen>
-      );
-      break;
-    case 'notes':
-      body = (
-        <Screen eyebrow="Almost done" title="Anything else we should know?" hint="Optional. Allergies, special requests, or anything that helps us serve your family well. This stays private to staff.">
-          <Textarea value={draft.notes} onChange={(e) => update({ notes: e.target.value })} error={errors.notes} className="min-h-32" />
-        </Screen>
-      );
-      break;
-    case 'review': {
-      const jump = (kind: StepKind, child?: number) => go(steps.findIndex((s) => s.kind === kind && (child === undefined || s.child === child)));
-      const Row = ({ k, v, onEdit }: { k: string; v: React.ReactNode; onEdit: () => void }) => (
-        <div className="flex items-start justify-between gap-4 py-2.5">
-          <div className="min-w-0"><div className="text-xs font-semibold uppercase tracking-wider text-ink-3">{k}</div><div className="text-[15px]">{v || <span className="text-ink-3">—</span>}</div></div>
-          <button onClick={onEdit} className="shrink-0 text-sm font-semibold text-ember">Edit</button>
         </div>
-      );
-      body = (
-        <Screen eyebrow="Review" title="Does everything look right?" hint="Tap Edit to change anything. Submit when you're ready.">
-          <div className="rounded-xl3 border border-line bg-paper p-5 shadow-soft divide-y divide-line">
-            <Row k="Parent / guardian" v={draft.guardianName} onEdit={() => jump('name')} />
-            <Row k="Phone · preferred" v={`${draft.phone} · ${draft.preferredContact}`} onEdit={() => jump('phone')} />
-            <Row k="Email" v={draft.email} onEdit={() => jump('email')} />
-            <Row k="Address" v={`${draft.address}, ${draft.city}, ${draft.state} ${draft.zip}`} onEdit={() => jump('address')} />
-            <Row k="Transportation" v={draft.transportation} onEdit={() => jump('transport')} />
-          </div>
-          {draft.children.map((k, i) => (
-            <div key={i} className="mt-4 rounded-xl3 border border-line bg-paper p-5 shadow-soft divide-y divide-line">
-              <Row k={`Child ${i + 1}`} v={`${k.name}, ${k.age} · ${k.gender === 'Male' ? 'Boy' : 'Girl'}`} onEdit={() => jump('child-basics', i)} />
-              <Row k="Sizes" v={`${k.clothingCategory} · shirt ${k.shirtSize} · pants ${k.pantsSize} · shoes ${k.shoeCategory} ${k.shoeSize}${k.sizeNotes ? ` · ${k.sizeNotes}` : ''}`} onEdit={() => jump('child-sizes', i)} />
-              <Row k="Loves" v={[k.favoriteColor, k.hobbies].filter(Boolean).join(' · ')} onEdit={() => jump('child-likes', i)} />
-              <Row k="Clothing" v={[...k.clothingWishlist, k.otherClothing].filter(Boolean).join(', ')} onEdit={() => jump('child-clothes', i)} />
-              <Row k="Fun gifts" v={[...k.giftTypes, k.specificGifts].filter(Boolean).join(', ')} onEdit={() => jump('child-gifts', i)} />
-            </div>
-          ))}
-          <div className="mt-4 rounded-xl3 border border-line bg-paper p-5 shadow-soft divide-y divide-line">
-            <Row k="Family story" v={draft.familyStory} onEdit={() => jump('story')} />
-            <Row k="Notes" v={draft.notes} onEdit={() => jump('notes')} />
-          </div>
-        </Screen>
-      );
-      break;
-    }
-  }
-
-  const isLast = step.kind === 'review';
-  return (
-    <Shell progress={progress} onExit={() => { toast('Saved on this device', 'ok'); }}>
-      <div ref={screenRef} className="relative flex-1">
-        <AnimatePresence mode="wait" custom={dir} initial={false}>
-          <motion.div key={`${step.kind}-${step.child ?? ''}`} custom={dir} initial={{ opacity: 0, x: dir * 36 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: dir * -36 }} transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}>
-            {body}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-      <div className="sticky bottom-0 -mx-4 mt-8 border-t border-line/60 bg-cream/90 px-4 py-3 backdrop-blur-md pb-safe sm:-mx-6 sm:px-6">
-        <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
-          <Button variant="ghost" onClick={back} disabled={idx === 0}>Back</Button>
-          <div className="hidden text-xs text-ink-3 sm:block">{step.kind !== 'review' ? 'Press Enter ↵' : ''}</div>
-          {isLast ? (
-            <Button size="lg" onClick={doSubmit} loading={submit.isPending}>Submit application</Button>
-          ) : (
-            <Button size="lg" onClick={next}>{step.kind === 'email' && !draft.email ? 'Skip' : step.kind === 'intro' ? "Let's go" : 'Continue'}</Button>
-          )}
+        <div className="flex items-center justify-between border-t border-line px-7 pb-6 pt-4">
+          {step > 0 && q.t !== 'done' ? <button onClick={() => setStep((s) => Math.max(0, s - 1))} className="px-1.5 text-[15px] font-semibold">Back</button> : <span />}
+          <button onClick={next} disabled={!valid || busy} className="flex h-[52px] items-center gap-2 rounded-full bg-pri px-7 text-base font-bold text-white transition-colors hover:bg-pri-dark active:scale-[.97] disabled:bg-disabled">{nextLabel}{!['welcome', 'done', 'confirm'].includes(q.t) && <span className="opacity-70">↵</span>}</button>
         </div>
       </div>
-    </Shell>
-  );
-}
-
-function Shell({ children, progress, onExit }: { children: React.ReactNode; progress: number; onExit?: () => void }) {
-  return (
-    <div className="flex min-h-dvh flex-col bg-cream">
-      <header className="sticky top-0 z-40 bg-cream/85 backdrop-blur-md pt-safe">
-        <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Logo />
-          <Link to="/" onClick={onExit} className="rounded-full px-3 py-1.5 text-sm font-semibold text-ink-2 hover:bg-cream-2">Save & exit</Link>
+      <div className="hidden min-w-0 gap-3.5 lg:grid">
+        <div className="min-w-0 overflow-hidden rounded-xl3 border border-line bg-white p-[22px]">
+          <div className="flex items-center justify-between"><h3 className="text-base">What the record looks like</h3><span className="rounded-full bg-soft px-2 py-1 text-[11px] font-semibold uppercase tracking-[.08em] text-pri-dark">live</span></div>
+          <p className="mt-2 text-[13px] leading-[1.5] text-ink-2">Each answer writes one field. Guardian contact stays in private columns; only the <b>public projection</b> reaches the catalog.</p>
+          <div className="mt-3.5 grid gap-1 text-[13px]">{recordRows.map(([k, v, p]) => <div key={k} className={cx('flex min-w-0 justify-between gap-3 overflow-hidden rounded-[10px] px-2.5 py-2', pub(p))}><span className="flex-none text-ink-3">{k}</span><span className="min-w-0 flex-1 truncate text-right font-semibold">{v || '—'}</span></div>)}</div>
+          <div className="mt-3 flex gap-3 text-[11px] text-ink-3"><span className="flex items-center gap-1.5"><span className="inline-block size-2.5 rounded-[3px] bg-soft" />public</span><span className="flex items-center gap-1.5"><span className="inline-block size-2.5 rounded-[3px] border border-line bg-bg" />private</span></div>
         </div>
-        <Progress value={progress} className="h-1 rounded-none" tone="ember" />
-      </header>
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-4 pt-8 sm:px-6 sm:pt-16">{children}</main>
+        <div className="rounded-xl3 bg-soft p-[22px]"><h3 className="text-[15px]">Step {step} of {steps.length - 1}</h3><div className="mt-1.5 text-[13px] leading-[1.5] text-ink-2">Household questions are one per screen. Each child is a group of 5 (who · sizes · interests · clothing · gifts).</div></div>
+      </div>
     </div>
   );
 }
