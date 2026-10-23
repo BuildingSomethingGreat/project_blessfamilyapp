@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Bricolage Grotesque', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* Brand */
+  --color-cream: #f6f1e9;
+  --color-cream-2: #efe7da;
+  --color-paper: #fffdf9;
+  --color-ink: #15130f;
+  --color-ink-2: #3d3a33;
+  --color-ink-3: #7a756a;
+  --color-line: #e5dccd;
+  --color-ember: #e4572e;
+  --color-ember-2: #c8451f;
+  --color-ember-soft: #fbe7df;
+  --color-pine: #1e5a46;
+  --color-pine-soft: #dcebe3;
+  --color-gold: #e8b04b;
+  --color-gold-soft: #fbefd3;
+  --color-night: #1b1a17;
+
+  /* Status (reserved) */
+  --color-ok: #008300;
+  --color-warn: #c98500;
+  --color-bad: #c73a37;
+  --color-info: #2a78d6;
+
+  /* Chart series (validated adjacent order) */
+  --color-s1: #2a78d6;
+  --color-s2: #eb6834;
+  --color-s3: #1baf7a;
+  --color-s4: #eda100;
+  --color-s5: #e87ba4;
+  --color-s6: #008300;
+  --color-s7: #6250d6;
+  --color-s8: #e34948;
+
+  --radius-xl2: 1.5rem;
+  --radius-xl3: 2rem;
+  --shadow-soft: 0 1px 2px rgb(21 19 15 / 0.04), 0 8px 24px -12px rgb(21 19 15 / 0.18);
+  --shadow-lift: 0 2px 4px rgb(21 19 15 / 0.05), 0 20px 40px -16px rgb(21 19 15 / 0.28);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root {
+  color-scheme: light;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root { min-height: 100%; }
+body {
+  @apply bg-cream text-ink font-sans antialiased;
+  font-feature-settings: 'ss01', 'cv11';
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+h1, h2, h3, .display { font-family: var(--font-display); letter-spacing: -0.025em; font-weight: 700; }
+.display-tight { letter-spacing: -0.04em; }
+
+/* Soft focus ring that matches the brand */
+:focus-visible { outline: 2px solid var(--color-ember); outline-offset: 3px; border-radius: 6px; }
+button, [role='button'] { touch-action: manipulation; }
+
+/* Scrollbar-less horizontal rails */
+.rail { scrollbar-width: none; -ms-overflow-style: none; }
+.rail::-webkit-scrollbar { display: none; }
+
+/* Safe areas for installed PWA */
+.pb-safe { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+.pt-safe { padding-top: max(0.75rem, env(safe-area-inset-top)); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+}
+
+/* Chart primitives */
+.viz-root { --surface-1: var(--color-paper); --text-primary: var(--color-ink); --text-secondary: var(--color-ink-3); --grid: var(--color-line); }
+.viz-tip { @apply pointer-events-none absolute z-20 rounded-xl bg-ink px-3 py-2 text-xs text-cream shadow-lift; }

@@ -1,0 +1,57 @@
+import { Suspense, lazy, useEffect } from 'react';
+import { Route, Routes, useLocation } from 'react-router-dom';
+import { AnimatePresence } from 'motion/react';
+import { PublicLayout } from './pages/public/PublicLayout.tsx';
+import { AdminLayout } from './pages/admin/AdminLayout.tsx';
+
+const Landing = lazy(() => import('./pages/public/Landing.tsx'));
+const Catalog = lazy(() => import('./pages/public/Catalog.tsx'));
+const FamilyDetail = lazy(() => import('./pages/public/FamilyDetail.tsx'));
+const Register = lazy(() => import('./pages/public/Register.tsx'));
+const SponsorPortal = lazy(() => import('./pages/public/SponsorPortal.tsx'));
+const NotFound = lazy(() => import('./pages/public/NotFound.tsx'));
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin.tsx'));
+const Dashboard = lazy(() => import('./pages/admin/Dashboard.tsx'));
+const AdminFamilies = lazy(() => import('./pages/admin/Families.tsx'));
+const AdminFamily = lazy(() => import('./pages/admin/FamilyDetail.tsx'));
+const FollowUps = lazy(() => import('./pages/admin/FollowUps.tsx'));
+const Assistant = lazy(() => import('./pages/admin/Assistant.tsx'));
+const Settings = lazy(() => import('./pages/admin/Settings.tsx'));
+
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo({ top: 0 }); }, [pathname]);
+  return null;
+}
+
+export default function App() {
+  const location = useLocation();
+  return (
+    <>
+      <ScrollToTop />
+      <Suspense fallback={<div className="p-8 text-center text-ink-3">Loading…</div>}>
+        <AnimatePresence mode="wait" initial={false}>
+          <Routes location={location} key={location.pathname.split('/').slice(0, 2).join('/')}>
+            <Route element={<PublicLayout />}>
+              <Route index element={<Landing />} />
+              <Route path="families" element={<Catalog />} />
+              <Route path="families/:slug" element={<FamilyDetail />} />
+              <Route path="s/:token" element={<SponsorPortal />} />
+            </Route>
+            <Route path="register" element={<Register />} />
+            <Route path="admin/login" element={<AdminLogin />} />
+            <Route path="admin" element={<AdminLayout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="families" element={<AdminFamilies />} />
+              <Route path="families/:id" element={<AdminFamily />} />
+              <Route path="follow-ups" element={<FollowUps />} />
+              <Route path="assistant" element={<Assistant />} />
+              <Route path="settings" element={<Settings />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AnimatePresence>
+      </Suspense>
+    </>
+  );
+}

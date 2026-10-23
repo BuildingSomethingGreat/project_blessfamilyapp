@@ -1,0 +1,35 @@
+# Deploys on push to main once the two secrets exist:
+#   FLY_API_TOKEN      -> https://fly.io/user/personal_access_tokens
+#   NETLIFY_AUTH_TOKEN -> Netlify user settings > Applications > Personal access tokens
+#   NETLIFY_SITE_ID    -> Netlify site settings > Site details > Site ID
+name: Deploy
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  api:
+    name: API → Fly.io
+    runs-on: ubuntu-latest
+    if: ${{ vars.DEPLOY_API != 'false' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - run: flyctl deploy . --remote-only --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+  web:
+    name: PWA → Netlify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @bless/web build
+      - run: npx netlify-cli@17 deploy --prod --dir apps/web/dist --site "$NETLIFY_SITE_ID" --auth "$NETLIFY_AUTH_TOKEN" --message "${{ github.sha }}"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}

@@ -1,0 +1,122 @@
+import { deriveNickname, toPublicFamily, type ClaimRequest, type FamilyApplication, type Family, type PublicFamily, type SponsorPortalView } from '@bless/shared';
+import type { Store } from '../store/types.ts';
+import { FollowUpEngine, nextFollowUp } from '../followup/engine.ts';
+import { familyCode, nowIso, shortId, token as newToken } from './ids.ts';
+
+export class HttpError extends Error {
+  constructor(public status: number, message: string) {
+    super(message);
+  }
+}
+
+/** Single-process mutex so two sponsors can't claim the same family at once. */
+const locks = new Map<string, Promise<unknown>>();
+async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = locks.get(key) ?? Promise.resolve();
+  let release!: () => void;
+  const mine = new Promise<void>((r) => (release = r));
+  locks.set(key, prev.then(() => mine));
+  await prev;
+  try {
+    return await fn();
+  } finally {
+    release();
+    if (locks.get(key) === mine) locks.delete(key);
+  }
+}
+
+export class Services {
+  readonly followUp: FollowUpEngine;
+  constructor(public store: Store) {
+    this.followUp = new FollowUpEngine(store);
+  }
+
+  async registerFamily(app: FamilyApplication): Promise<Family> {
+    const settings = await this.store.getSettings();
+    if (!settings.registrationOpen) throw new HttpError(403, 'Registration is closed for this season.');
+    const seq = await this.store.nextFamilySequence(settings.season);
+    const code = familyCode(settings.season, seq);
+    const children = app.children.map((c, i) => ({ ...c, sortOrder: i }));
+    const family = await this.store.createFamily({
+      familyId: code, season: settings.season, status: 'Submitted', slug: shortId(), nickname: deriveNickname(children.map((c) => ({ ...c, id: '', familyId: '' })), code),
+      guardianName: app.guardianName, phone: app.phone, email: app.email, preferredContact: app.preferredContact, address: app.address, city: app.city, state: app.state.toUpperCase(),
+      zip: app.zip, transportation: app.transportation, familyStory: app.familyStory, storyApproved: false, eligibilityConfirmed: true, notes: app.notes, adminNotes: '',
+      views: 0, claimStarts: 0, approvedAt: null, fulfilledAt: null, children,
+    });
+    await this.store.logActivity({ type: 'status_change', channel: 'web', familyId: family.id, sponsorshipId: null, subject: `Application received: ${code}`, body: '', meta: { to: 'Submitted' }, occurredAt: nowIso() });
+    this.followUp.sendToFamily('family_received', family).catch(() => {});
+    return family;
+  }
+
+  async publicCatalog(): Promise<{ families: PublicFamily[]; counts: { available: number; claimed: number; fulfilled: number } }> {
+    const settings = await this.store.getSettings();
+    const all = await this.store.listFamilies({ season: settings.season });
+    const counts = { available: 0, claimed: 0, fulfilled: 0 };
+    for (const f of all) {
+      if (f.status === 'Available') counts.available++;
+      else if (f.status === 'Claimed') counts.claimed++;
+      else if (f.status === 'Fulfilled') counts.fulfilled++;
+    }
+    const families = all.filter((f) => f.status === 'Available').map((f) => toPublicFamily(f)).sort((a, b) => b.daysWaiting - a.daysWaiting);
+    return { families, counts };
+  }
+
+  async publicFamily(slug: string): Promise<PublicFamily> {
+    const f = await this.store.getFamilyBySlug(slug);
+    if (!f || !['Available', 'Claimed', 'Fulfilled'].includes(f.status)) throw new HttpError(404, 'Family not found');
+    return toPublicFamily(f);
+  }
+
+  async recordView(slug: string) {
+    const f = await this.store.getFamilyBySlug(slug);
+    if (!f) return;
+    await this.store.incrementFamilyCounter(f.id, 'views');
+    await this.store.logActivity({ type: 'family_view', channel: 'web', familyId: f.id, sponsorshipId: null, subject: 'Viewed', body: '', meta: {}, occurredAt: nowIso() });
+  }
+
+  async recordClaimStart(slug: string) {
+    const f = await this.store.getFamilyBySlug(slug);
+    if (!f) return;
+    await this.store.incrementFamilyCounter(f.id, 'claimStarts');
+    await this.store.logActivity({ type: 'claim_start', channel: 'web', familyId: f.id, sponsorshipId: null, subject: 'Started claim', body: '', meta: {}, occurredAt: nowIso() });
+  }
+
+  async claim(slug: string, req: ClaimRequest): Promise<{ token: string; sponsorshipId: string; family: PublicFamily }> {
+    return withLock(`claim:${slug}`, async () => {
+      const settings = await this.store.getSettings();
+      if (!settings.catalogOpen) throw new HttpError(403, 'Sponsorships are closed for this season.');
+      const f = await this.store.getFamilyBySlug(slug);
+      if (!f) throw new HttpError(404, 'Family not found');
+      if (f.status !== 'Available') throw new HttpError(409, 'Someone just claimed this family. Thank you for trying — there are other families waiting.');
+      let sponsor = await this.store.findSponsorByEmail(req.email);
+      if (!sponsor) sponsor = await this.store.createSponsor({ name: req.name, email: req.email.toLowerCase(), phone: req.phone, organization: req.organization, preferredContact: req.preferredContact, notes: '' });
+      const existing = await this.store.listSponsorships();
+      const seq = existing.length + 1;
+      const now = nowIso();
+      const next = nextFollowUp('Claimed', settings);
+      const s = await this.store.createSponsorship({
+        sponsorshipId: `SP-${settings.season}-${String(seq).padStart(3, '0')}`, familyId: f.id, sponsorId: sponsor.id, status: 'Claimed', token: newToken(), claimedAt: now,
+        confirmedAt: null, shoppingAt: null, droppedOffAt: null, deliveredAt: null, releasedAt: null, nextFollowUpAt: next ? next.toISOString() : null, lastNudgedAt: null,
+        lastResponseAt: null, followUpCount: 0, flagged: false, flagReason: '', releaseReason: '', sponsorNote: req.note, adminNotes: '',
+      });
+      await this.store.updateFamily(f.id, { status: 'Claimed' });
+      await this.store.logActivity({ type: 'claim_complete', channel: 'web', familyId: f.id, sponsorshipId: s.id, subject: `${sponsor.name} claimed ${f.familyId}`, body: req.note, meta: { sponsorId: sponsor.id }, occurredAt: now });
+      this.followUp.send('claim_confirmation', s, { actor: 'system' }).catch((e) => console.error('claim email failed', e));
+      return { token: s.token, sponsorshipId: s.sponsorshipId, family: toPublicFamily({ ...f, status: 'Claimed' }) };
+    });
+  }
+
+  async sponsorPortal(tok: string): Promise<SponsorPortalView> {
+    const s = await this.store.getSponsorshipByToken(tok);
+    if (!s) throw new HttpError(404, 'This link is not valid.');
+    const [family, sponsor, settings, timeline] = await Promise.all([this.store.getFamily(s.familyId), this.store.getSponsor(s.sponsorId), this.store.getSettings(), this.store.listActivity({ sponsorshipId: s.id, limit: 30 })]);
+    if (!family || !sponsor) throw new HttpError(404, 'This link is not valid.');
+    return {
+      sponsorship: { sponsorshipId: s.sponsorshipId, status: s.status, claimedAt: s.claimedAt, confirmedAt: s.confirmedAt, shoppingAt: s.shoppingAt, droppedOffAt: s.droppedOffAt, deliveredAt: s.deliveredAt, releasedAt: s.releasedAt, sponsorNote: s.sponsorNote },
+      sponsor: { name: sponsor.name, email: sponsor.email },
+      family: toPublicFamily(family),
+      settings,
+      timeline: timeline.filter((a) => a.type !== 'family_view').map((a) => ({ type: a.type, subject: a.subject, occurredAt: a.occurredAt, channel: a.channel })),
+    };
+  }
+}
