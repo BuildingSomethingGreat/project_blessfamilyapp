@@ -35,6 +35,9 @@ Rather than splitting CRUD into Netlify Functions and the agent onto Fly, everyt
 ## 9. Admin sign-in is a magic link
 No passwords to manage. Admin emails are an allowlist in the API environment; a sign-in link lands in their inbox and sets a two-week HttpOnly cookie.
 
+## 10. Festive decor is a layer system, not page chrome
+The holiday framing on the home page and Find a family page (`apps/web/src/components/festive`) is three layers: a back layer (CSS bokeh, blurred props, fine snow), the real content, and a front layer (sharp props, large soft snow) that overlaps the UI but is `pointer-events: none` and `aria-hidden`. Depth comes from blur, per-prop parallax rates, and the two snow canvases. Props are transparent PNGs in `apps/web/public/festive` (ornament with the K monogram, pine branch with lights, gifts, lantern, snowflake), generated for this project and quantized to keep the whole set under 400 KB. Everything respects `prefers-reduced-motion`, and the snow pauses off-screen and in hidden tabs. Below the `lg` breakpoint the sharp branches move behind the content so the headline and pill stay clear on phones.
+
 ## Open questions for The Konnection
 - Drop-off logistics: one location? Should sponsors book a slot?
 - Do you want families to be able to update a wishlist after submitting (today: contact staff)?

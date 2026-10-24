@@ -8,4 +8,5 @@ pnpm monorepo. `packages/shared` (domain types/schemas), `apps/api` (Hono, Fly.i
 - Airtable field names are the contract (`apps/api/src/store/airtable.ts`, `docs/AIRTABLE.md`). Status option lists must match `packages/shared/src/status.ts`.
 - Follow-up policy lives in `apps/api/src/followup/engine.ts` (`nextFollowUp`, `messageKindFor`) and is unit tested; message copy in `followup/messages.ts`.
 - Design is the "Bless This Family v3" prototype (Poppins, purple `--color-pri #6c22dd`, ink `#1d1133`, bg `#f6f3fb`). Tokens are Tailwind v4 `@theme` vars in `apps/web/src/styles.css`; UI kit in `apps/web/src/components/ui`. Keep new UI on those tokens.
+- Festive decor (branches, ornament, gifts, lantern, snow) lives in `apps/web/src/components/festive` with PNGs in `apps/web/public/festive`; it is decorative only (`aria-hidden`, `pointer-events-none`) and must never cover interactive UI.
 - Decisions and open questions: `docs/DECISIONS.md`.

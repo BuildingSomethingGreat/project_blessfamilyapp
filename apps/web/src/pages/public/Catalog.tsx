@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { PublicFamily } from '@bless/shared';
 import { api } from '@/lib/api';
 import { FamilyArt, Skeleton } from '@/components/ui';
+import { Bokeh, FESTIVE, Layer, Prop, Snow } from '@/components/festive';
 import { cx } from '@/lib/format';
 import { art, KidChip, matchQuery, matchTag, needChips, photoFor, shell, TAGS, wrap } from './shared.tsx';
 
@@ -29,8 +30,20 @@ export default function Catalog() {
   const savedList = saved.map((s) => all.find((f) => f.slug === s)).filter((x): x is PublicFamily => !!x);
 
   return (
-    <div className={`${shell} anim-rise`}>
-      <div className={wrap}>
+    <div className={`${shell} anim-rise relative overflow-x-clip`}>
+      {/* back layer: lights, soft branches in the top corners, a light snowfall over the header area */}
+      <Layer className="z-0">
+        <div className="absolute inset-x-0 top-0 h-[520px] overflow-hidden">
+          <Bokeh count={24} seed={5} />
+          <Snow layer="back" density={0.7} />
+        </div>
+        <Prop src={FESTIVE.branch} flip blur={4} opacity={0.4} depth={-0.04} className="-right-[6%] -top-[60px] w-[clamp(220px,34vw,560px)]" />
+        <Prop src={FESTIVE.branch} motion="sway" opacity={0.88} depth={0.02} className="-left-28 -top-24 w-[210px] sm:-left-24 sm:w-[260px] lg:-left-20 lg:-top-28 lg:w-[300px]" />
+        <Prop src={FESTIVE.branch} flip motion="sway" opacity={0.88} depth={0.03} delay="-3s" className="-right-12 -top-14 w-[170px] sm:-right-10 sm:w-[240px] lg:-right-8 lg:-top-16 lg:w-[320px]" />
+        <Prop src={FESTIVE.snowflake} motion="drift" opacity={0.6} blur={0.5} depth={-0.04} className="left-[3%] top-[34%] hidden w-[56px] md:block" />
+        <Prop src={FESTIVE.snowflake} motion="drift" opacity={0.5} blur={0.8} depth={-0.03} delay="-5s" className="right-[4%] top-[58%] hidden w-[48px] lg:block" />
+      </Layer>
+      <div className={`${wrap} relative z-10 lg:pt-6`}>
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div><div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">Bless-A-Family {settings.data?.season ?? ''}</div><h1 className="mt-1.5 text-[clamp(36px,5vw,64px)] font-extrabold leading-none tracking-[-.045em]">Families waiting <span className="text-muted-lav">· {catalog.data ? shown.length : '…'}</span></h1></div>
           <div className="flex gap-1 rounded-full bg-soft p-1">
@@ -51,7 +64,12 @@ export default function Catalog() {
           <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-[380px] rounded-[28px]" />)}</div>
         ) : mode === 'swipe' ? (
           <>
-            <Deck families={shown} idx={deckIdx} setIdx={setDeckIdx} saved={saved} setSaved={setSaved} open={open} showPhotos={showPhotos} />
+            <div className="relative">
+              <Deck families={shown} idx={deckIdx} setIdx={setDeckIdx} saved={saved} setSaved={setSaved} open={open} showPhotos={showPhotos} />
+              {/* gifts and a lantern lean over the stage corners; purely decorative, never over the card or the skip/save zones */}
+              <Prop src={FESTIVE.gifts} motion="hover" depth={0.04} className="z-20 -bottom-5 -left-3 hidden w-[clamp(96px,11vw,176px)] sm:block lg:-left-6" />
+              <Prop src={FESTIVE.lantern} motion="hover" delay="-3s" depth={0.06} className="z-20 -bottom-3 -right-2 hidden w-[clamp(56px,6vw,104px)] sm:block lg:-right-4" />
+            </div>
             <div className="mt-5 flex flex-wrap items-center gap-3">
               <div className="text-[15px] font-semibold">Saved <span className="font-medium text-ink-3">· {savedList.length}</span></div>
               {savedList.length === 0 && <span className="text-[13px] text-ink-3">Swipe right on a family to keep them here.</span>}
@@ -86,6 +104,11 @@ export default function Catalog() {
           </>
         )}
       </div>
+      {/* front layer: an ornament hangs over the header edge and the first snowflakes drift above the content */}
+      <Layer className="z-20">
+        <Prop src={FESTIVE.ornament} motion="swing" depth={0.06} className="right-[clamp(300px,34vw,520px)] -top-6 hidden w-[clamp(52px,6vw,92px)] lg:block" />
+        <div className="absolute inset-x-0 top-0 h-[520px]"><Snow layer="front" density={0.5} /></div>
+      </Layer>
     </div>
   );
 }

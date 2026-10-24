@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { api, PHOTOS } from '@/lib/api';
 import { fmtDate } from '@/lib/format';
 import { ArrowButton, Orb, Photo, SectionPill } from '@/components/ui';
+import { Bokeh, FESTIVE, Layer, Prop, Snow } from '@/components/festive';
 import { cx } from '@/lib/format';
 
 const HEADLINE = [['Give', 0], ['a', 1], ['family', 2], ['the', 3], ['holiday', 4], ["they've", 5, true], ['been', 6, true], ['hoping', 7, true], ['for.', 8, true]] as const;
@@ -31,6 +32,20 @@ export default function Landing() {
 
   return (
     <div className="overflow-x-clip">
+      {/* Opener: hero + image band share one festive stage so snow can fall behind and in front of both */}
+      <div className="relative">
+        <Layer className="z-0">
+          <Bokeh count={30} seed={3} />
+          {/* far back: an out-of-focus branch for depth; the sharp twin sits in the front layer */}
+          <Prop src={FESTIVE.branch} flip blur={5} opacity={0.45} depth={-0.04} className="-right-[10%] -top-[4%] w-[clamp(260px,42vw,720px)]" />
+          <Prop src={FESTIVE.branch} blur={6} opacity={0.35} depth={-0.05} className="-left-[12%] -top-[6%] w-[clamp(260px,40vw,680px)]" />
+          {/* on small screens the branches stay behind the content so the headline and pill remain clear */}
+          <Prop src={FESTIVE.branch} motion="sway" depth={0.02} opacity={0.95} className="-left-16 -top-10 w-[210px] md:-left-12 md:w-[260px] lg:hidden" />
+          <Prop src={FESTIVE.branch} flip motion="sway" depth={0.02} opacity={0.95} delay="-3s" className="-right-10 -top-8 w-[180px] md:-right-8 md:w-[220px] lg:hidden" />
+          <Prop src={FESTIVE.snowflake} motion="drift" blur={0.6} opacity={0.75} depth={-0.06} className="left-[4%] top-[38%] w-[clamp(34px,5vw,84px)] sm:left-[9%]" />
+          <Prop src={FESTIVE.snowflake} motion="drift" blur={0.4} opacity={0.7} depth={-0.03} delay="-4s" className="right-[5%] top-[30%] w-[clamp(30px,4vw,64px)] sm:right-[10%] sm:top-[36%]" />
+          <Snow layer="back" />
+        </Layer>
       {/* Hero */}
       <section className="relative px-4 pt-[clamp(56px,8vw,104px)] text-center sm:px-8">
         <Orb className="left-[8%] top-[-40px] z-0" color="#c9b8ff" size={380} />
@@ -75,20 +90,32 @@ export default function Landing() {
               <div className="mt-1.5 text-[11px] text-ink-4">{blessedPct}% of the season matched</div>
             </div>
           </div>
-          <div className="float-b pointer-events-none absolute right-[clamp(12px,3vw,32px)] top-[clamp(12px,3vw,32px)] max-w-[46%]">
+          <div className="float-b pointer-events-none absolute bottom-[clamp(12px,3vw,32px)] right-[clamp(12px,3vw,32px)] max-w-[46%]">
             <div className="flex items-center gap-3 rounded-[24px] border border-white/12 bg-ink/72 py-3.5 pl-3.5 pr-[18px] text-white shadow-lift backdrop-blur-[18px]">
               <span className="grid size-[38px] flex-none place-items-center rounded-full bg-lav font-bold text-ink">✓</span>
               <div><div className="text-[13px] font-semibold">Gifts dropped off</div><div className="text-[11px] opacity-70">Greater Grace Youth Group · just now</div></div>
             </div>
           </div>
+          {/* props overlapping the band's top corners (in front of the photo, behind nothing interactive) */}
+          <Prop src={FESTIVE.gifts} motion="hover" depth={0.06} className="z-20 -left-1 -top-[clamp(52px,7vw,112px)] w-[clamp(92px,13vw,214px)] sm:-left-6" />
+          <Prop src={FESTIVE.lantern} motion="hover" delay="-3s" depth={0.1} className="z-20 -right-1 -top-[clamp(64px,9vw,150px)] w-[clamp(54px,7vw,122px)] sm:-right-5" />
         </div>
       </section>
+        <Layer className="z-20">
+          <Prop src={FESTIVE.branch} motion="sway" depth={0.05} className="hidden lg:block lg:-left-12 lg:-top-20 lg:w-[clamp(260px,24vw,440px)]" />
+          <Prop src={FESTIVE.ornament} motion="swing" depth={0.08} className="hidden xl:block left-[clamp(40px,7vw,150px)] top-[clamp(120px,13vw,250px)] w-[clamp(56px,6.5vw,118px)]" />
+          <Prop src={FESTIVE.branch} flip motion="sway" depth={0.03} delay="-3s" className="hidden lg:block lg:-right-8 lg:-top-14 lg:w-[clamp(230px,22vw,380px)]" />
+        </Layer>
+        <Snow layer="front" className="z-30" />
+      </div>
 
       {/* Partners marquee */}
       <PartnersMarquee />
 
       {/* How it works */}
-      <section className="px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+      <section className="relative px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+        <Prop src={FESTIVE.snowflake} motion="drift" opacity={0.6} depth={-0.03} className="right-[3%] top-[12%] hidden w-[clamp(40px,5vw,76px)] md:block" />
+        <Prop src={FESTIVE.ornament} motion="swing" depth={0.04} className="left-[2%] -top-10 hidden w-[clamp(56px,6vw,96px)] lg:block xl:left-[4%]" />
         <div className="mx-auto max-w-[1180px]">
           <div className="reveal text-center"><SectionPill>How it works</SectionPill><h2 className="balance mt-4 text-[clamp(34px,4.6vw,60px)] leading-[1.05] tracking-[-.045em]">Three steps. We handle the rest.</h2></div>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
@@ -116,7 +143,9 @@ export default function Landing() {
       </section>
 
       {/* Why it matters */}
-      <section className="px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+      <section className="relative px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+        <Prop src={FESTIVE.gifts} motion="hover" depth={0.03} blur={1.5} opacity={0.8} className="left-[1%] bottom-[-40px] hidden w-[clamp(120px,12vw,190px)] lg:block" />
+        <Prop src={FESTIVE.snowflake} motion="drift" opacity={0.5} blur={1} depth={-0.04} delay="-2s" className="right-[6%] top-[4%] hidden w-[56px] md:block" />
         <div className="mx-auto grid max-w-[1180px] items-stretch gap-4 md:grid-cols-2">
           <div className="reveal relative min-h-[460px] overflow-hidden rounded-[32px]"><div className="parallax-img absolute inset-0"><Photo src={PHOTOS.stats} alt="Konnection program" className="size-full" /></div></div>
           <div className="reveal-late flex flex-col justify-center p-[clamp(8px,2vw,24px)]">
@@ -133,7 +162,9 @@ export default function Landing() {
       </section>
 
       {/* Testimonial */}
-      <section className="px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+      <section className="relative px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+        <Prop src={FESTIVE.lantern} motion="hover" depth={0.05} className="right-[4%] top-[20%] hidden w-[clamp(70px,7vw,120px)] lg:block" />
+        <Prop src={FESTIVE.snowflake} motion="drift" opacity={0.55} depth={-0.03} delay="-6s" className="left-[6%] top-[10%] hidden w-[64px] lg:block" />
         <div className="mx-auto max-w-[900px] text-center" style={{ viewTimelineName: '--quote' } as React.CSSProperties}>
           <div className="balance text-[clamp(24px,3vw,40px)] font-medium leading-[1.3] tracking-[-.03em]">
             “{QUOTE.map((w, i) => <span key={i}><span style={{ animation: 'ink linear both', animationTimeline: '--quote', animationRange: `cover ${10 + i * 1.7}% cover ${14 + i * 1.7}%` } as React.CSSProperties}>{w}</span>{i < QUOTE.length - 1 ? ' ' : ''}</span>)}”
@@ -165,6 +196,9 @@ export default function Landing() {
         <div className="reveal relative mx-auto max-w-[1180px] overflow-hidden rounded-[40px] bg-ink px-[clamp(24px,5vw,72px)] py-[clamp(48px,7vw,96px)] text-white">
           <Orb className="bottom-[-160px] right-[-120px]" color="#6c22dd" size={480} opacity={0.65} />
           <Orb className="left-[-100px] top-[-140px]" color="#c9b8ff" size={360} opacity={0.25} delay="-8s" reverse />
+          <Bokeh count={22} seed={11} edges={false} className="opacity-70" />
+          <Prop src={FESTIVE.branch} flip motion="sway" className="-right-12 -top-14 w-[clamp(200px,30vw,420px)]" />
+          <Prop src={FESTIVE.gifts} motion="hover" delay="-2s" className="bottom-[-18px] right-[clamp(16px,8vw,120px)] hidden w-[clamp(120px,14vw,200px)] md:block" />
           <div className="relative max-w-[760px]">
             <h2 className="balance text-[clamp(36px,5.4vw,76px)] leading-none tracking-[-.05em] text-white">{counts.available} families are still waiting.</h2>
             <p className="mt-[18px] max-w-[520px] text-[17px] leading-[1.55] text-white/72">Drop-off closes {deadlineLong}. Pick one today — it takes two minutes.</p>

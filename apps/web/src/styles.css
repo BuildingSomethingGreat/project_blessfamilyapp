@@ -87,6 +87,12 @@
 @keyframes drift { 0% { transform: translate(0,0) scale(1); } 33% { transform: translate(60px,-40px) scale(1.12); } 66% { transform: translate(-50px,30px) scale(.94); } 100% { transform: translate(0,0) scale(1); } }
 @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @keyframes pulseDot { 0% { box-shadow: 0 0 0 0 rgba(108,34,221,.5); } 100% { box-shadow: 0 0 0 10px rgba(108,34,221,0); } }
+/* Festive decor */
+@keyframes festiveSway { 0%, 100% { transform: rotate(-1.2deg); } 50% { transform: rotate(1.4deg); } }
+@keyframes festiveSwing { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
+@keyframes festiveDrift { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(6px, 14px) rotate(14deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+@keyframes festiveHover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes festiveTwinkle { 0%, 100% { transform: scale(1); opacity: var(--tw, .5); } 50% { transform: scale(1.25); opacity: calc(var(--tw, .5) * 1.6); } }
 @keyframes loaderWord { from { opacity: 0; filter: blur(10px); transform: translateY(30px); } to { opacity: 1; filter: blur(0); transform: none; } }
 
 .anim-rise { animation: rise .45s var(--ease-out-expo) both; }
@@ -110,9 +116,16 @@
 .float-b { animation: floatB linear both; animation-timeline: view(); animation-range: cover 0% cover 100%; }
 .marquee { animation: marquee 38s linear infinite; }
 
+.festive-sway { animation: festiveSway 7s ease-in-out infinite; }
+.festive-swing { animation: festiveSwing 4.2s ease-in-out infinite; }
+.festive-drift { animation: festiveDrift 9s ease-in-out infinite; }
+.festive-hover { animation: festiveHover 6s ease-in-out infinite; }
+.festive-twinkle { animation: festiveTwinkle 5s ease-in-out infinite; }
+.snow-front { filter: blur(1.1px); }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-delay: 0s !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
-  .reveal, .reveal-late, .band-in, .parallax-img, .float-a, .float-b { animation: none !important; }
+  .reveal, .reveal-late, .band-in, .parallax-img, .float-a, .float-b, .festive-sway, .festive-swing, .festive-drift, .festive-hover, .festive-twinkle { animation: none !important; }
 }
 
 /* Chart primitives */
