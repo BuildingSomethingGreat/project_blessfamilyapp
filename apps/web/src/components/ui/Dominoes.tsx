@@ -6,7 +6,7 @@ import { cx } from '@/lib/format';
  * by a line that fills purple as steps complete. `compact` renders the 6-dot pill
  * row used in admin tables.
  */
-export function Dominoes({ status, compact, dates, deadlineLabel }: { status: SponsorshipStatus; compact?: boolean; dates?: Partial<Record<SponsorshipStatus, string | null>>; deadlineLabel?: string }) {
+export function Dominoes({ status, compact, dates, deadlineLabel, handoffLabel }: { status: SponsorshipStatus; compact?: boolean; dates?: Partial<Record<SponsorshipStatus, string | null>>; deadlineLabel?: string; handoffLabel?: string }) {
   const idx = status === 'Released' ? -1 : stepIndex(status);
   if (compact) {
     return (
@@ -23,7 +23,7 @@ export function Dominoes({ status, compact, dates, deadlineLabel }: { status: Sp
         const done = i <= idx;
         const current = i === idx;
         const last = i === SPONSORSHIP_STEPS.length - 1;
-        const sub = s.status === 'Dropped Off' && deadlineLabel ? `Konnection office · by ${deadlineLabel}` : s.sub;
+        const sub = s.status === 'Dropped Off' && deadlineLabel ? `${handoffLabel ?? 'Dropped off or delivered'} · by ${deadlineLabel}` : s.sub;
         return (
           <li key={s.status} className={cx('relative flex items-start gap-3.5', !last && 'pb-5')}>
             {!last && (

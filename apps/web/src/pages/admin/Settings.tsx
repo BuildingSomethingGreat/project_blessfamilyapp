@@ -22,13 +22,13 @@ export default function Settings() {
   if (!form) return <div className="space-y-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-96" /></div>;
   const set = <K extends keyof SeasonSettings>(k: K, v: SeasonSettings[K]) => setForm({ ...form, [k]: v });
   const dirty = JSON.stringify(form) !== JSON.stringify(q.data);
-  const Row = ({ title, body, k }: { title: string; body: string; k: 'catalogOpen' | 'registrationOpen' | 'chipInsEnabled' | 'showPhotos' }) => (
+  const Row = ({ title, body, k }: { title: string; body: string; k: 'catalogOpen' | 'registrationOpen' | 'chipInsEnabled' | 'showPhotos' | 'askFamilyPhoto' }) => (
     <div className="flex items-start justify-between gap-4"><div><div className="text-[14px] font-semibold">{title}</div><div className="text-[13px] text-ink-3">{body}</div></div><Toggle checked={form[k]} onChange={(v) => set(k, v)} /></div>
   );
 
   return (
     <div className="anim-rise">
-      <PageHead title="Settings" sub="Season details that show up in the catalog, the sponsor portal and every message." />
+      <PageHead title="Settings" sub="Season details that show up in the catalog, each Holiday Konnector's family page and every message." />
       <form onSubmit={(e) => { e.preventDefault(); save.mutate(form); }} className="mt-[22px] grid gap-3.5 lg:grid-cols-5">
         <div className="space-y-3.5 lg:col-span-3">
           <Panel>
@@ -38,7 +38,7 @@ export default function Settings() {
               <div><Label htmlFor="deadline">Gift drop-off deadline</Label><Input id="deadline" type="date" value={form.dropoffDeadline} onChange={(e) => set('dropoffDeadline', e.target.value)} /></div>
               <div><Label htmlFor="loc">Drop-off location</Label><Input id="loc" value={form.dropoffLocation} onChange={(e) => set('dropoffLocation', e.target.value)} /></div>
               <div><Label htmlFor="hours">Drop-off hours</Label><Input id="hours" value={form.dropoffHours} onChange={(e) => set('dropoffHours', e.target.value)} /></div>
-              <div className="sm:col-span-2"><Label htmlFor="budget" hint="shown to sponsors">Per-child budget note</Label><Textarea id="budget" className="min-h-20" value={form.perChildBudgetNote} onChange={(e) => set('perChildBudgetNote', e.target.value)} /></div>
+              <div className="sm:col-span-2"><Label htmlFor="budget" hint="shown to Holiday Konnectors">Per-child budget note</Label><Textarea id="budget" className="min-h-20" value={form.perChildBudgetNote} onChange={(e) => set('perChildBudgetNote', e.target.value)} /></div>
             </div>
           </Panel>
           <Panel>
@@ -55,16 +55,17 @@ export default function Settings() {
           <Panel>
             <PanelTitle>Open / closed</PanelTitle>
             <div className="mt-3.5 space-y-4">
-              <Row title="Catalog open" body="Sponsors can browse and claim families." k="catalogOpen" />
+              <Row title="Catalog open" body="Holiday Konnectors can browse and choose families." k="catalogOpen" />
               <Row title="Registration open" body="Families can submit new applications." k="registrationOpen" />
               <Row title="Chip-ins" body='Show "Chip in" on family pages for partial giving.' k="chipInsEnabled" />
-              <Row title="Family photos" body="Show approved family photos in the catalog." k="showPhotos" />
+              <Row title="Ask families for a photo" body="Adds an optional photo question to the application. Families can skip it or keep the photo staff-only." k="askFamilyPhoto" />
+              <Row title="Show family photos" body="Show approved, non-private photos in the catalog. Off hides every photo." k="showPhotos" />
             </div>
           </Panel>
           <Panel>
             <PanelTitle>Data</PanelTitle>
             <p className="mt-3 text-[13px] leading-[1.5] text-ink-2">
-              Records live in {me.data?.store === 'airtable' ? <><b>Airtable</b> (base "Client-TheKonnection-BlessAFamily": Families, Children, Sponsors, Sponsorships, Activity, Settings). Edits made directly in Airtable show up here within about 20 seconds.</> : <><b>a local demo store</b>. Set <code className="rounded bg-soft px-1 font-mono text-[12px]">STORE=airtable</code> on the API to use the Airtable base.</>}
+              Records live in {me.data?.store === 'airtable' ? <><b>Airtable</b> (base "Client-TheKonnection-BlessAFamily": Families, Children, Sponsors, Sponsorships, Quotes, Activity, Settings). Edits made directly in Airtable show up here within about 20 seconds.</> : <><b>a local demo store</b>. Set <code className="rounded bg-soft px-1 font-mono text-[12px]">STORE=airtable</code> on the API to use the Airtable base.</>}
             </p>
             <a href={api.admin.exportUrl} className="mt-4 inline-flex h-10 items-center rounded-full border border-line bg-white px-4 text-[13px] font-semibold hover:border-ink">Export season CSV</a>
           </Panel>

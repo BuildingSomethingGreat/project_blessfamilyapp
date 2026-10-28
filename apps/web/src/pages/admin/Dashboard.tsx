@@ -101,7 +101,7 @@ export default function Dashboard() {
         <Panel>
           <PanelTitle right={`${r.followUp.dueNext24h} due in next 24h`}>Needs attention</PanelTitle>
           {attentionList.length === 0 ? (
-            <div className="mt-3.5 rounded-2xl bg-soft p-5 text-center text-[14px] font-semibold text-pri-dark">Every sponsor has responded recently. Nothing to chase.</div>
+            <div className="mt-3.5 rounded-2xl bg-soft p-5 text-center text-[14px] font-semibold text-pri-dark">Every Holiday Konnector has responded recently. Nothing to chase.</div>
           ) : (
             <div className="mt-2">
               {attentionList.map((a) => {
@@ -157,7 +157,7 @@ export default function Dashboard() {
           <div className="overflow-x-auto">
             <div className="min-w-[420px]">
               <div className="grid grid-cols-[1fr_44px_70px_56px_90px] gap-2 border-b border-soft pb-2 pt-3.5 text-[11px] font-semibold uppercase tracking-[.06em] text-ink-3"><span>Family</span><span>Kids</span><span>Waiting</span><span>Views</span><span>Story</span></div>
-              {r.familiesLeft.length === 0 && <div className="py-6 text-center text-[13px] text-ink-3">Every approved family has a sponsor.</div>}
+              {r.familiesLeft.length === 0 && <div className="py-6 text-center text-[13px] text-ink-3">Every approved family has a Holiday Konnector.</div>}
               {r.familiesLeft.map((x) => {
                 const fam = famByCode.get(x.familyId);
                 const late = x.daysWaiting >= 21;

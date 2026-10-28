@@ -1,5 +1,5 @@
-import type { Activity, Family, FamilyStatus, SeasonSettings, Sponsor, Sponsorship, SponsorshipStatus, Child } from '@bless/shared';
-import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewFamily, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
+import type { Activity, Family, FamilyStatus, Quote, QuoteStatus, SeasonSettings, Sponsor, Sponsorship, SponsorshipStatus, Child } from '@bless/shared';
+import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewFamily, type NewQuote, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
 import { uuid } from '../lib/ids.ts';
 
 /**
@@ -9,7 +9,7 @@ import { uuid } from '../lib/ids.ts';
  */
 type Rec = { id: string; createdTime: string; fields: Record<string, any> };
 
-const T = { families: 'Families', children: 'Children', sponsors: 'Sponsors', sponsorships: 'Sponsorships', activity: 'Activity', settings: 'Settings' } as const;
+const T = { families: 'Families', children: 'Children', sponsors: 'Sponsors', sponsorships: 'Sponsorships', activity: 'Activity', quotes: 'Quotes', settings: 'Settings' } as const;
 
 const esc = (s: string) => s.replace(/'/g, "\\'");
 
@@ -118,7 +118,7 @@ export class AirtableStore implements Store {
       nickname: f['Nickname'] ?? '', guardianName: f['Guardian Name'] ?? '', phone: f['Phone'] ?? '', email: f['Email'] ?? '',
       preferredContact: f['Preferred Contact'] ?? 'Text', address: f['Address'] ?? '', city: f['City'] ?? '', state: f['State'] ?? '', zip: f['ZIP'] ?? '',
       transportation: f['Transportation'] ?? 'No', familyStory: f['Family Story'] ?? '', storyApproved: !!f['Story Approved'],
-      photoUrl: f['Photo']?.[0]?.url ?? '', photoApproved: !!f['Photo Approved'], raised: Number(f['Raised'] ?? 0), goal: Number(f['Goal'] ?? 0),
+      photoUrl: f['Photo']?.[0]?.url ?? '', photoApproved: !!f['Photo Approved'], photoPrivate: !!f['Photo Private'], raised: Number(f['Raised'] ?? 0), goal: Number(f['Goal'] ?? 0),
       eligibilityConfirmed: !!f['Eligibility Confirmed'], notes: f['Notes'] ?? '', adminNotes: f['Admin Notes'] ?? '', views: Number(f['Views'] ?? 0),
       claimStarts: Number(f['Claim Starts'] ?? 0), createdAt: f['Created At'] ?? r.createdTime, approvedAt: f['Approved At'] ?? null, fulfilledAt: f['Fulfilled At'] ?? null,
       children: children.sort((a, b) => a.sortOrder - b.sortOrder),
@@ -130,19 +130,28 @@ export class AirtableStore implements Store {
       Email: p.email || undefined, 'Preferred Contact': p.preferredContact, Address: p.address, City: p.city, State: p.state, ZIP: p.zip,
       Transportation: p.transportation, 'Family Story': p.familyStory, 'Story Approved': p.storyApproved, 'Eligibility Confirmed': p.eligibilityConfirmed,
       Notes: p.notes, 'Admin Notes': p.adminNotes, Views: p.views, 'Claim Starts': p.claimStarts, 'Approved At': p.approvedAt, 'Fulfilled At': p.fulfilledAt,
-      'Photo Approved': p.photoApproved, Raised: p.raised, Goal: p.goal,
+      'Photo Approved': p.photoApproved, 'Photo Private': p.photoPrivate, Raised: p.raised, Goal: p.goal,
     };
     return strip(m);
   }
   private sponsorFrom(r: Rec): Sponsor {
     const f = r.fields;
-    return { id: r.id, name: f['Name'] ?? '', email: f['Email'] ?? '', phone: f['Phone'] ?? '', organization: f['Organization'] ?? '', preferredContact: f['Preferred Contact'] ?? 'Email', notes: f['Notes'] ?? '', createdAt: f['Created At'] ?? r.createdTime };
+    return {
+      id: r.id, name: f['Name'] ?? '', email: f['Email'] ?? '', phone: f['Phone'] ?? '', organization: f['Organization'] ?? '', preferredContact: f['Preferred Contact'] ?? 'Email', notes: f['Notes'] ?? '',
+      displayName: f['Display Name'] ?? '', wallOptIn: !!f['Wall Opt In'], wallHidden: !!f['Wall Hidden'], createdAt: f['Created At'] ?? r.createdTime,
+    };
+  }
+  private sponsorTo(p: Partial<Sponsor>) {
+    return strip({
+      Name: p.name, Email: p.email, Phone: p.phone || undefined, Organization: p.organization, 'Preferred Contact': p.preferredContact, Notes: p.notes,
+      'Display Name': p.displayName, 'Wall Opt In': p.wallOptIn, 'Wall Hidden': p.wallHidden,
+    });
   }
   private sponsorshipFrom(r: Rec): Sponsorship {
     const f = r.fields;
     return {
       id: r.id, sponsorshipId: f['Sponsorship ID'] ?? '', familyId: f['Family']?.[0] ?? '', sponsorId: f['Sponsor']?.[0] ?? '', status: (f['Status'] ?? 'Claimed') as SponsorshipStatus,
-      token: f['Token'] ?? '', claimedAt: f['Claimed At'] ?? r.createdTime, shoppingAt: f['Shopping At'] ?? null, purchasedAt: f['Purchased At'] ?? null, wrappedAt: f['Wrapped At'] ?? null,
+      token: f['Token'] ?? '', handoff: f['Handoff'] === 'Deliver directly' ? 'Deliver directly' : 'Drop off', claimedAt: f['Claimed At'] ?? r.createdTime, shoppingAt: f['Shopping At'] ?? null, purchasedAt: f['Purchased At'] ?? null, wrappedAt: f['Wrapped At'] ?? null,
       droppedOffAt: f['Dropped Off At'] ?? null, deliveredAt: f['Delivered At'] ?? null, releasedAt: f['Released At'] ?? null, nextFollowUpAt: f['Next Follow Up At'] ?? null,
       lastNudgedAt: f['Last Nudged At'] ?? null, lastResponseAt: f['Last Response At'] ?? null, followUpCount: Number(f['Follow Up Count'] ?? 0), flagged: !!f['Flagged'],
       flagReason: f['Flag Reason'] ?? '', releaseReason: f['Release Reason'] ?? '', sponsorNote: f['Sponsor Note'] ?? '', adminNotes: f['Admin Notes'] ?? '', createdAt: f['Created At'] ?? r.createdTime,
@@ -150,7 +159,7 @@ export class AirtableStore implements Store {
   }
   private sponsorshipTo(p: Partial<Sponsorship>) {
     return strip({
-      'Sponsorship ID': p.sponsorshipId, Status: p.status, Token: p.token, 'Claimed At': p.claimedAt, 'Shopping At': p.shoppingAt, 'Purchased At': p.purchasedAt, 'Wrapped At': p.wrappedAt,
+      'Sponsorship ID': p.sponsorshipId, Status: p.status, Token: p.token, Handoff: p.handoff, 'Claimed At': p.claimedAt, 'Shopping At': p.shoppingAt, 'Purchased At': p.purchasedAt, 'Wrapped At': p.wrappedAt,
       'Dropped Off At': p.droppedOffAt, 'Delivered At': p.deliveredAt, 'Released At': p.releasedAt, 'Next Follow Up At': p.nextFollowUpAt, 'Last Nudged At': p.lastNudgedAt,
       'Last Response At': p.lastResponseAt, 'Follow Up Count': p.followUpCount, Flagged: p.flagged, 'Flag Reason': p.flagReason, 'Release Reason': p.releaseReason,
       'Sponsor Note': p.sponsorNote, 'Admin Notes': p.adminNotes, Family: p.familyId ? [p.familyId] : undefined, Sponsor: p.sponsorId ? [p.sponsorId] : undefined,
@@ -241,8 +250,11 @@ export class AirtableStore implements Store {
     return (await this.listSponsors()).find((s) => s.email.toLowerCase() === e) ?? null;
   }
   async createSponsor(input: NewSponsor) {
-    const r = await this.create(T.sponsors, strip({ Name: input.name, Email: input.email, Phone: input.phone || undefined, Organization: input.organization, 'Preferred Contact': input.preferredContact, Notes: input.notes }));
+    const r = await this.create(T.sponsors, this.sponsorTo(input));
     return this.sponsorFrom(r);
+  }
+  async updateSponsor(id: string, patch: Partial<Sponsor>) {
+    return this.sponsorFrom(await this.patch(T.sponsors, id, this.sponsorTo(patch)));
   }
 
   // ---- sponsorships ---------------------------------------------------------
@@ -286,6 +298,34 @@ export class AirtableStore implements Store {
     if (filter.sponsorshipId) rows = rows.filter((a) => a.sponsorshipId === filter.sponsorshipId);
     if (filter.limit) rows = rows.slice(0, filter.limit);
     return rows;
+  }
+
+  // ---- quotes -------------------------------------------------------------------
+  private quoteFrom(r: Rec): Quote {
+    const f = r.fields;
+    return {
+      id: r.id, quote: f['Quote'] ?? '', name: f['Name'] ?? '', role: f['Role'] === 'Konnection family' ? 'Konnection family' : 'Holiday Konnector', organization: f['Organization'] ?? '',
+      email: f['Email'] ?? '', status: (['Pending', 'Approved', 'Hidden'].includes(f['Status']) ? f['Status'] : 'Pending') as QuoteStatus, featured: !!f['Featured'], season: f['Season'] ?? '',
+      familyId: f['Family']?.[0] ?? null, sponsorshipId: f['Sponsorship']?.[0] ?? null, submittedAt: f['Submitted At'] ?? r.createdTime,
+    };
+  }
+  private quoteTo(p: Partial<Quote>) {
+    return strip({
+      Quote: p.quote, Name: p.name, Role: p.role, Organization: p.organization, Email: p.email || undefined, Status: p.status, Featured: p.featured, Season: p.season,
+      'Submitted At': p.submittedAt, Family: p.familyId ? [p.familyId] : undefined, Sponsorship: p.sponsorshipId ? [p.sponsorshipId] : undefined,
+    });
+  }
+  async listQuotes(filter: { status?: QuoteStatus[]; season?: string } = {}) {
+    return (await this.all(T.quotes))
+      .map((r) => this.quoteFrom(r))
+      .filter((q) => (!filter.status || filter.status.includes(q.status)) && (!filter.season || q.season === filter.season))
+      .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  }
+  async createQuote(input: NewQuote) {
+    return this.quoteFrom(await this.create(T.quotes, this.quoteTo(input)));
+  }
+  async updateQuote(id: string, patch: Partial<Quote>) {
+    return this.quoteFrom(await this.patch(T.quotes, id, this.quoteTo(patch)));
   }
 
   // ---- settings ---------------------------------------------------------------

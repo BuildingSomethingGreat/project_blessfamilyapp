@@ -10,7 +10,7 @@
 
 | Variable | Value |
 |---|---|
-| `AIRTABLE_TOKEN` | personal access token scoped to base `apphUgu1q4Z7ya3Tw` (`data.records:read`, `data.records:write`, `schema.bases:read`). Without it the API serves in-memory demo data that resets on cold starts. |
+| `AIRTABLE_TOKEN` | personal access token scoped to base `apphUgu1q4Z7ya3Tw` (`data.records:read`, `data.records:write`, `schema.bases:read`). **Required for the live site.** Without it the site shows no families and refuses applications and claims (HTTP 503) so nothing is silently lost. |
 | `SESSION_SECRET` | `openssl rand -base64 48` |
 | `ADMIN_EMAILS` | comma-separated admin emails |
 | `ADMIN_PASSCODE` | a team passcode; lets admins sign in before an email provider exists |
@@ -19,7 +19,7 @@
 
 3. **Deploy**. The admin is at `https://<your-site>.netlify.app/admin/login`: enter an allowlisted email, then the passcode (or tap the emailed link once Resend is configured).
 
-Limits to know: Netlify Functions time out at 10 s (26 s on request), so very long assistant answers may be cut; the in-memory store is per-instance, so set `AIRTABLE_TOKEN` for anything beyond a demo.
+Limits to know: Netlify Functions time out at 10 s (26 s on request), so very long assistant answers may be cut. Demo data is never seeded in production (`SEED_DEMO` defaults to off when `NETLIFY` or `NODE_ENV=production` is set). Several function instances can run at once, so claims are double-checked after writing: if two Holiday Konnectors claim the same family within seconds, the earlier claim wins and the other is told the family was taken.
 
 ## 0. One-time secrets
 | Where | Variable | Notes |

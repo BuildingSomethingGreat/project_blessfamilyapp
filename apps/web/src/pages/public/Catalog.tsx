@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { PublicFamily } from '@bless/shared';
+import { AGE_GROUPS, NEED_FILTERS, type PublicFamily } from '@bless/shared';
 import { api } from '@/lib/api';
 import { FamilyArt, Skeleton } from '@/components/ui';
 import { Bokeh, FESTIVE, Layer, Prop, Snow } from '@/components/festive';
 import { cx } from '@/lib/format';
-import { art, KidChip, matchQuery, matchTag, needChips, photoFor, shell, TAGS, wrap } from './shared.tsx';
+import { art, describeFilters, EMPTY_FILTERS, filterCount, KidChip, matchFilters, matchQuery, needChips, photoFor, shell, SIZE_OPTIONS, wrap, type Filters } from './shared.tsx';
 
 const ss = { get: (k: string, d: string) => { try { return sessionStorage.getItem(k) ?? d; } catch { return d; } }, set: (k: string, v: string) => { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } } };
 const ls = { get: (): string[] => { try { return JSON.parse(localStorage.getItem('baf-saved') ?? '[]'); } catch { return []; } }, set: (v: string[]) => { try { localStorage.setItem('baf-saved', JSON.stringify(v)); } catch { /* ignore */ } } };
@@ -16,15 +16,20 @@ export default function Catalog() {
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: api.catalog });
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings, staleTime: 5 * 60_000 });
   const [mode, setMode] = useState<'swipe' | 'grid'>(() => (ss.get('baf-cat-mode', 'swipe') as 'swipe' | 'grid'));
-  const [tag, setTag] = useState(() => ss.get('baf-cat-tag', 'All'));
+  const [filters, setFilters] = useState<Filters>(() => { try { return { ...EMPTY_FILTERS, ...JSON.parse(ss.get('baf-cat-filters', '{}')) }; } catch { return EMPTY_FILTERS; } });
   const [query, setQuery] = useState(() => ss.get('baf-cat-q', ''));
   const [saved, setSaved] = useState<string[]>(ls.get);
   const [deckIdx, setDeckIdx] = useState(0);
-  useEffect(() => { ss.set('baf-cat-mode', mode); ss.set('baf-cat-tag', tag); ss.set('baf-cat-q', query); }, [mode, tag, query]);
+  useEffect(() => { ss.set('baf-cat-mode', mode); ss.set('baf-cat-filters', JSON.stringify(filters)); ss.set('baf-cat-q', query); }, [mode, filters, query]);
   useEffect(() => ls.set(saved), [saved]);
 
   const all = catalog.data?.families ?? [];
-  const shown = useMemo(() => all.filter((f) => matchTag(f, tag) && matchQuery(f, query)), [all, tag, query]);
+  const shown = useMemo(() => all.filter((f) => matchFilters(f, filters) && matchQuery(f, query)), [all, filters, query]);
+  const update = (patch: Partial<Filters>) => { setFilters((f) => ({ ...f, ...patch })); setDeckIdx(0); };
+  /** How many families you'd see if this option were picked, given everything else selected. */
+  const countWith = (patch: Partial<Filters>) => all.filter((f) => matchFilters(f, { ...filters, ...patch }) && matchQuery(f, query)).length;
+  const toggle = <K extends 'ages' | 'needs'>(k: K, v: Filters[K][number]) => update({ [k]: (filters[k] as string[]).includes(v) ? (filters[k] as string[]).filter((x) => x !== v) : [...filters[k], v] } as Partial<Filters>);
+  const active = filterCount(filters) > 0 || !!query.trim();
   const showPhotos = settings.data?.showPhotos;
   const open = (f: PublicFamily) => nav(`/families/${f.slug}`);
   const savedList = saved.map((s) => all.find((f) => f.slug === s)).filter((x): x is PublicFamily => !!x);
@@ -50,13 +55,25 @@ export default function Catalog() {
             {(['swipe', 'grid'] as const).map((m) => <button key={m} onClick={() => setMode(m)} className={cx('rounded-full px-4 py-[9px] text-[13px] font-semibold capitalize transition-all', mode === m ? 'bg-ink text-white' : 'text-pri-dark')}>{m}</button>)}
           </div>
         </div>
-        <div className="mt-5 flex flex-wrap items-center gap-2.5">
-          <div className="relative min-w-[220px] max-w-[360px] flex-1">
+        <div className="mt-5 rounded-[26px] border border-line-2 bg-white/88 p-3 shadow-soft backdrop-blur-[10px] sm:p-4">
+          <div className="relative">
             <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-ink-3">⌕</span>
-            <input value={query} onChange={(e) => { setQuery(e.target.value); setDeckIdx(0); }} placeholder="Search names, interests, city" className="h-[46px] w-full rounded-full border border-line bg-white pl-10 pr-4 text-[14px] outline-none focus:border-pri" />
+            <input value={query} onChange={(e) => { setQuery(e.target.value); setDeckIdx(0); }} placeholder="Search a first name, interest, or city" aria-label="Search families" className="h-[46px] w-full rounded-full border border-line bg-bg pl-10 pr-4 text-[14px] outline-none focus:border-pri focus:bg-white" />
           </div>
-          <div className="rail flex flex-1 gap-1.5 overflow-x-auto p-0.5">
-            {TAGS.map((t) => <button key={t} onClick={() => { setTag(t); setDeckIdx(0); }} className={cx('flex-none rounded-full px-3.5 py-2.5 text-[13px] font-semibold transition-all', tag === t ? 'bg-ink text-white' : 'bg-white text-ink-2')}>{t}</button>)}
+          <div className="mt-3 grid gap-2.5">
+            <FilterRow label="Kids in the family">
+              {SIZE_OPTIONS.map((o) => <FilterChip key={o.key} on={filters.size === o.key} count={o.key === 'any' ? undefined : countWith({ size: o.key })} onClick={() => update({ size: filters.size === o.key && o.key !== 'any' ? 'any' : o.key })}>{o.label}</FilterChip>)}
+            </FilterRow>
+            <FilterRow label="Has a child who is">
+              {AGE_GROUPS.map((g) => <FilterChip key={g.key} on={filters.ages.includes(g.key)} count={countWith({ ages: filters.ages.includes(g.key) ? filters.ages : [...filters.ages, g.key] })} onClick={() => toggle('ages', g.key)}>{g.label} <span className="font-medium opacity-70">{g.range}</span></FilterChip>)}
+            </FilterRow>
+            <FilterRow label="Needs a">
+              {NEED_FILTERS.map((n) => <FilterChip key={n.key} on={filters.needs.includes(n.key)} count={countWith({ needs: filters.needs.includes(n.key) ? filters.needs : [...filters.needs, n.key] })} onClick={() => toggle('needs', n.key)}>{n.label}</FilterChip>)}
+            </FilterRow>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line-2 pt-3 text-[13px]" aria-live="polite">
+            <span className="text-ink-2">{catalog.data ? <>Showing <b className="text-ink">{shown.length}</b> of {all.length} {all.length === 1 ? 'family' : 'families'}{filterCount(filters) ? ` ${describeFilters(filters)}` : ''}{query.trim() ? ` matching “${query.trim()}”` : ''}</> : 'Loading families…'}</span>
+            {active && <button onClick={() => { setFilters(EMPTY_FILTERS); setQuery(''); setDeckIdx(0); }} className="font-semibold text-pri hover:text-ink">Clear all</button>}
           </div>
         </div>
 
@@ -100,7 +117,7 @@ export default function Catalog() {
                 </button>
               ))}
             </div>
-            {shown.length === 0 && <div className="mt-7 rounded-xl3 border border-dashed border-line bg-white p-10 text-center"><div className="font-bold">No families match that</div><div className="mt-1 text-[13px] text-ink-3">Try another filter or clear the search.</div></div>}
+            {shown.length === 0 && <div className="mt-7 rounded-xl3 border border-dashed border-line bg-white p-10 text-center"><div className="font-bold">No families match that</div><div className="mt-1 text-[13px] text-ink-3">Try widening a filter, or <button onClick={() => { setFilters(EMPTY_FILTERS); setQuery(''); }} className="font-semibold text-pri">clear them all</button>.</div></div>}
           </>
         )}
       </div>
@@ -110,6 +127,27 @@ export default function Catalog() {
         <div className="absolute inset-x-0 top-0 h-[520px]"><Snow layer="front" density={0.5} /></div>
       </Layer>
     </div>
+  );
+}
+
+function FilterRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3">
+      <div className="w-[150px] flex-none text-[12px] font-semibold uppercase tracking-[.08em] text-ink-3">{label}</div>
+      <div className="rail -mx-1 flex gap-1.5 overflow-x-auto px-1 py-0.5">{children}</div>
+    </div>
+  );
+}
+
+function FilterChip({ on, count, onClick, children }: { on: boolean; count?: number; onClick: () => void; children: React.ReactNode }) {
+  const empty = count === 0 && !on;
+  return (
+    <button type="button" onClick={onClick} aria-pressed={on} disabled={empty}
+      className={cx('inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-2 text-[13px] font-semibold transition-all',
+        on ? 'border-ink bg-ink text-white' : 'border-line bg-white text-ink-2 hover:border-ink-3', empty && 'cursor-not-allowed opacity-45 hover:border-line')}>
+      {on && <span aria-hidden>✓</span>}{children}
+      {count !== undefined && <span className={cx('rounded-full px-1.5 text-[11px]', on ? 'bg-white/18' : 'bg-soft text-pri-dark')}>{count}</span>}
+    </button>
   );
 }
 

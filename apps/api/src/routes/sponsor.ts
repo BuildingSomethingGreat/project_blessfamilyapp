@@ -21,6 +21,11 @@ export function sponsorRoutes(services: Services) {
     return c.json(await services.sponsorPortal(s.token));
   });
 
+  r.post('/:token/wall', async (c) => {
+    const { optIn, displayName } = (await c.req.json()) as { optIn?: boolean; displayName?: string };
+    return c.json(await services.setWall(c.req.param('token'), !!optIn, String(displayName ?? '')));
+  });
+
   r.post('/:token/note', async (c) => {
     const s = await services.store.getSponsorshipByToken(c.req.param('token'));
     if (!s) throw new HttpError(404, 'This link is not valid.');
@@ -28,7 +33,7 @@ export function sponsorRoutes(services: Services) {
     const text = String(note ?? '').trim().slice(0, 1000);
     if (!text) return c.json({ error: 'Empty note' }, 400);
     await services.store.updateSponsorship(s.id, { sponsorNote: text, lastResponseAt: nowIso(), followUpCount: 0, flagged: false, flagReason: '' });
-    await services.store.logActivity({ type: 'sponsor_response', channel: 'web', familyId: s.familyId, sponsorshipId: s.id, subject: 'Sponsor left a note', body: text, meta: {}, occurredAt: nowIso() });
+    await services.store.logActivity({ type: 'sponsor_response', channel: 'web', familyId: s.familyId, sponsorshipId: s.id, subject: 'Konnector left a note', body: text, meta: {}, occurredAt: nowIso() });
     return c.json(await services.sponsorPortal(s.token));
   });
 

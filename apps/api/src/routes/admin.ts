@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { FamilyStatusSchema, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
+import { FamilyStatusSchema, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { isAdminEmail, loginToken, sessionToken, verifyToken, SESSION_COOKIE } from '../lib/auth.ts';
 import { buildReport } from '../lib/reporting.ts';
 import type { Services } from '../lib/services.ts';
-import { HttpError } from '../lib/services.ts';
+import { HttpError, wallName } from '../lib/services.ts';
 import { getNotifier } from '../notify/index.ts';
 import { nowIso } from '../lib/ids.ts';
 import { AdminAgent } from '../agent/admin-agent.ts';
@@ -86,7 +86,7 @@ export function adminRoutes(services: Services) {
     const activity = await store.listActivity({ familyId: f.id, limit: 50 });
     return c.json({ ...f, public: toPublicFamily(f), sponsorships: withSponsor, activity });
   });
-  const FamilyPatch = z.object({ status: FamilyStatusSchema.optional(), adminNotes: z.string().max(5000).optional(), storyApproved: z.boolean().optional(), photoApproved: z.boolean().optional(), nickname: z.string().max(80).optional(), familyStory: z.string().max(1000).optional(), goal: z.number().int().min(0).max(100000).optional() });
+  const FamilyPatch = z.object({ status: FamilyStatusSchema.optional(), adminNotes: z.string().max(5000).optional(), storyApproved: z.boolean().optional(), photoApproved: z.boolean().optional(), photoPrivate: z.boolean().optional(), nickname: z.string().max(80).optional(), familyStory: z.string().max(1000).optional(), goal: z.number().int().min(0).max(100000).optional() });
   r.patch('/families/:id', async (c) => {
     const f = await store.getFamily(c.req.param('id'));
     if (!f) throw new HttpError(404, 'Not found');
@@ -139,22 +139,62 @@ export function adminRoutes(services: Services) {
   r.get('/settings', async (c) => c.json(await store.getSettings()));
   r.patch('/settings', async (c) => {
     const body = (await c.req.json()) as Partial<SeasonSettings>;
-    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos'];
+    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos', 'askFamilyPhoto'];
     const patch: Partial<SeasonSettings> = {};
     for (const k of allowed) if (k in body) (patch as any)[k] = body[k];
     return c.json(await store.updateSettings(patch));
   });
+  // ---- community: quotes + Wall of Holiday Konnectors ----
+  r.get('/quotes', async (c) => c.json(await store.listQuotes()));
+  const QuoteBody = z.object({ quote: z.string().trim().min(3).max(600), name: z.string().trim().min(1).max(80), role: z.enum(QUOTE_ROLES), organization: z.string().trim().max(120).default(''), featured: z.boolean().default(false) });
+  r.post('/quotes', async (c) => {
+    const body = QuoteBody.parse(await c.req.json());
+    const settings = await store.getSettings();
+    const q = await store.createQuote({ ...body, email: '', status: 'Approved', season: settings.season, familyId: null, sponsorshipId: null, submittedAt: nowIso() });
+    await store.logActivity({ type: 'admin_action', channel: 'system', familyId: null, sponsorshipId: null, subject: `${c.get('admin')} added a quote from ${q.name}`, body: '', meta: { quoteId: q.id }, occurredAt: nowIso() });
+    return c.json(q);
+  });
+  const QuotePatch = QuoteBody.partial().extend({ status: z.enum(QUOTE_STATUSES).optional() });
+  r.patch('/quotes/:id', async (c) => {
+    const patch = QuotePatch.parse(await c.req.json());
+    const q = await store.updateQuote(c.req.param('id'), patch);
+    await store.logActivity({ type: 'admin_action', channel: 'system', familyId: q.familyId, sponsorshipId: q.sponsorshipId, subject: `${c.get('admin')} updated a quote from ${q.name}`, body: '', meta: { quoteId: q.id, patch }, occurredAt: nowIso() });
+    return c.json(q);
+  });
+  r.get('/wall', async (c) => {
+    const settings = await store.getSettings();
+    const [sponsors, sps, fams] = await Promise.all([store.listSponsors(), store.listSponsorships(), store.listFamilies({ season: settings.season })]);
+    const seasonFams = new Set(fams.map((f) => f.id));
+    return c.json(
+      sponsors
+        .map((p) => {
+          const mine = sps.filter((s) => s.sponsorId === p.id && seasonFams.has(s.familyId) && s.status !== 'Released');
+          const done = mine.filter((s) => s.status === 'Dropped Off' || s.status === 'Delivered').length;
+          return { id: p.id, name: p.name, email: p.email, organization: p.organization, displayName: p.displayName, publicName: wallName(p), wallOptIn: p.wallOptIn, wallHidden: p.wallHidden, active: mine.length, done, showing: p.wallOptIn && !p.wallHidden && done > 0 };
+        })
+        .filter((p) => p.active > 0 || p.wallOptIn)
+        .sort((a, b) => Number(b.showing) - Number(a.showing) || b.done - a.done || a.publicName.localeCompare(b.publicName)),
+    );
+  });
+  const SponsorPatch = z.object({ wallHidden: z.boolean().optional(), wallOptIn: z.boolean().optional(), displayName: z.string().trim().max(80).optional() });
+  r.patch('/sponsors/:id', async (c) => {
+    const patch = SponsorPatch.parse(await c.req.json());
+    const p = await store.updateSponsor(c.req.param('id'), patch);
+    await store.logActivity({ type: 'admin_action', channel: 'system', familyId: null, sponsorshipId: null, subject: `${c.get('admin')} updated Konnector ${p.name}`, body: '', meta: { patch }, occurredAt: nowIso() });
+    return c.json(p);
+  });
+
   r.post('/followups/run', async (c) => c.json(await followUp.tick()));
   r.get('/export.csv', async (c) => {
     const settings = await store.getSettings();
     const fams = await store.listFamilies({ season: settings.season });
     const sps = await store.listSponsorships();
     const sponsors = new Map((await store.listSponsors()).map((s) => [s.id, s]));
-    const rows = [['Family ID', 'Nickname', 'Status', 'Guardian', 'Phone', 'Email', 'Address', 'City', 'State', 'ZIP', 'Transportation', 'Child', 'Age', 'Gender', 'Clothing Category', 'Shirt', 'Pants', 'Shoe Category', 'Shoe', 'Size Notes', 'Favorite Color', 'Hobbies', 'Clothing Wishlist', 'Other Clothing', 'Gift Types', 'Specific Gifts', 'Sponsor', 'Sponsor Email', 'Sponsorship Status']];
+    const rows = [['Family ID', 'Nickname', 'Status', 'Guardian', 'Phone', 'Email', 'Address', 'City', 'State', 'ZIP', 'Transportation', 'Child', 'Age', 'Gender', 'Clothing Category', 'Shirt', 'Pants', 'Shoe Category', 'Shoe', 'Size Notes', 'Favorite Color', 'Hobbies', 'Clothing Wishlist', 'Other Clothing', 'Gift Types', 'Specific Gifts', 'Holiday Konnector', 'Konnector Email', 'Konnector Phone', 'Hand-off', 'Sponsorship Status']];
     for (const f of fams) {
       const s = sps.filter((x) => x.familyId === f.id && x.status !== 'Released').sort((a, b) => b.claimedAt.localeCompare(a.claimedAt))[0];
       const sp = s ? sponsors.get(s.sponsorId) : null;
-      for (const k of f.children) rows.push([f.familyId, toPublicFamily(f).nickname, f.status, f.guardianName, f.phone, f.email, f.address, f.city, f.state, f.zip, f.transportation, k.name, String(k.age), k.gender, k.clothingCategory, k.shirtSize, k.pantsSize, k.shoeCategory, k.shoeSize, k.sizeNotes, k.favoriteColor, k.hobbies, k.clothingWishlist.join('; '), k.otherClothing, k.giftTypes.join('; '), k.specificGifts, sp?.name ?? '', sp?.email ?? '', s?.status ?? '']);
+      for (const k of f.children) rows.push([f.familyId, toPublicFamily(f).nickname, f.status, f.guardianName, f.phone, f.email, f.address, f.city, f.state, f.zip, f.transportation, k.name, String(k.age), k.gender, k.clothingCategory, k.shirtSize, k.pantsSize, k.shoeCategory, k.shoeSize, k.sizeNotes, k.favoriteColor, k.hobbies, k.clothingWishlist.join('; '), k.otherClothing, k.giftTypes.join('; '), k.specificGifts, sp?.name ?? '', sp?.email ?? '', sp?.phone ?? '', s?.handoff ?? '', s?.status ?? '']);
     }
     const csv = rows.map((row) => row.map((v) => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
     return c.body(csv, 200, { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="bless-a-family-${settings.season}.csv"` });

@@ -1,4 +1,4 @@
-import { deriveNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type FamilyApplication, type Family, type PublicFamily, type SponsorPortalView } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, deriveNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type CommunityView, type FamilyApplication, type Family, type PublicFamily, type QuoteSubmit, type Sponsor, type SponsorPortalView, type WallEntry } from '@bless/shared';
 import type { Store } from '../store/types.ts';
 import { FollowUpEngine, nextFollowUp } from '../followup/engine.ts';
 import { familyCode, nowIso, shortId, token as newToken } from './ids.ts';
@@ -9,7 +9,18 @@ export class HttpError extends Error {
   }
 }
 
-/** Single-process mutex so two sponsors can't claim the same family at once. */
+/** Public credit line for a Holiday Konnector: their chosen display name, else "First L." (never a full surname). */
+export function wallName(s: Pick<Sponsor, 'displayName' | 'name'>): string {
+  if (s.displayName.trim()) return s.displayName.trim();
+  const [first, ...rest] = s.name.trim().split(/\s+/);
+  const last = rest.at(-1);
+  return last ? `${first} ${last[0].toUpperCase()}.` : first || 'A Holiday Konnector';
+}
+
+/**
+ * Per-process mutex so two Konnectors can't claim the same family at once. Serverless runs several
+ * instances, so claim() also re-checks the store after writing (see the duplicate guard below).
+ */
 const locks = new Map<string, Promise<unknown>>();
 async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   const prev = locks.get(key) ?? Promise.resolve();
@@ -37,16 +48,18 @@ export class Services {
     const seq = await this.store.nextFamilySequence(settings.season);
     const code = familyCode(settings.season, seq);
     const children = app.children.map((c, i) => ({ ...c, sortOrder: i }));
+    // The photo question can be switched off in admin settings; ignore a stray photo if it is.
+    const photo = settings.askFamilyPhoto ? app.photoDataUrl : '';
     const family = await this.store.createFamily({
       familyId: code, season: settings.season, status: 'Submitted', slug: shortId(), nickname: deriveNickname(children.map((c) => ({ ...c, id: '', familyId: '' })), code),
       guardianName: app.guardianName, phone: app.phone, email: app.email, preferredContact: app.preferredContact, address: app.address, city: app.city, state: app.state.toUpperCase(),
       zip: app.zip, transportation: app.transportation, familyStory: app.familyStory, storyApproved: false, eligibilityConfirmed: true, notes: app.notes, adminNotes: '',
-      photoUrl: '', photoApproved: false, raised: 0, goal: GOAL_PER_CHILD * children.length,
+      photoUrl: '', photoApproved: false, photoPrivate: !!app.photoPrivate, raised: 0, goal: GOAL_PER_CHILD * children.length,
       views: 0, claimStarts: 0, approvedAt: null, fulfilledAt: null, children,
     });
-    if (app.photoDataUrl) {
+    if (photo) {
       try {
-        const url = await this.store.storeFamilyPhoto(family.id, app.photoDataUrl);
+        const url = await this.store.storeFamilyPhoto(family.id, photo);
         family.photoUrl = url;
       } catch (e) {
         console.error('photo store failed', (e as Error).message);
@@ -97,18 +110,29 @@ export class Services {
       if (!settings.catalogOpen) throw new HttpError(403, 'Sponsorships are closed for this season.');
       const f = await this.store.getFamilyBySlug(slug);
       if (!f) throw new HttpError(404, 'Family not found');
-      if (f.status !== 'Available') throw new HttpError(409, 'Someone just claimed this family. Thank you for trying — there are other families waiting.');
-      let sponsor = await this.store.findSponsorByEmail(req.email);
-      if (!sponsor) sponsor = await this.store.createSponsor({ name: req.name, email: req.email.toLowerCase(), phone: req.phone, organization: req.organization, preferredContact: req.preferredContact, notes: '' });
+      const taken = 'Someone just claimed this family. Thank you for trying — there are other families waiting.';
+      if (f.status !== 'Available') throw new HttpError(409, taken);
       const existing = await this.store.listSponsorships();
+      if (existing.some((x) => x.familyId === f.id && ACTIVE_SPONSORSHIP_STATUSES.includes(x.status))) throw new HttpError(409, taken);
+      const wall = req.wallOptIn ? { wallOptIn: true, displayName: req.displayName } : {};
+      let sponsor = await this.store.findSponsorByEmail(req.email);
+      if (!sponsor) sponsor = await this.store.createSponsor({ name: req.name, email: req.email.toLowerCase(), phone: req.phone, organization: req.organization, preferredContact: req.preferredContact, notes: '', displayName: '', wallOptIn: false, wallHidden: false, ...wall });
+      else if (req.wallOptIn) sponsor = await this.store.updateSponsor(sponsor.id, wall);
       const seq = existing.length + 1;
       const now = nowIso();
       const next = nextFollowUp('Claimed', settings);
       const s = await this.store.createSponsorship({
-        sponsorshipId: `SP-${settings.season}-${String(seq).padStart(3, '0')}`, familyId: f.id, sponsorId: sponsor.id, status: 'Claimed', token: newToken(), claimedAt: now,
+        sponsorshipId: `SP-${settings.season}-${String(seq).padStart(3, '0')}`, familyId: f.id, sponsorId: sponsor.id, status: 'Claimed', token: newToken(), handoff: req.handoff, claimedAt: now,
         shoppingAt: null, purchasedAt: null, wrappedAt: null, droppedOffAt: null, deliveredAt: null, releasedAt: null, nextFollowUpAt: next ? next.toISOString() : null, lastNudgedAt: null,
         lastResponseAt: null, followUpCount: 0, flagged: false, flagReason: '', releaseReason: '', sponsorNote: req.note, adminNotes: '',
       });
+      // Duplicate guard: another instance may have claimed the same family in the same few seconds.
+      // The earliest claim wins; a later duplicate is released and the Konnector is told the family is taken.
+      const rivals = (await this.store.listSponsorships({ familyId: f.id })).filter((x) => x.status === 'Claimed' && x.id !== s.id);
+      if (rivals.some((x) => x.claimedAt < s.claimedAt || (x.claimedAt === s.claimedAt && x.id < s.id))) {
+        await this.store.updateSponsorship(s.id, { status: 'Released', releasedAt: nowIso(), releaseReason: 'Duplicate claim (another Konnector was first)', nextFollowUpAt: null });
+        throw new HttpError(409, taken);
+      }
       await this.store.updateFamily(f.id, { status: 'Claimed' });
       await this.store.logActivity({ type: 'claim_complete', channel: 'web', familyId: f.id, sponsorshipId: s.id, subject: `${sponsor.name} claimed ${f.familyId}`, body: req.note, meta: { sponsorId: sponsor.id }, occurredAt: now });
       this.followUp.send('claim_confirmation', s, { actor: 'system' }).catch((e) => console.error('claim email failed', e));
@@ -135,11 +159,67 @@ export class Services {
     const [family, sponsor, settings, timeline] = await Promise.all([this.store.getFamily(s.familyId), this.store.getSponsor(s.sponsorId), this.store.getSettings(), this.store.listActivity({ sponsorshipId: s.id, limit: 30 })]);
     if (!family || !sponsor) throw new HttpError(404, 'This link is not valid.');
     return {
-      sponsorship: { sponsorshipId: s.sponsorshipId, status: s.status, claimedAt: s.claimedAt, shoppingAt: s.shoppingAt, purchasedAt: s.purchasedAt, wrappedAt: s.wrappedAt, droppedOffAt: s.droppedOffAt, deliveredAt: s.deliveredAt, releasedAt: s.releasedAt, sponsorNote: s.sponsorNote, nextFollowUpAt: s.nextFollowUpAt, followUpCount: s.followUpCount, flagged: s.flagged },
-      sponsor: { name: sponsor.name, email: sponsor.email, preferredContact: sponsor.preferredContact },
+      sponsorship: { sponsorshipId: s.sponsorshipId, status: s.status, handoff: s.handoff ?? 'Drop off', claimedAt: s.claimedAt, shoppingAt: s.shoppingAt, purchasedAt: s.purchasedAt, wrappedAt: s.wrappedAt, droppedOffAt: s.droppedOffAt, deliveredAt: s.deliveredAt, releasedAt: s.releasedAt, sponsorNote: s.sponsorNote, nextFollowUpAt: s.nextFollowUpAt, followUpCount: s.followUpCount, flagged: s.flagged },
+      sponsor: { name: sponsor.name, email: sponsor.email, preferredContact: sponsor.preferredContact, displayName: sponsor.displayName, wallOptIn: sponsor.wallOptIn },
       family: toPublicFamily(family),
       settings,
       timeline: timeline.filter((a) => a.type !== 'family_view').map((a) => ({ type: a.type, subject: a.subject, body: a.type === 'message_sent' ? a.body : '', occurredAt: a.occurredAt, channel: a.channel })),
+    };
+  }
+
+  /** Konnector opts in/out of the public wall from their family page. */
+  async setWall(tok: string, optIn: boolean, displayName: string) {
+    const s = await this.store.getSponsorshipByToken(tok);
+    if (!s) throw new HttpError(404, 'This link is not valid.');
+    await this.store.updateSponsor(s.sponsorId, { wallOptIn: optIn, displayName: displayName.trim().slice(0, 80) });
+    return this.sponsorPortal(tok);
+  }
+
+  /** Testimonials go in as Pending; staff approve them before anything is public. */
+  async submitQuote(input: QuoteSubmit) {
+    const settings = await this.store.getSettings();
+    const s = input.token ? await this.store.getSponsorshipByToken(input.token) : null;
+    const q = await this.store.createQuote({
+      quote: input.quote, name: input.name, role: s ? 'Holiday Konnector' : input.role, organization: input.organization, email: input.email, status: 'Pending', featured: false,
+      season: settings.season, familyId: s?.familyId ?? null, sponsorshipId: s?.id ?? null, submittedAt: nowIso(),
+    });
+    await this.store.logActivity({ type: 'quote', channel: 'web', familyId: q.familyId, sponsorshipId: q.sponsorshipId, subject: `New ${q.role === 'Konnection family' ? 'family' : 'Konnector'} quote from ${q.name}`, body: q.quote, meta: { quoteId: q.id }, occurredAt: q.submittedAt });
+    return { ok: true };
+  }
+
+  /**
+   * Public thank-you feed: approved quotes plus the Wall of Holiday Konnectors. A name only appears
+   * once that Konnector opted in AND their gifts were handed off, and staff can hide any name.
+   */
+  async community(): Promise<CommunityView> {
+    const settings = await this.store.getSettings();
+    const [quotes, families, sponsorships, sponsors] = await Promise.all([
+      this.store.listQuotes({ status: ['Approved'] }), this.store.listFamilies({ season: settings.season }), this.store.listSponsorships(), this.store.listSponsors(),
+    ]);
+    const fams = new Map(families.map((f) => [f.id, f]));
+    const people = new Map(sponsors.map((p) => [p.id, p]));
+    const done = sponsorships.filter((s) => fams.has(s.familyId) && (s.status === 'Dropped Off' || s.status === 'Delivered'));
+    const wall = new Map<string, WallEntry>();
+    for (const s of done) {
+      const p = people.get(s.sponsorId);
+      if (!p || !p.wallOptIn || p.wallHidden) continue;
+      const name = wallName(p);
+      const e = wall.get(name.toLowerCase()) ?? { name, families: 0, kids: 0, latestAt: '' };
+      e.families += 1;
+      e.kids += fams.get(s.familyId)!.children.length;
+      const at = s.deliveredAt ?? s.droppedOffAt ?? s.claimedAt;
+      if (at > e.latestAt) e.latestAt = at;
+      wall.set(name.toLowerCase(), e);
+    }
+    const blessed = done.map((s) => fams.get(s.familyId)!);
+    return {
+      quotes: quotes
+        .filter((q) => !q.season || q.season === settings.season || q.featured)
+        .sort((a, b) => Number(b.featured) - Number(a.featured) || b.submittedAt.localeCompare(a.submittedAt))
+        .slice(0, 12)
+        .map(({ id, quote, name, role, organization, featured, season }) => ({ id, quote, name, role, organization, featured, season })),
+      wall: [...wall.values()].sort((a, b) => b.latestAt.localeCompare(a.latestAt)),
+      totals: { konnectors: new Set(done.map((s) => s.sponsorId)).size, familiesBlessed: blessed.length, kidsBlessed: blessed.reduce((n, f) => n + f.children.length, 0) },
     };
   }
 }

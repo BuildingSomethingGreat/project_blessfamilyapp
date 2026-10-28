@@ -44,7 +44,8 @@ export interface Family {
   familyStory: string;
   storyApproved: boolean;
   photoUrl: string;        // data URL (memory) or attachment URL (Airtable); empty if none
-  photoApproved: boolean;
+  photoApproved: boolean;  // staff reviewed it and it may be shown
+  photoPrivate: boolean;   // the family asked us to keep the photo from sponsors (staff only)
   raised: number;          // chip-in pledges, dollars
   goal: number;            // wishlist goal, dollars
   eligibilityConfirmed: boolean;
@@ -106,8 +107,17 @@ export interface Sponsor {
   organization: string;
   preferredContact: 'Email' | 'Text' | 'Call';
   notes: string;
+  /** How the Konnector wants to be thanked publicly, e.g. "The Carter Family" or "Greater Grace Youth Group". */
+  displayName: string;
+  /** Opted in to the public Wall of Holiday Konnectors. */
+  wallOptIn: boolean;
+  /** Staff removed this name from the wall. */
+  wallHidden: boolean;
   createdAt: string;
 }
+
+export const HANDOFFS = ['Drop off', 'Deliver directly'] as const;
+export type Handoff = (typeof HANDOFFS)[number];
 
 export interface Sponsorship {
   id: string;
@@ -116,6 +126,8 @@ export interface Sponsorship {
   sponsorId: string;
   status: SponsorshipStatus;
   token: string;
+  /** Drop off at the drop-off site (we deliver), or deliver directly to the family (staff connect them privately). */
+  handoff: Handoff;
   claimedAt: string;
   shoppingAt: string | null;
   purchasedAt: string | null;
@@ -137,7 +149,7 @@ export interface Sponsorship {
 
 export type ActivityType =
   | 'catalog_view' | 'family_view' | 'claim_start' | 'claim_complete' | 'message_sent' | 'sponsor_response'
-  | 'status_change' | 'admin_action' | 'agent_action' | 'flag' | 'release' | 'chip_in';
+  | 'status_change' | 'admin_action' | 'agent_action' | 'flag' | 'release' | 'chip_in' | 'quote';
 
 export interface Activity {
   id: string;
@@ -165,12 +177,51 @@ export interface SeasonSettings {
   chipInsEnabled: boolean;
   chipInUrl: string;       // external checkout (Zeffy/Stripe link); empty = pledge only
   showPhotos: boolean;
+  /** Ask families for an (optional) photo on the application. Off = the photo question is not shown. */
+  askFamilyPhoto: boolean;
+}
+
+export const QUOTE_ROLES = ['Holiday Konnector', 'Konnection family'] as const;
+export type QuoteRole = (typeof QUOTE_ROLES)[number];
+export const QUOTE_STATUSES = ['Pending', 'Approved', 'Hidden'] as const;
+export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
+
+/** A testimonial from a Holiday Konnector or a family. Shown publicly only once staff approve it. */
+export interface Quote {
+  id: string;
+  quote: string;
+  name: string;           // display name, as the author wants it shown
+  role: QuoteRole;
+  organization: string;
+  email: string;          // private, for staff follow-up only
+  status: QuoteStatus;
+  featured: boolean;
+  season: string;
+  familyId: string | null;       // store id, private link
+  sponsorshipId: string | null;  // store id, private link
+  submittedAt: string;
+}
+
+export type PublicQuote = Pick<Quote, 'id' | 'quote' | 'name' | 'role' | 'organization' | 'featured' | 'season'>;
+
+/** One name on the Wall of Holiday Konnectors. */
+export interface WallEntry {
+  name: string;
+  families: number;       // families they followed through for this season
+  kids: number;
+  latestAt: string;       // most recent drop-off/delivery
+}
+
+export interface CommunityView {
+  quotes: PublicQuote[];
+  wall: WallEntry[];
+  totals: { konnectors: number; familiesBlessed: number; kidsBlessed: number };
 }
 
 /** What a sponsor sees on their magic-link status page. */
 export interface SponsorPortalView {
-  sponsorship: Pick<Sponsorship, 'sponsorshipId' | 'status' | 'claimedAt' | 'shoppingAt' | 'purchasedAt' | 'wrappedAt' | 'droppedOffAt' | 'deliveredAt' | 'releasedAt' | 'sponsorNote' | 'nextFollowUpAt' | 'followUpCount' | 'flagged'>;
-  sponsor: Pick<Sponsor, 'name' | 'email' | 'preferredContact'>;
+  sponsorship: Pick<Sponsorship, 'sponsorshipId' | 'status' | 'handoff' | 'claimedAt' | 'shoppingAt' | 'purchasedAt' | 'wrappedAt' | 'droppedOffAt' | 'deliveredAt' | 'releasedAt' | 'sponsorNote' | 'nextFollowUpAt' | 'followUpCount' | 'flagged'>;
+  sponsor: Pick<Sponsor, 'name' | 'email' | 'preferredContact' | 'displayName' | 'wallOptIn'>;
   family: PublicFamily;
   settings: SeasonSettings;
   timeline: Pick<Activity, 'type' | 'subject' | 'body' | 'occurredAt' | 'channel'>[];

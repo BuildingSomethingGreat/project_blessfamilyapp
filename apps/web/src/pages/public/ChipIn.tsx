@@ -39,7 +39,7 @@ export default function ChipIn() {
           <div className="anim-pop py-5 text-center">
             <div className="mx-auto grid size-[84px] place-items-center rounded-full bg-pri text-[38px] text-white">✓</div>
             <h1 className="mt-5 text-[36px] font-extrabold tracking-[-.045em]">Thank you.</h1>
-            <p className="mx-auto mt-2.5 max-w-[340px] text-[15px] leading-[1.5] text-ink-2">${fmt(done.total)} goes toward {f?.nickname}'s wishlist. Konnection staff shop whatever a sponsor doesn't cover; we'll email you when it's delivered.</p>
+            <p className="mx-auto mt-2.5 max-w-[340px] text-[15px] leading-[1.5] text-ink-2">${fmt(done.total)} goes toward {f?.nickname}'s wishlist. Konnection staff shop whatever a Holiday Konnector doesn't cover; we'll email you when it's delivered.</p>
             {done.url && <p className="mt-3 text-[13px] text-ink-3">Checkout opened in a new tab. <a href={done.url} target="_blank" rel="noreferrer" className="font-semibold text-pri">Open it again</a> if it was blocked.</p>}
             <Link to="/families" className="mt-[26px] inline-flex h-[50px] items-center rounded-full bg-ink px-6 text-[15px] font-semibold text-white">Back to families</Link>
           </div>

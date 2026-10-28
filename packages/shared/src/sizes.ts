@@ -32,9 +32,10 @@ export const GIFT_OPTIONS = [
 
 export const GENDERS = ['Girl', 'Boy', 'Prefer not to say'] as const;
 export const CONTACT_METHODS = ['Text', 'Call', 'Email'] as const;
-export const TRANSPORT_OPTIONS = ['I can pick up', 'Please deliver'] as const;
+/** Answers to "Would you prefer to pick up the gifts or have them delivered?" (stored as Transportation Yes/No). */
+export const TRANSPORT_OPTIONS = ['I’ll pick them up', 'Please deliver them'] as const;
 export const FAVORITE_COLORS = ['Purple', 'Pink', 'Yellow', 'Black', 'Green', 'Rainbow', 'Red', 'Blue', 'Lavender', 'Teal', 'Orange', 'Gold', 'White'] as const;
 export const CHIP_IN_AMOUNTS = [25, 50, 100, 150, 250, 500] as const;
 export const CARD_FEE = 1.2;
 /** Default per-child wishlist budget used for chip-in goals. */
-export const GOAL_PER_CHILD = 150;
+export const GOAL_PER_CHILD = 175;

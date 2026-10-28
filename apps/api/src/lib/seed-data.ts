@@ -6,7 +6,7 @@ import type { NewChild } from '../store/types.ts';
  * addresses are invented; keep them obviously non-real (555 numbers).
  */
 /** Bump when the demo dataset changes so stale local stores reseed. */
-export const SEED_VERSION = '2026-10-23.2';
+export const SEED_VERSION = '2026-10-28.1';
 
 export type SeedStatus = 'Available' | 'Claimed' | 'Fulfilled' | 'Submitted' | 'Needs Info';
 export interface SeedHousehold {
@@ -152,11 +152,11 @@ export const SEED_HOUSEHOLDS: SeedHousehold[] = [
 ];
 
 export const SEED_SPONSORS = [
-  { name: 'Danielle Carter', email: 'danielle@example.com', phone: '', organization: '', preferredContact: 'Email' as const, notes: '' },
-  { name: 'Greater Grace Youth Group', email: 'youth@example.org', phone: '', organization: 'Greater Grace Temple', preferredContact: 'Email' as const, notes: 'Group of 12 teens; wants 2 families next year' },
-  { name: 'Marcus & Tina Lee', email: 'lee.family@example.com', phone: '(313) 555-0199', organization: '', preferredContact: 'Text' as const, notes: '' },
-  { name: 'Rocket Mortgage Team 4B', email: 'team4b@example.com', phone: '', organization: 'Rocket Mortgage', preferredContact: 'Email' as const, notes: 'Corporate team; invoice-free' },
-  { name: 'Priya Natarajan', email: 'priya.n@example.com', phone: '(248) 555-0101', organization: '', preferredContact: 'Text' as const, notes: '' },
+  { name: 'Danielle Carter', email: 'danielle@example.com', phone: '', organization: '', preferredContact: 'Email' as const, notes: '', displayName: '', wallOptIn: false, wallHidden: false },
+  { name: 'Greater Grace Youth Group', email: 'youth@example.org', phone: '', organization: 'Greater Grace Temple', preferredContact: 'Email' as const, notes: 'Group of 12 teens; wants 2 families next year', displayName: 'Greater Grace Youth Group', wallOptIn: true, wallHidden: false },
+  { name: 'Marcus & Tina Lee', email: 'lee.family@example.com', phone: '(313) 555-0199', organization: '', preferredContact: 'Text' as const, notes: '', displayName: 'The Lee Family', wallOptIn: true, wallHidden: false },
+  { name: 'Rocket Mortgage Team 4B', email: 'team4b@example.com', phone: '', organization: 'Rocket Mortgage', preferredContact: 'Email' as const, notes: 'Corporate team; invoice-free', displayName: '', wallOptIn: false, wallHidden: false },
+  { name: 'Priya Natarajan', email: 'priya.n@example.com', phone: '(248) 555-0101', organization: '', preferredContact: 'Text' as const, notes: '', displayName: '', wallOptIn: true, wallHidden: false },
 ];
 
 /** Which seeded sponsorship goes with which claimed/fulfilled household (by index in SEED_HOUSEHOLDS). */
@@ -166,4 +166,11 @@ export const SEED_SPONSORSHIPS: { householdIdx: number; sponsorIdx: number; stat
   { householdIdx: 10, sponsorIdx: 3, status: 'Shopping', claimedDaysAgo: 5, lastResponseDaysAgo: 2, lastNudgedDaysAgo: 3, followUpCount: 0 },
   { householdIdx: 11, sponsorIdx: 2, status: 'Delivered', claimedDaysAgo: 20, lastResponseDaysAgo: 5, lastNudgedDaysAgo: 6, followUpCount: 0 },
   { householdIdx: 12, sponsorIdx: 4, status: 'Delivered', claimedDaysAgo: 18, lastResponseDaysAgo: 4, lastNudgedDaysAgo: 8, followUpCount: 0, note: 'Added a train table, hope that is okay!' },
+];
+
+/** Local-dev sample testimonials (never loaded in production). */
+export const SEED_QUOTES = [
+  { quote: 'The reminders kept us on track, and hearing the gifts were delivered made our whole office smile.', name: 'Tina L.', role: 'Holiday Konnector' as const, organization: '', status: 'Approved' as const, featured: true },
+  { quote: 'My kids felt so special this year. Thank you to whoever picked our family.', name: 'A Konnection mom', role: 'Konnection family' as const, organization: '', status: 'Approved' as const, featured: false },
+  { quote: 'Our youth group shopped together. Best night of the season.', name: 'Greater Grace Youth Group', role: 'Holiday Konnector' as const, organization: 'Greater Grace Temple', status: 'Pending' as const, featured: false },
 ];

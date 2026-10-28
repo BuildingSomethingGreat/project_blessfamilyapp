@@ -38,8 +38,20 @@ No passwords to manage. Admin emails are an allowlist in the API environment; a 
 ## 10. Festive decor is a layer system, not page chrome
 The holiday framing on the home page and Find a family page (`apps/web/src/components/festive`) is three layers: a back layer (CSS bokeh, blurred props, fine snow), the real content, and a front layer (sharp props, large soft snow) that overlaps the UI but is `pointer-events: none` and `aria-hidden`. Depth comes from blur, per-prop parallax rates, and the two snow canvases. Props are transparent PNGs in `apps/web/public/festive` (ornament with the K monogram, pine branch with lights, gifts, lantern, snowflake), generated for this project and quantized to keep the whole set under 400 KB. Everything respects `prefers-reduced-motion`, and the snow pauses off-screen and in hidden tabs. Below the `lg` breakpoint the sharp branches move behind the content so the headline and pill stay clear on phones.
 
+## 11. "Holiday Konnectors", and how gifts reach a family
+Public copy calls gift givers **Holiday Konnectors**; the code, API and Airtable keep the word "sponsor" so the data contract didn't churn. A Konnector chooses on the claim form whether to **drop off** at the drop-off site (we deliver) or **deliver directly**. Direct delivery never reveals the family's address on the site: staff see the choice in admin and connect the two privately. Gift rules (wrap, label with the child's name, gift receipt for clothing, same number of gifts per child) are repeated on the family page, the claim form, the Konnector page and the emails.
+
+## 12. Quotes and the Wall of Holiday Konnectors are moderated
+Testimonials come from `/share` (anyone) and from the Konnector page after hand-off, and always land as **Pending**; staff approve, hide, edit or feature them in Admin → Community, or add one they received by text. The Wall thanks Konnectors who opted in, and only after their gifts are handed off, so drive-by names can't appear; staff can hide or rename any entry. Default credit is first name + last initial.
+
+## 13. Family photos are off by default
+The application no longer asks for a photo unless an admin turns on "Ask families for a photo". When it's on, families can skip it or keep the photo staff-only; staff can still hide any photo per family.
+
+## 14. Airtable is the right store for this season
+At a few hundred families and a few thousand activity rows, Airtable's 5 requests/second limit is comfortable with the 20-second read cache, and staff get a spreadsheet for free. The base stays multi-table (Families, Children, Sponsors, Sponsorships, Quotes, Activity, Settings) because one flat table can't hold several children and a claim history per family. The live API refuses writes in production if Airtable isn't connected, rather than accepting data into a throwaway store.
+
 ## Open questions for The Konnection
-- Drop-off logistics: one location? Should sponsors book a slot?
+- Direct delivery: should staff share the family's address with the Konnector, or meet them at the family's door?
 - Do you want families to be able to update a wishlist after submitting (today: contact staff)?
 - Should a sponsor be able to claim more than one family in one go (organizations often do)?
 - Text message follow-ups: worth a Twilio number this season?

@@ -18,7 +18,16 @@ export function createApp(store: Store) {
   app.use('/api/*', cors({ origin: (o) => (config.corsOrigins.includes(o) ? o : config.corsOrigins[0]), credentials: true }));
 
   app.get('/', (c) => c.json({ name: 'bless-a-family-api', ok: true }));
-  app.get('/healthz', (c) => c.json({ ok: true, store: store.kind, time: new Date().toISOString() }));
+  app.get('/healthz', (c) => c.json({ ok: true, store: store.kind, live: store.kind === 'airtable', time: new Date().toISOString() }));
+  // In production the only durable store is Airtable. If it isn't connected, refuse public writes
+  // instead of accepting an application or claim into a throwaway in-memory store.
+  app.use('/api/*', async (c, next) => {
+    const write = c.req.method !== 'GET' && c.req.method !== 'HEAD' && c.req.method !== 'OPTIONS';
+    if (write && config.isProd && store.kind !== 'airtable' && !c.req.path.startsWith('/api/admin/auth')) {
+      return c.json({ error: 'Bless This Family is not connected to its database yet. Please try again soon or email us.' }, 503);
+    }
+    await next();
+  });
   app.route('/api', publicRoutes(services));
   app.route('/api/sponsor', sponsorRoutes(services));
   app.route('/api/admin', adminRoutes(services));

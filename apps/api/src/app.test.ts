@@ -113,3 +113,42 @@ test('register → admin approve → claim → sponsor dominoes → report', asy
   assert.equal(a.status, 503);
   assert.ok(services);
 });
+
+test('a duplicate claim written by another instance loses to the earlier one', async () => {
+  const fam = (await store.listFamilies({ status: ['Available'] }))[0];
+  // Simulate a second serverless instance that already wrote a claim a moment earlier but hasn't flipped the family yet.
+  const rival = await store.createSponsor({ name: 'Early Bird', email: 'early@example.com', phone: '', organization: '', preferredContact: 'Email', notes: '', displayName: '', wallOptIn: false, wallHidden: false });
+  await store.createSponsorship({ sponsorshipId: 'SP-T-1', familyId: fam.id, sponsorId: rival.id, status: 'Claimed', token: 'rival-token', handoff: 'Drop off', claimedAt: new Date(Date.now() - 1000).toISOString(), shoppingAt: null, purchasedAt: null, wrappedAt: null, droppedOffAt: null, deliveredAt: null, releasedAt: null, nextFollowUpAt: null, lastNudgedAt: null, lastResponseAt: null, followUpCount: 0, flagged: false, flagReason: '', releaseReason: '', sponsorNote: '', adminNotes: '' });
+  const res = await post(`/api/families/${fam.slug}/claim`, { name: 'Late Comer', email: 'late@example.com', agree: true });
+  assert.equal(res.status, 409);
+  const mine = (await store.listSponsorships({ familyId: fam.id })).filter((s) => s.sponsorId !== rival.id);
+  assert.ok(mine.every((s) => s.status === 'Released'), 'the later duplicate is released');
+});
+
+test('claim records hand-off choice and wall opt-in; the wall only shows names after hand-off', async () => {
+  const taken = new Set((await store.listSponsorships({ status: ['Claimed'] })).map((s) => s.familyId));
+  const fresh = (await store.listFamilies({ status: ['Available'] })).find((f) => !taken.has(f.id))!;
+  const res = await (await post(`/api/families/${fresh.slug}/claim`, { name: 'Wanda Wall', email: 'wanda@example.com', agree: true, handoff: 'Deliver directly', wallOptIn: true, displayName: 'The Wall Family' })).json();
+  assert.ok(res.token, JSON.stringify(res));
+  const sp = (await store.getSponsorshipByToken(res.token))!;
+  assert.equal(sp.handoff, 'Deliver directly');
+  const before = await (await app.request('/api/community')).json();
+  assert.ok(!before.wall.some((w: any) => w.name === 'The Wall Family'), 'not on the wall before gifts are handed off');
+  for (const status of ['Shopping', 'Purchased', 'Wrapped', 'Dropped Off']) assert.equal((await post(`/api/sponsor/${res.token}/status`, { status })).status, 200);
+  const after = await (await app.request('/api/community')).json();
+  assert.ok(after.wall.some((w: any) => w.name === 'The Wall Family'));
+  assert.ok(!JSON.stringify(after).includes('wanda@example.com'), 'no emails in the public feed');
+});
+
+test('quotes are pending until approved', async () => {
+  const sent = await post('/api/quotes', { role: 'Konnection family', name: 'A Konnection dad', quote: 'Thank you for making our holiday so special.', consent: true });
+  assert.equal(sent.status, 200);
+  const pub = await (await app.request('/api/community')).json();
+  assert.ok(!pub.quotes.some((q: any) => q.name === 'A Konnection dad'));
+  const q = (await store.listQuotes()).find((x) => x.name === 'A Konnection dad')!;
+  assert.equal(q.status, 'Pending');
+  await store.updateQuote(q.id, { status: 'Approved' });
+  const pub2 = await (await app.request('/api/community')).json();
+  assert.ok(pub2.quotes.some((x: any) => x.name === 'A Konnection dad'));
+  assert.equal((await post('/api/quotes', { role: 'Konnection family', name: 'X', quote: 'too short', consent: false })).status, 400);
+});

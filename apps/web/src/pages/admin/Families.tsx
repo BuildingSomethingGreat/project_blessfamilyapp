@@ -69,7 +69,7 @@ export default function Families() {
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[880px] text-[13px]">
               <thead className="text-left text-[11px] font-semibold uppercase tracking-[.06em] text-ink-3">
-                <tr className="border-b border-soft"><th className="px-5 py-3 font-semibold">Family</th><th className="px-3 py-3 font-semibold">Kids</th><th className="px-3 py-3 font-semibold">Status</th><th className="px-3 py-3 font-semibold">Sponsor</th><th className="px-3 py-3 text-right font-semibold">Views</th><th className="px-3 py-3 text-right font-semibold">Chip-ins</th><th className="px-3 py-3 font-semibold">Submitted</th><th className="px-5 py-3" /></tr>
+                <tr className="border-b border-soft"><th className="px-5 py-3 font-semibold">Family</th><th className="px-3 py-3 font-semibold">Kids</th><th className="px-3 py-3 font-semibold">Status</th><th className="px-3 py-3 font-semibold">Konnector</th><th className="px-3 py-3 text-right font-semibold">Views</th><th className="px-3 py-3 text-right font-semibold">Chip-ins</th><th className="px-3 py-3 font-semibold">Submitted</th><th className="px-5 py-3" /></tr>
               </thead>
               <tbody>
                 {rows.map((f) => (

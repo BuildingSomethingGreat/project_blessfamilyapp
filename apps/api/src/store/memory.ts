@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import type { Activity, Family, FamilyStatus, SeasonSettings, Sponsor, Sponsorship, SponsorshipStatus } from '@bless/shared';
-import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewFamily, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
+import type { Activity, Family, FamilyStatus, Quote, QuoteStatus, SeasonSettings, Sponsor, Sponsorship, SponsorshipStatus } from '@bless/shared';
+import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewFamily, type NewQuote, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
 import { nowIso, uuid } from '../lib/ids.ts';
 
 interface Snapshot {
@@ -10,6 +10,7 @@ interface Snapshot {
   sponsors: Sponsor[];
   sponsorships: Sponsorship[];
   activity: Activity[];
+  quotes: Quote[];
   settings: SeasonSettings;
 }
 
@@ -19,7 +20,7 @@ interface Snapshot {
  */
 export class MemoryStore implements Store {
   readonly kind = 'memory' as const;
-  private data: Snapshot = { families: [], sponsors: [], sponsorships: [], activity: [], settings: { ...DEFAULT_SETTINGS } };
+  private data: Snapshot = { families: [], sponsors: [], sponsorships: [], activity: [], quotes: [], settings: { ...DEFAULT_SETTINGS } };
   private file: string | null;
   private saveTimer: NodeJS.Timeout | null = null;
 
@@ -31,7 +32,8 @@ export class MemoryStore implements Store {
     if (!this.file) return;
     try {
       const raw = await readFile(this.file, 'utf8');
-      this.data = { ...this.data, ...JSON.parse(raw) };
+      const loaded = JSON.parse(raw) as Partial<Snapshot>;
+      this.data = { ...this.data, ...loaded, quotes: loaded.quotes ?? [], settings: { ...DEFAULT_SETTINGS, ...(loaded.settings ?? {}) } };
     } catch {
       /* fresh */
     }
@@ -59,7 +61,7 @@ export class MemoryStore implements Store {
   }
   /** Drops all data (used when the bundled demo seed changes). */
   reset(seedVersion: string) {
-    this.data = { seedVersion, families: [], sponsors: [], sponsorships: [], activity: [], settings: { ...DEFAULT_SETTINGS } };
+    this.data = { seedVersion, families: [], sponsors: [], sponsorships: [], activity: [], quotes: [], settings: { ...DEFAULT_SETTINGS } };
     this.persist();
   }
 
@@ -136,6 +138,14 @@ export class MemoryStore implements Store {
     return this.clone(s);
   }
 
+  async updateSponsor(id: string, patch: Partial<Sponsor>) {
+    const s = this.data.sponsors.find((x) => x.id === id);
+    if (!s) throw new Error('sponsor not found');
+    Object.assign(s, patch, { id: s.id });
+    this.persist();
+    return this.clone(s);
+  }
+
   async listSponsorships(filter: { status?: SponsorshipStatus[]; familyId?: string; sponsorId?: string } = {}) {
     return this.clone(
       this.data.sponsorships.filter(
@@ -185,6 +195,27 @@ export class MemoryStore implements Store {
     rows = [...rows].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
     if (filter.limit) rows = rows.slice(0, filter.limit);
     return this.clone(rows);
+  }
+
+  async listQuotes(filter: { status?: QuoteStatus[]; season?: string } = {}) {
+    return this.clone(
+      this.data.quotes
+        .filter((q) => (!filter.status || filter.status.includes(q.status)) && (!filter.season || q.season === filter.season))
+        .sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
+    );
+  }
+  async createQuote(input: NewQuote) {
+    const q: Quote = { ...input, id: uuid() };
+    this.data.quotes.push(q);
+    this.persist();
+    return this.clone(q);
+  }
+  async updateQuote(id: string, patch: Partial<Quote>) {
+    const q = this.data.quotes.find((x) => x.id === id);
+    if (!q) throw new Error('quote not found');
+    Object.assign(q, patch, { id: q.id });
+    this.persist();
+    return this.clone(q);
   }
 
   async getSettings() {

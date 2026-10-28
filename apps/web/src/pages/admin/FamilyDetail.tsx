@@ -86,7 +86,7 @@ export default function FamilyDetail() {
         </div>
         <div className="flex flex-wrap gap-2">
           {FAMILY_ACTIONS[f.status].map((a) => (
-            <Button key={a.to} size="sm" variant={a.variant} onClick={() => { if (a.to === 'Declined' || a.to === 'Withdrawn' ? window.confirm(`${a.label} ${f.familyId}? Sponsors will no longer see this family.`) : true) patchFamily.mutate({ status: a.to }); }} loading={patchFamily.isPending && patchFamily.variables?.status === a.to}>{a.label}</Button>
+            <Button key={a.to} size="sm" variant={a.variant} onClick={() => { if (a.to === 'Declined' || a.to === 'Withdrawn' ? window.confirm(`${a.label} ${f.familyId}? Holiday Konnectors will no longer see this family.`) : true) patchFamily.mutate({ status: a.to }); }} loading={patchFamily.isPending && patchFamily.variables?.status === a.to}>{a.label}</Button>
           ))}
           {(f.status === 'Available' || f.status === 'Claimed' || f.status === 'Fulfilled') && <Button size="sm" variant="secondary" onClick={() => { copyText(publicUrl); toast('Public link copied', 'ok'); }}>Copy public link</Button>}
         </div>
@@ -102,7 +102,7 @@ export default function FamilyDetail() {
               <Row k="Email" v={f.email ? <a className="text-pri hover:underline" href={`mailto:${f.email}`}>{f.email}</a> : '—'} />
               <Row k="Prefers" v={f.preferredContact} />
               <Row k="Address" v={`${f.address}, ${f.city}, ${f.state} ${f.zip}`} />
-              <Row k="Gifts" v={f.transportation === 'Yes' ? 'Can pick up from the office' : 'Needs delivery'} />
+              <Row k="Gifts" v={f.transportation === 'Yes' ? 'Prefers to pick up' : 'Prefers delivery'} />
               <Row k="Eligibility" v={f.eligibilityConfirmed ? 'Confirmed by guardian' : 'Not confirmed'} />
               <Row k="Approved" v={f.approvedAt ? fmtDate(f.approvedAt) : '—'} />
             </dl>
@@ -116,9 +116,9 @@ export default function FamilyDetail() {
               <p className="mt-3 text-[12px] text-ink-3">Only visible on the public page after approval. Check for full names or addresses.</p>
             </Panel>
             <Panel>
-              <PanelTitle right={<Toggle checked={f.photoApproved} onChange={(v) => patchFamily.mutate({ photoApproved: v })} label="Show publicly" />}>Family photo</PanelTitle>
+              <PanelTitle right={f.photoUrl ? <Toggle checked={f.photoApproved && !f.photoPrivate} onChange={(v) => patchFamily.mutate(v ? { photoApproved: true, photoPrivate: false } : { photoPrivate: true })} label="Show publicly" /> : undefined}>Family photo</PanelTitle>
               <FamilyArt art={art} photoUrl={f.photoUrl} className="mt-3 h-[160px] rounded-[16px]" />
-              <p className="mt-3 text-[12px] text-ink-3">{f.photoUrl ? (f.photoApproved ? 'Will show on the public card.' : 'Check: no faces of minors unless consent box was ticked.') : 'No photo submitted. The card uses the gradient from the kids\' favorite colors.'}</p>
+              <p className="mt-3 text-[12px] text-ink-3">{!f.photoUrl ? 'No photo. The card uses a gradient from the kids\' favorite colors.' : f.photoPrivate ? 'Hidden from Holiday Konnectors (staff only). Only turn it on if the family says it\'s okay.' : f.photoApproved ? 'Shows on the public card and family page.' : 'Waiting for review. Check that it doesn\'t show full names, addresses or school logos.'}</p>
             </Panel>
           </div>
 
@@ -135,7 +135,7 @@ export default function FamilyDetail() {
                 <div className="flex-1"><Label htmlFor="goal" hint="dollars">Wishlist goal</Label><Input id="goal" type="number" min={0} step={10} value={goal} onChange={(e) => setGoal(e.target.value)} /></div>
                 <Button size="md" variant="dark" className="h-[50px]" disabled={Number(goal) === f.public.goal} onClick={() => patchFamily.mutate({ goal: Number(goal) })}>Save</Button>
               </div>
-              <p className="mt-3 text-[12px] text-ink-3">Defaults to $150 per child. Konnection staff shop whatever a sponsor doesn't cover.</p>
+              <p className="mt-3 text-[12px] text-ink-3">Defaults to $175 per child. Konnection staff shop whatever a Holiday Konnector doesn't cover.</p>
             </Panel>
           </div>
 
@@ -164,10 +164,10 @@ export default function FamilyDetail() {
 
         <div className="space-y-3.5 lg:col-span-2">
           <Panel>
-            <PanelTitle right={active ? <SpStatusChip status={active.status} /> : undefined}>Sponsorship</PanelTitle>
+            <PanelTitle right={active ? <SpStatusChip status={active.status} /> : undefined}>Holiday Konnector</PanelTitle>
             {!active ? (
               <div className="mt-3">
-                <p className="text-[13px] text-ink-3">{f.status === 'Available' ? 'Listed and waiting for a sponsor.' : f.status === 'Submitted' || f.status === 'Needs Info' ? 'Not listed yet. Approve the family to make it visible to sponsors.' : 'No active sponsor.'}</p>
+                <p className="text-[13px] text-ink-3">{f.status === 'Available' ? 'Listed and waiting for a Holiday Konnector.' : f.status === 'Submitted' || f.status === 'Needs Info' ? 'Not listed yet. Approve the family to make it visible to Holiday Konnectors.' : 'No active Holiday Konnector.'}</p>
                 {f.status === 'Available' && (
                   <div className="mt-3.5 flex items-center gap-2 rounded-[14px] bg-bg p-3 text-[13px]">
                     <span className="min-w-0 flex-1 truncate font-mono text-[11px]">{publicUrl}</span>
@@ -180,12 +180,14 @@ export default function FamilyDetail() {
               <div className="mt-3.5 space-y-5">
                 {active.flagged && <div className="rounded-2xl bg-bad-soft px-4 py-3 text-[13px] text-bad"><b>Flagged:</b> {active.flagReason || 'needs a human decision'}</div>}
                 <div>
-                  <div className="text-[17px] font-bold">{active.sponsor?.name ?? 'Unknown sponsor'}</div>
+                  <div className="text-[17px] font-bold">{active.sponsor?.name ?? 'Unknown Konnector'}</div>
                   <div className="text-[13px] text-ink-2">
                     {active.sponsor?.organization && <div>{active.sponsor.organization}</div>}
                     {active.sponsor?.email && <a className="block text-pri hover:underline" href={`mailto:${active.sponsor.email}`}>{active.sponsor.email}</a>}
                     {active.sponsor?.phone && <a className="block text-pri hover:underline" href={`tel:${active.sponsor.phone}`}>{active.sponsor.phone}</a>}
                     <div className="text-ink-3">Prefers {active.sponsor?.preferredContact?.toLowerCase() ?? 'email'} · {active.sponsorshipId}</div>
+                    <div className={active.handoff === 'Deliver directly' ? 'mt-1 font-semibold text-warn' : 'mt-1 text-ink-3'}>{active.handoff === 'Deliver directly' ? 'Will deliver directly: share the family\'s address with them privately' : 'Dropping off gifts with us'}</div>
+                    {active.sponsor && <div className="text-ink-3">Wall: {active.sponsor.wallOptIn ? (active.sponsor.wallHidden ? 'opted in, hidden by staff' : 'opted in') : 'not opted in'}</div>}
                   </div>
                   {active.sponsorNote && <p className="mt-2 rounded-[14px] bg-bg px-3 py-2 text-[13px] italic">“{active.sponsorNote}”</p>}
                 </div>
@@ -198,9 +200,9 @@ export default function FamilyDetail() {
                 </dl>
                 <div className="grid grid-cols-2 gap-2">
                   {active.status !== 'Delivered' && <Button size="sm" variant="secondary" onClick={() => setNudgeOpen(active)}>Send nudge</Button>}
-                  <Button size="sm" variant="secondary" onClick={() => { copyText(`${window.location.origin}/s/${active.token}`); toast('Sponsor portal link copied', 'ok'); }}>Copy portal link</Button>
+                  <Button size="sm" variant="secondary" onClick={() => { copyText(`${window.location.origin}/s/${active.token}`); toast('Konnector page link copied', 'ok'); }}>Copy portal link</Button>
                   {inShopping && <Button size="sm" variant="dark" onClick={() => move(active, 'Dropped Off', 'Record that gifts were dropped off at The Konnection?')}>Mark dropped off</Button>}
-                  {active.status === 'Dropped Off' && <Button size="sm" onClick={() => move(active, 'Delivered', `Mark gifts delivered to ${f.public.nickname}? The sponsor gets a thank-you.`)}>Mark delivered</Button>}
+                  {active.status === 'Dropped Off' && <Button size="sm" onClick={() => move(active, 'Delivered', `Mark gifts delivered to ${f.public.nickname}? The Konnector gets a thank-you and a link to share their story.`)}>Mark delivered</Button>}
                   {active.status !== 'Delivered' && <Button size="sm" variant="danger" onClick={() => setReleaseOpen(active)}>Release family</Button>}
                   {active.flagged && <Button size="sm" variant="ghost" onClick={() => patchSp.mutate({ spId: active.id, body: { flagged: false } })}>Clear flag</Button>}
                 </div>
@@ -296,7 +298,7 @@ export function ReleaseSheet({ sp, familyName, onClose, onConfirm, pending }: { 
             {reason === 'Other' && <Input className="mt-2" placeholder="Tell the next admin why" value={other} onChange={(e) => setOther(e.target.value)} />}
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="secondary" size="lg" onClick={onClose}>Keep sponsor</Button>
+            <Button variant="secondary" size="lg" onClick={onClose}>Keep Konnector</Button>
             <Button variant="danger" size="lg" loading={pending} onClick={() => onConfirm(reason === 'Other' ? other.trim() || 'Other' : reason)}>Release family</Button>
           </div>
         </div>

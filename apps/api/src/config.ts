@@ -26,7 +26,7 @@ export const config = {
     driver: env('NOTIFY_DRIVER', 'console') as 'console' | 'resend',
     resendKey: env('RESEND_API_KEY'),
     from: env('EMAIL_FROM', 'The Konnection <bless@thekonnection.org>'),
-    replyTo: env('EMAIL_REPLY_TO', 'info@thekonnection.org'),
+    replyTo: env('EMAIL_REPLY_TO', 'sharnese@thekonnection.org'),
     twilio: { sid: env('TWILIO_ACCOUNT_SID'), token: env('TWILIO_AUTH_TOKEN'), from: env('TWILIO_FROM') },
   },
   anthropic: {
@@ -43,5 +43,6 @@ export const config = {
     flagAfterNudges: Number(env('FOLLOWUP_FLAG_AFTER', '2')),
     enabled: env('FOLLOWUP_ENABLED', 'true') !== 'false',
   },
-  seedDemo: env('SEED_DEMO', 'true') !== 'false',
+  /** Load the bundled test households into the in-memory store. Never on by default in production. */
+  seedDemo: env('SEED_DEMO', env('NODE_ENV') === 'production' || process.env.NETLIFY ? 'false' : 'true') !== 'false',
 };

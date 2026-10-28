@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { ChipInSchema, ClaimRequestSchema, FamilyApplicationSchema } from '@bless/shared';
+import { ChipInSchema, ClaimRequestSchema, FamilyApplicationSchema, QuoteSubmitSchema } from '@bless/shared';
 import type { Services } from '../lib/services.ts';
 import { HttpError } from '../lib/services.ts';
 import { nowIso } from '../lib/ids.ts';
@@ -68,6 +68,15 @@ export function publicRoutes(services: Services) {
     const parsed = ChipInSchema.safeParse(await c.req.json());
     if (!parsed.success) return c.json({ error: 'Please check the amount', issues: parsed.error.flatten() }, 400);
     return c.json(await services.chipIn(c.req.param('slug'), parsed.data));
+  });
+
+  r.get('/community', async (c) => c.json(await services.community()));
+
+  r.post('/quotes', async (c) => {
+    if (!allow(`quote:${ip(c)}`, 5, 10 * 60_000)) throw new HttpError(429, 'Slow down a moment and try again.');
+    const parsed = QuoteSubmitSchema.safeParse(await c.req.json());
+    if (!parsed.success) return c.json({ error: 'Please check the form', issues: parsed.error.flatten() }, 400);
+    return c.json(await services.submitQuote(parsed.data));
   });
 
   r.post('/register', async (c) => {

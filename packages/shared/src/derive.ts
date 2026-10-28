@@ -1,4 +1,5 @@
 import type { Child, Family, PublicFamily, PublicChild } from './types.ts';
+import { GOAL_PER_CHILD } from './sizes.ts';
 
 export const COLOR_MAP: Record<string, string> = {
   purple: '#7c5cff', pink: '#ff7eb6', yellow: '#f5c542', black: '#1b1a17', green: '#2fa36b', rainbow: '#c17aff', red: '#e34948', blue: '#2a78d6',
@@ -30,11 +31,25 @@ export function firstName(name: string): string {
   return (name || 'Child').trim().split(/\s+/)[0];
 }
 
+/** Age groups used by the catalog filters and card chips. Ranges are inclusive. */
+export const AGE_GROUPS = [
+  { key: 'little', label: 'Babies & toddlers', range: '0–3', min: 0, max: 3 },
+  { key: 'kids', label: 'Kids', range: '4–12', min: 4, max: 12 },
+  { key: 'teens', label: 'Teens', range: '13–17', min: 13, max: 17 },
+] as const;
+export type AgeGroupKey = (typeof AGE_GROUPS)[number]['key'];
+
+/** Clothing needs the catalog can filter on, keyed to the wishlist option that signals them. */
+export const NEED_FILTERS = [
+  { key: 'coat', label: 'Winter coat', tag: 'Needs a winter coat', item: 'Winter Coat' },
+  { key: 'boots', label: 'Boots', tag: 'Needs boots', item: 'Boots' },
+  { key: 'shoes', label: 'Shoes', tag: 'Needs shoes', item: 'Shoes / Sneakers' },
+] as const;
+export type NeedKey = (typeof NEED_FILTERS)[number]['key'];
+
 export function ageBand(age: number): string {
-  if (age < 2) return 'Baby';
-  if (age < 5) return 'Little kid';
-  if (age < 10) return 'Kid';
-  if (age < 13) return 'Tween';
+  if (age <= 3) return 'Baby / toddler';
+  if (age <= 12) return 'Kid';
   return 'Teen';
 }
 
@@ -45,10 +60,9 @@ export function deriveTags(children: Child[]): string[] {
   else if (n <= 3) tags.add(`${n} kids`);
   else tags.add('Big family');
   const bands = new Set(children.map((c) => ageBand(c.age)));
-  for (const b of ['Baby', 'Little kid', 'Kid', 'Tween', 'Teen']) if (bands.has(b)) tags.add(b === 'Baby' ? 'Babies' : b === 'Little kid' ? 'Little kids' : b + 's');
-  if (children.some((c) => c.clothingWishlist.includes('Winter Coat'))) tags.add('Needs winter coats');
-  if (children.some((c) => c.clothingWishlist.includes('Boots'))) tags.add('Needs boots');
-  if (children.some((c) => c.clothingWishlist.includes('Shoes / Sneakers'))) tags.add('Needs shoes');
+  if (bands.has('Baby / toddler')) tags.add('Baby or toddler');
+  if (bands.has('Teen')) tags.add('Teen');
+  for (const n of NEED_FILTERS) if (children.some((c) => (c.clothingWishlist as readonly string[]).includes(n.item))) tags.add(n.tag);
   if (children.some((c) => c.giftTypes.includes('Books'))) tags.add('Readers');
   if (children.some((c) => c.giftTypes.includes('Sports Equipment'))) tags.add('Athletes');
   if (children.some((c) => c.giftTypes.includes('Art Supplies') || c.giftTypes.includes('Craft Kits'))) tags.add('Creatives');
@@ -96,9 +110,9 @@ export function toPublicFamily(f: Family, now = new Date()): PublicFamily {
     city: f.city,
     status: f.status,
     story: f.storyApproved ? f.familyStory : '',
-    photoUrl: f.photoApproved ? f.photoUrl : '',
+    photoUrl: f.photoApproved && !f.photoPrivate ? f.photoUrl : '',
     raised: f.raised ?? 0,
-    goal: f.goal || n * 150,
+    goal: f.goal || n * GOAL_PER_CHILD,
     childCount: n,
     ageRange: [Math.min(...ages), Math.max(...ages)],
     colors: colors.length ? colors : ['#eb6834'],

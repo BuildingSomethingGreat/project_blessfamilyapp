@@ -7,27 +7,27 @@ import { Checkbox, KMark, Seg, Select, UnderlineInput } from '@/components/ui';
 import { cx } from '@/lib/format';
 
 type Kid = { name: string; age: string; gender: string; cat: ClothingCategory; shirt: string; pants: string; shoe: string; sizeNotes: string; hobbies: string; color: string; clothing: string[]; clothingExtra: string; gifts: string[]; giftsExtra: string };
-type Ans = { guardian: string; phone: string; contact: string; email: string; city: string; address: string; zip: string; transport: string; kidCount: string; kids: Kid[]; story: string; photo: string; photoDataUrl: string; eligible: boolean };
+type Ans = { guardian: string; phone: string; contact: string; email: string; city: string; address: string; zip: string; transport: string; kidCount: string; kids: Kid[]; story: string; photo: string; photoDataUrl: string; photoPrivate: boolean; eligible: boolean };
 type Step = { t: 'welcome' | 'text' | 'choice' | 'address' | 'who' | 'sizes' | 'interests' | 'multi' | 'story' | 'photo' | 'confirm' | 'done'; key?: keyof Ans | 'clothing' | 'gifts'; i?: number; kicker?: string; title: string; help?: string; ph?: string; type?: string; opts?: readonly string[]; extraPh?: string };
 
 const DRAFT = 'baf-register-draft';
 const blankKid = (): Kid => ({ name: '', age: '', gender: '', cat: 'Youth / Kids', shirt: '', pants: '', shoe: '', sizeNotes: '', hobbies: '', color: '', clothing: [], clothingExtra: '', gifts: [], giftsExtra: '' });
-const fresh = (): Ans => ({ guardian: '', phone: '', contact: '', email: '', city: '', address: '', zip: '', transport: '', kidCount: '', kids: [], story: '', photo: '', photoDataUrl: '', eligible: false });
+const fresh = (): Ans => ({ guardian: '', phone: '', contact: '', email: '', city: '', address: '', zip: '', transport: '', kidCount: '', kids: [], story: '', photo: '', photoDataUrl: '', photoPrivate: false, eligible: false });
 const field = 'mt-1.5 h-[50px] w-full rounded-2xl border border-line bg-bg px-4 text-base outline-none focus:border-pri focus:bg-white';
 const label = 'text-[13px] font-semibold text-ink-2';
 
-function buildSteps(a: Ans): Step[] {
+function buildSteps(a: Ans, askPhoto: boolean): Step[] {
   const s: Step[] = [
-    { t: 'welcome', title: 'Tell us about your family.', help: "Bless-A-Family matches Konnection households with holiday sponsors. Answer a few questions and we'll take it from there." },
-    { t: 'text', key: 'guardian', kicker: 'About you', title: "What's your name?", help: 'Parent or guardian. Donors never see this.', ph: 'First and last name' },
-    { t: 'text', key: 'phone', kicker: 'About you', title: 'Best number to reach you?', help: "We'll text when your family is reviewed and when a sponsor steps up.", ph: '(313) 555-0100', type: 'tel' },
+    { t: 'welcome', title: 'Tell us about your family.', help: "Bless This Family matches Konnection households with Holiday Konnectors who shop your children's wish lists. Answer a few questions and we'll take it from there." },
+    { t: 'text', key: 'guardian', kicker: 'About you', title: "What's your name?", help: 'Parent or guardian. Holiday Konnectors never see this.', ph: 'First and last name' },
+    { t: 'text', key: 'phone', kicker: 'About you', title: 'Best number to reach you?', help: "We'll text when your family is reviewed and when a Holiday Konnector steps up.", ph: '(313) 555-0100', type: 'tel' },
     { t: 'choice', key: 'contact', kicker: 'About you', title: 'How do you prefer we reach you?', opts: CONTACT_METHODS },
   ];
   if (a.contact === 'Email') s.push({ t: 'text', key: 'email', kicker: 'About you', title: "What's your email?", help: "We'll only use it for updates about your application.", ph: 'you@example.com', type: 'email' });
   s.push(
-    { t: 'text', key: 'city', kicker: 'Your household', title: 'What city do you live in?', help: 'Donors see the city only — never your street address.', ph: 'Detroit' },
-    { t: 'address', kicker: 'Your household', title: "What's your home address?", help: 'Private. Only our delivery team sees it.' },
-    { t: 'choice', key: 'transport', kicker: 'Your household', title: 'Can you pick gifts up from our office, or should we deliver?', opts: TRANSPORT_OPTIONS },
+    { t: 'text', key: 'city', kicker: 'Your household', title: 'What city do you live in?', help: 'Holiday Konnectors see the city only, never your street address.', ph: 'Detroit' },
+    { t: 'address', kicker: 'Your household', title: "What's your home address?", help: 'Private. Only our team sees it, to arrange delivery.' },
+    { t: 'choice', key: 'transport', kicker: 'Your household', title: 'Would you prefer to pick up the gifts or have them delivered?', opts: TRANSPORT_OPTIONS },
     { t: 'choice', key: 'kidCount', kicker: 'Your children', title: 'How many children are in your household?', help: 'Under 18, living with you.', opts: ['1', '2', '3', '4', '5', '6'] },
   );
   const n = Math.min(15, Number(a.kidCount) || 0);
@@ -38,22 +38,25 @@ function buildSteps(a: Ans): Step[] {
       { t: 'sizes', i, kicker: `Child ${i + 1} · ${nm}`, title: `What sizes does ${nm} wear?`, help: 'Category first, then the exact size.' },
       { t: 'interests', i, kicker: `Child ${i + 1} · ${nm}`, title: `What does ${nm} love?`, help: 'Hobbies, characters, sports — this is what makes a gift feel chosen.' },
       { t: 'multi', i, key: 'clothing', kicker: `Child ${i + 1} · ${nm}`, title: `Clothing ${nm} needs`, opts: CLOTHING_OPTIONS, extraPh: 'Anything else? (optional)' },
-      { t: 'multi', i, key: 'gifts', kicker: `Child ${i + 1} · ${nm}`, title: `Fun gifts for ${nm}`, help: 'Pick a few kinds. Sponsors choose within them.', opts: GIFT_OPTIONS, extraPh: 'A specific wish, e.g. a sketchbook and markers' },
+      { t: 'multi', i, key: 'gifts', kicker: `Child ${i + 1} · ${nm}`, title: `Fun gifts for ${nm}`, help: 'Pick a few kinds. Holiday Konnectors choose within them.', opts: GIFT_OPTIONS, extraPh: 'A specific wish, e.g. a sketchbook and markers' },
     );
   }
   s.push(
-    { t: 'story', key: 'story', kicker: 'Your story', title: 'Tell donors a little about your family.', help: 'Two or three sentences. What makes your kids who they are? Optional, but families with a story are chosen sooner.' },
-    { t: 'photo', key: 'photo', kicker: 'Your story', title: 'Would you like to share a family photo?', help: 'Optional. Photos are reviewed by our team and shown only with your approval.' },
+    { t: 'story', key: 'story', kicker: 'Your story', title: 'Tell Holiday Konnectors a little about your family.', help: 'Two or three sentences. What makes your kids who they are? Optional, but families with a story are chosen sooner.' },
+  );
+  if (askPhoto) s.push({ t: 'photo', key: 'photo', kicker: 'Your story', title: 'Would you like to share a family photo?', help: 'Completely optional. Our team reviews every photo, and you choose whether Holiday Konnectors see it.' });
+  s.push(
     { t: 'confirm', kicker: 'Last step', title: 'Does this look right?' },
     { t: 'done', kicker: 'Submitted', title: `Thank you, ${(a.guardian || 'friend').split(' ')[0]}.` },
   );
   return s;
 }
 
-function toApplication(a: Ans) {
+function toApplication(a: Ans, askPhoto: boolean) {
+  if (!askPhoto) a = { ...a, photo: '', photoDataUrl: '' };
   return {
     eligibilityConfirmed: a.eligible as true, guardianName: a.guardian, phone: a.phone, email: a.email, preferredContact: (a.contact || 'Text') as 'Text' | 'Call' | 'Email',
-    address: a.address, city: a.city, state: 'MI', zip: a.zip, transportation: (a.transport === 'I can pick up' ? 'Yes' : 'No') as 'Yes' | 'No', familyStory: a.story, photoDataUrl: a.photo === 'Yes, share a photo' ? a.photoDataUrl : '', notes: '',
+    address: a.address, city: a.city, state: 'MI', zip: a.zip, transportation: (a.transport === TRANSPORT_OPTIONS[0] || a.transport === 'I can pick up' ? 'Yes' : 'No') as 'Yes' | 'No', familyStory: a.story, photoDataUrl: a.photo === 'Share a photo' ? a.photoDataUrl : '', photoPrivate: a.photo === 'Share a photo' && a.photoPrivate, notes: '',
     children: a.kids.slice(0, Math.min(15, Number(a.kidCount) || 0)).map((k): ChildInput => ({
       name: k.name, age: Number(k.age), gender: (k.gender || 'Prefer not to say') as ChildInput['gender'], clothingCategory: k.cat, shirtSize: k.shirt, pantsSize: k.pants, shoeCategory: k.cat, shoeSize: k.shoe,
       sizeNotes: k.sizeNotes, favoriteColor: k.color, hobbies: k.hobbies, clothingWishlist: k.clothing as ChildInput['clothingWishlist'], otherClothing: k.clothingExtra, giftTypes: k.gifts as ChildInput['giftTypes'], specificGifts: k.giftsExtra,
@@ -87,7 +90,8 @@ export default function Register() {
   useEffect(() => { try { const raw = localStorage.getItem(DRAFT); if (raw) { const d = JSON.parse(raw); if (d?.ans?.guardian || d?.step > 0) setResume(d); } } catch { /* ignore */ } }, []);
   useEffect(() => { if (submitted) return; try { if (step > 0) localStorage.setItem(DRAFT, JSON.stringify({ ans: { ...a, photoDataUrl: '' }, step })); } catch { /* ignore */ } }, [a, step, submitted]);
 
-  const steps = useMemo(() => buildSteps(a), [a]);
+  const askPhoto = !!settings.data?.askFamilyPhoto;
+  const steps = useMemo(() => buildSteps(a, askPhoto), [a, askPhoto]);
   const q = steps[Math.min(step, steps.length - 1)];
   const kid = a.kids[q.i ?? 0] ?? blankKid();
   const setKid = (i: number, patch: Partial<Kid>) => setA((s) => { const kids = [...s.kids]; kids[i] = { ...(kids[i] ?? blankKid()), ...patch }; return { ...s, kids }; });
@@ -110,7 +114,7 @@ export default function Register() {
   const next = async () => {
     if (!valid || busy) return;
     if (q.t === 'confirm') {
-      const parsed = FamilyApplicationSchema.safeParse(toApplication(a));
+      const parsed = FamilyApplicationSchema.safeParse(toApplication(a, askPhoto));
       if (!parsed.success) { const issue = parsed.error.issues[0]; setError(`${issue.path.join(' › ') || 'Form'}: ${issue.message}`); const idx = issue.path[0] === 'children' ? steps.findIndex((s) => s.t === 'who' && s.i === Number(issue.path[1])) : 1; if (idx >= 0) setStep(idx); return; }
       setBusy(true); setError('');
       try {
@@ -130,16 +134,14 @@ export default function Register() {
   const nextLabel = q.t === 'welcome' ? 'Start' : q.t === 'confirm' ? (busy ? 'Submitting…' : 'Submit application') : q.t === 'done' ? 'Done' : 'Continue';
   const sizeOpts = [...CLOTHING_SIZES[kid.cat], OTHER_SIZE];
   const shoeOpts = [...SHOE_SIZES[kid.cat], OTHER_SIZE];
-  const pub = (b: boolean) => (b ? 'bg-soft' : 'bg-bg');
-  const recordRows: [string, string, boolean][] = [['Family ID', submitted ?? 'auto-assigned', false], ['Status', 'Submitted', true], ['Guardian', a.guardian, false], ['Phone', a.phone, false], ['Preferred contact', a.contact, false], ['City', a.city, true], ['Address', a.address ? `${a.address}, ${a.zip}` : '', false], ['Pick-up / delivery', a.transport, false], ['Children', a.kids.map((k) => k.name && `${k.name}, ${k.age}`).filter(Boolean).join(' · '), true], ['Story', a.story, true], ['Photo', a.photo, true]];
 
   if (settings.data && !settings.data.registrationOpen) {
     return <div className="mx-auto my-16 max-w-[520px] px-4 text-center anim-rise"><KMark size={40} className="mx-auto" /><h1 className="mt-5 text-[36px] font-extrabold tracking-[-.045em]">Applications are closed for this season.</h1><p className="mt-3 text-[15px] text-ink-2">Questions? Email <a className="text-pri" href={`mailto:${settings.data.contactEmail}`}>{settings.data.contactEmail}</a>.</p><Link to="/" className="mt-6 inline-flex h-12 items-center rounded-full bg-ink px-6 font-semibold text-white">Back home</Link></div>;
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-[1240px] items-start gap-6 px-4 pb-16 pt-6 sm:px-8 lg:grid-cols-3">
-      <div onKeyDown={onKey} className="flex min-h-[640px] flex-col overflow-hidden rounded-[32px] border border-line bg-white lg:col-span-2">
+    <div className="mx-auto w-full max-w-[860px] px-4 pb-16 pt-6 sm:px-8">
+      <div onKeyDown={onKey} className="flex min-h-[640px] flex-col overflow-hidden rounded-[32px] border border-line bg-white">
         <div className="flex items-center justify-between px-7 pt-[22px]">
           <div className="flex items-center gap-2.5"><KMark /><span className="text-[15px] font-bold">Bless-A-Family application</span></div>
           <Link to="/" className="text-[13px] font-semibold text-ink-2">Save & exit</Link>
@@ -161,7 +163,7 @@ export default function Register() {
             {q.t === 'welcome' && (
               <div className="mt-7 grid gap-2.5">
                 <div className="flex items-center gap-3.5 rounded-[18px] bg-bg px-[18px] py-4"><div className="grid size-10 flex-none place-items-center rounded-xl bg-soft text-[13px] font-extrabold text-pri-dark">6m</div><div><div className="text-[14px] font-semibold">About 6 minutes</div><div className="text-[13px] text-ink-3">One question at a time. Your progress saves on this device.</div></div></div>
-                <div className="flex items-center gap-3.5 rounded-[18px] bg-bg px-[18px] py-4"><div className="grid size-10 flex-none place-items-center rounded-xl bg-soft font-extrabold text-pri-dark">●</div><div><div className="text-[14px] font-semibold">Private by default</div><div className="text-[13px] text-ink-3">Donors see first names, ages, sizes and your story. Never your address or phone.</div></div></div>
+                <div className="flex items-center gap-3.5 rounded-[18px] bg-bg px-[18px] py-4"><div className="grid size-10 flex-none place-items-center rounded-xl bg-soft font-extrabold text-pri-dark">●</div><div><div className="text-[14px] font-semibold">Private by default</div><div className="text-[13px] text-ink-3">Holiday Konnectors see first names, ages, sizes and your story. Never your address or phone.</div></div></div>
               </div>
             )}
             {q.t === 'text' && <div className="mt-7"><UnderlineInput autoFocus type={q.type ?? 'text'} value={String(a[q.key as keyof Ans] ?? '')} onChange={(e) => set(q.key as keyof Ans, e.target.value.slice(0, 200))} placeholder={q.ph} /></div>}
@@ -219,14 +221,15 @@ export default function Register() {
             )}
             {q.t === 'photo' && (
               <>
-                <div className="mt-[26px] flex gap-2">{['Yes, share a photo', 'No photo'].map((o) => <Seg key={o} grow active={a.photo === o} onClick={() => set('photo', o)}>{o}</Seg>)}</div>
-                {a.photo === 'Yes, share a photo' && (
+                <div className="mt-[26px] flex gap-2">{['Share a photo', 'No photo'].map((o) => <Seg key={o} grow active={a.photo === o} onClick={() => set('photo', o)}>{o}</Seg>)}</div>
+                {a.photo === 'Share a photo' && (
                   <>
                     <button type="button" onClick={() => fileRef.current?.click()} className="mt-3.5 block h-[220px] w-full overflow-hidden rounded-[20px] border border-line bg-bg">
                       {a.photoDataUrl ? <img src={a.photoDataUrl} alt="Your family photo" className="size-full object-cover" /> : <span className="grid size-full place-items-center text-[14px] font-semibold text-ink-3">Tap to add a photo</span>}
                     </button>
                     <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) set('photoDataUrl', await resizeImage(f)); }} />
-                    <p className="mt-2.5 text-[13px] leading-[1.5] text-ink-3">Only what you're comfortable with — a doorway, hands, a holiday table. Faces are optional. You can remove it any time.</p>
+                    <div className="mt-3 rounded-2xl bg-bg px-4 py-3"><Checkbox checked={a.photoPrivate} onChange={(v) => set('photoPrivate', v)}>Keep my photo private. Only The Konnection team will see it.</Checkbox></div>
+                    <p className="mt-2.5 text-[13px] leading-[1.5] text-ink-3">Share only what you're comfortable with: a doorway, hands, a holiday table. Faces are optional, and you can ask us to remove it any time.</p>
                   </>
                 )}
               </>
@@ -234,7 +237,7 @@ export default function Register() {
             {q.t === 'confirm' && (
               <>
                 <div className="mt-6 rounded-[20px] bg-bg px-[18px] py-1">
-                  {[['Guardian', a.guardian || '—'], ['Contact', `${a.contact || '—'} · ${a.contact === 'Email' ? a.email : a.phone}`], ['Children', a.kids.slice(0, Number(a.kidCount) || 0).map((k) => `${k.name}, ${k.age}`).join(' · ') || '—'], ['Public story', a.story ? 'Yes' : 'None']].map(([k, v], i, arr) => (
+                  {[['Guardian', a.guardian || '—'], ['Contact', `${a.contact || '—'} · ${a.contact === 'Email' ? a.email : a.phone}`], ['Children', a.kids.slice(0, Number(a.kidCount) || 0).map((k) => `${k.name}, ${k.age}`).join(' · ') || '—'], ['Public story', a.story ? 'Yes' : 'None'], ...(askPhoto ? [['Photo', a.photo === 'Share a photo' && a.photoDataUrl ? (a.photoPrivate ? 'Staff only' : 'Shared after review') : 'None']] : []), ['Gifts', a.transport || '—']].map(([k, v], i, arr) => (
                     <div key={k} className={cx('flex justify-between gap-4 py-3 text-[14px]', i < arr.length - 1 && 'border-b border-line')}><span className="text-ink-3">{k}</span><b className="text-right">{v}</b></div>
                   ))}
                 </div>
@@ -246,7 +249,7 @@ export default function Register() {
               <div className="anim-pop mt-7 rounded-xl2 bg-ink p-7 text-bg">
                 <div className="text-[11px] font-semibold uppercase tracking-[.1em] text-lav">Your family ID</div>
                 <div className="mt-1 text-[40px] font-extrabold tracking-[-.04em] text-white">{submitted}</div>
-                <p className="mt-3 text-[14px] leading-[1.55] text-bg/75">We'll text you when it's reviewed — usually within 2 days — and again when a sponsor steps up. Keep this ID handy.</p>
+                <p className="mt-3 text-[14px] leading-[1.55] text-bg/75">We'll text you when it's reviewed — usually within 2 days — and again when a Holiday Konnector steps up. Keep this ID handy.</p>
               </div>
             )}
           </div>
@@ -255,15 +258,6 @@ export default function Register() {
           {step > 0 && q.t !== 'done' ? <button onClick={() => setStep((s) => Math.max(0, s - 1))} className="px-1.5 text-[15px] font-semibold">Back</button> : <span />}
           <button onClick={next} disabled={!valid || busy} className="flex h-[52px] items-center gap-2 rounded-full bg-pri px-7 text-base font-bold text-white transition-colors hover:bg-pri-dark active:scale-[.97] disabled:bg-disabled">{nextLabel}{!['welcome', 'done', 'confirm'].includes(q.t) && <span className="opacity-70">↵</span>}</button>
         </div>
-      </div>
-      <div className="hidden min-w-0 gap-3.5 lg:grid">
-        <div className="min-w-0 overflow-hidden rounded-xl3 border border-line bg-white p-[22px]">
-          <div className="flex items-center justify-between"><h3 className="text-base">What the record looks like</h3><span className="rounded-full bg-soft px-2 py-1 text-[11px] font-semibold uppercase tracking-[.08em] text-pri-dark">live</span></div>
-          <p className="mt-2 text-[13px] leading-[1.5] text-ink-2">Each answer writes one field. Guardian contact stays in private columns; only the <b>public projection</b> reaches the catalog.</p>
-          <div className="mt-3.5 grid gap-1 text-[13px]">{recordRows.map(([k, v, p]) => <div key={k} className={cx('flex min-w-0 justify-between gap-3 overflow-hidden rounded-[10px] px-2.5 py-2', pub(p))}><span className="flex-none text-ink-3">{k}</span><span className="min-w-0 flex-1 truncate text-right font-semibold">{v || '—'}</span></div>)}</div>
-          <div className="mt-3 flex gap-3 text-[11px] text-ink-3"><span className="flex items-center gap-1.5"><span className="inline-block size-2.5 rounded-[3px] bg-soft" />public</span><span className="flex items-center gap-1.5"><span className="inline-block size-2.5 rounded-[3px] border border-line bg-bg" />private</span></div>
-        </div>
-        <div className="rounded-xl3 bg-soft p-[22px]"><h3 className="text-[15px]">Step {step} of {steps.length - 1}</h3><div className="mt-1.5 text-[13px] leading-[1.5] text-ink-2">Household questions are one per screen. Each child is a group of 5 (who · sizes · interests · clothing · gifts).</div></div>
       </div>
     </div>
   );

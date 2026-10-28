@@ -36,6 +36,7 @@ export function AdminLayout() {
     { to: '/admin/review', label: 'Review queue', badge: r?.pipeline.Submitted ?? 0, badgeBg: 'bg-pri' },
     { to: '/admin/families', label: 'Families', badge: 0, badgeBg: 'bg-pri' },
     { to: '/admin/follow-ups', label: 'Dominoes board', badge: r?.followUp.flagged ?? 0, badgeBg: 'bg-bad' },
+    { to: '/admin/community', label: 'Community', badge: 0, badgeBg: 'bg-pri' },
     { to: '/admin/assistant', label: 'Assistant', badge: 0, badgeBg: 'bg-pri' },
     { to: '/admin/settings', label: 'Settings', badge: 0, badgeBg: 'bg-pri' },
   ];

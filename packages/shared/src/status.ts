@@ -16,13 +16,13 @@ export const SPONSORSHIP_STEPS: { status: SponsorshipStatus; label: string; spon
   { status: 'Claimed', label: 'Claimed', sponsorLabel: 'You claimed this family', sub: 'Your family page is live' },
   { status: 'Shopping', label: 'Shopping started', sponsorLabel: "I've started shopping", sub: 'Tap when you begin' },
   { status: 'Purchased', label: 'Gifts purchased', sponsorLabel: 'Gifts purchased', sub: 'Everything on the list is bought' },
-  { status: 'Wrapped', label: 'Wrapped & labeled', sponsorLabel: 'Wrapped & labeled', sub: 'One bag per child, first name on it' },
-  { status: 'Dropped Off', label: 'Dropped off at Konnection', sponsorLabel: 'Gifts dropped off', sub: 'Konnection office · by the deadline' },
+  { status: 'Wrapped', label: 'Wrapped & labeled', sponsorLabel: 'Wrapped & labeled', sub: "Every gift wrapped with the child's name on it" },
+  { status: 'Dropped Off', label: 'Gifts handed off', sponsorLabel: 'Gifts dropped off', sub: 'Dropped off with us, or delivered to the family' },
   { status: 'Delivered', label: 'Delivered to family', sponsorLabel: 'Delivered to family', sub: 'We tell you the moment it lands' },
 ];
 
 export const STATUS_LABEL: Record<SponsorshipStatus, string> = {
-  Claimed: 'Claimed', Shopping: 'Shopping started', Purchased: 'Gifts purchased', Wrapped: 'Wrapped & labeled', 'Dropped Off': 'Dropped off at Konnection', Delivered: 'Delivered to family', Released: 'Released',
+  Claimed: 'Claimed', Shopping: 'Shopping started', Purchased: 'Gifts purchased', Wrapped: 'Wrapped & labeled', 'Dropped Off': 'Gifts handed off', Delivered: 'Delivered to family', Released: 'Released',
 };
 
 export const SPONSORSHIP_TRANSITIONS: Record<SponsorshipStatus, SponsorshipStatus[]> = {

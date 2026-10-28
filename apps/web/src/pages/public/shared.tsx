@@ -1,16 +1,36 @@
 import type { PublicFamily, PublicChild } from '@bless/shared';
-import { colorSwatch, familyArt } from '@bless/shared';
+import { AGE_GROUPS, NEED_FILTERS, colorSwatch, familyArt, type AgeGroupKey, type NeedKey } from '@bless/shared';
 import { Link } from 'react-router-dom';
 import { cx } from '@/lib/format';
 
-export const TAGS = ['All', '1 child', '2 kids', '3+ kids', 'Needs winter coats', 'Needs boots', 'Babies', 'Teens'] as const;
+/**
+ * Catalog filters. Three plain-language groups: how many kids, which ages, which clothing needs.
+ * Within a group, options widen the search (any of them); across groups they narrow it.
+ */
+export type SizeKey = 'any' | '1' | '2' | '3+';
+export type Filters = { size: SizeKey; ages: AgeGroupKey[]; needs: NeedKey[] };
+export const EMPTY_FILTERS: Filters = { size: 'any', ages: [], needs: [] };
+export const SIZE_OPTIONS: { key: SizeKey; label: string }[] = [
+  { key: 'any', label: 'Any size' }, { key: '1', label: '1 child' }, { key: '2', label: '2 kids' }, { key: '3+', label: '3 or more' },
+];
 
-export function matchTag(f: PublicFamily, tag: string) {
-  if (tag === 'All') return true;
-  if (tag === '1 child') return f.childCount === 1;
-  if (tag === '2 kids') return f.childCount === 2;
-  if (tag === '3+ kids') return f.childCount >= 3;
-  return f.tags.includes(tag);
+export function matchFilters(f: PublicFamily, flt: Filters) {
+  if (flt.size === '1' && f.childCount !== 1) return false;
+  if (flt.size === '2' && f.childCount !== 2) return false;
+  if (flt.size === '3+' && f.childCount < 3) return false;
+  if (flt.ages.length && !AGE_GROUPS.some((g) => flt.ages.includes(g.key) && f.children.some((k) => k.age >= g.min && k.age <= g.max))) return false;
+  if (flt.needs.length && !NEED_FILTERS.some((n) => flt.needs.includes(n.key) && f.children.some((k) => (k.clothingWishlist as readonly string[]).includes(n.item)))) return false;
+  return true;
+}
+export const filterCount = (flt: Filters) => (flt.size !== 'any' ? 1 : 0) + flt.ages.length + flt.needs.length;
+
+/** One-line description of the active filters, e.g. "with a teen (13–17) who needs boots". */
+export function describeFilters(flt: Filters): string {
+  const parts: string[] = [];
+  if (flt.size !== 'any') parts.push(flt.size === '1' ? 'with 1 child' : flt.size === '2' ? 'with 2 kids' : 'with 3 or more kids');
+  if (flt.ages.length) parts.push('with ' + AGE_GROUPS.filter((g) => flt.ages.includes(g.key)).map((g) => `${g.label.toLowerCase()} (${g.range})`).join(' or '));
+  if (flt.needs.length) parts.push('needing ' + NEED_FILTERS.filter((n) => flt.needs.includes(n.key)).map((n) => n.label.toLowerCase()).join(' or '));
+  return parts.join(', ');
 }
 export function matchQuery(f: PublicFamily, q: string) {
   const s = q.trim().toLowerCase();
@@ -19,9 +39,12 @@ export function matchQuery(f: PublicFamily, q: string) {
 }
 /** v3 "need chips": up to 3, dark for needs, soft for ages/interests. */
 export function needChips(f: PublicFamily): { label: string; dark: boolean }[] {
-  const order = ['Needs winter coats', 'Needs boots', 'Needs shoes', 'Babies', 'Teens', 'Readers', 'Creatives', 'Athletes', 'Builders'];
+  const order = ['Needs a winter coat', 'Needs boots', 'Needs shoes', 'Baby or toddler', 'Teen', 'Readers', 'Creatives', 'Athletes', 'Builders'];
   return order.filter((t) => f.tags.includes(t)).map((label) => ({ label, dark: label.startsWith('Needs') })).slice(0, 3);
 }
+/** Wrapping and labeling rules, repeated wherever a Holiday Konnector decides or shops. */
+export const GIFT_RULES = ["Wrap every gift and label it with the child's name.", 'Include a gift receipt for each clothing item in case it doesn’t fit.', 'Buy the same number of gifts for each child so every child feels equally celebrated.'];
+
 export const art = (f: PublicFamily) => familyArt(f.colors);
 export const photoFor = (f: PublicFamily, show: boolean | undefined) => (show !== false && f.photoUrl ? f.photoUrl : undefined);
 

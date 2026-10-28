@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
+import type { CommunityView } from '@bless/shared';
 import { api, PHOTOS } from '@/lib/api';
 import { fmtDate } from '@/lib/format';
 import { ArrowButton, Orb, Photo, SectionPill } from '@/components/ui';
@@ -8,11 +9,13 @@ import { Bokeh, FESTIVE, Layer, Prop, Snow } from '@/components/festive';
 import { cx } from '@/lib/format';
 
 const HEADLINE = [['Give', 0], ['a', 1], ['family', 2], ['the', 3], ['holiday', 4], ["they've", 5, true], ['been', 6, true], ['hoping', 7, true], ['for.', 8, true]] as const;
-const QUOTE = "We adopted a family of four last year. The reminders kept us on track, and getting the 'delivered' text on Christmas week made our whole office cry.".split(' ');
 
 export default function Landing() {
   const catalog = useQuery({ queryKey: ['catalog'], queryFn: api.catalog });
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings, staleTime: 5 * 60_000 });
+  const community = useQuery({ queryKey: ['community'], queryFn: api.community, staleTime: 60_000 });
+  const latest = community.data?.wall[0];
+  const contact = settings.data?.contactEmail ?? 'sharnese@thekonnection.org';
   const counts = catalog.data?.counts ?? { available: 0, claimed: 0, fulfilled: 0, kids: 0 };
   const blessed = counts.claimed + counts.fulfilled;
   const blessedPct = Math.round((blessed / Math.max(1, blessed + counts.available)) * 100);
@@ -22,11 +25,12 @@ export default function Landing() {
   const deadlineLong = deadline ? fmtDate(deadline, { weekday: 'long', month: 'long', day: 'numeric' }) : 'the deadline';
   const [faq, setFaq] = useState(0);
   const FAQ: [string, string][] = [
-    ['Do I pay through this site?', `No. Sponsors shop the wishlist themselves and drop gifts at our office. If you prefer to give money, you can chip in toward a family or give to the general fund.`],
-    ['How much does it cost to sponsor a family?', settings.data?.perChildBudgetNote ?? 'Most sponsors spend $75–$150 per child. Every wishlist item is under $100, and you can choose a family that fits your budget.'],
-    ["What if I can't follow through?", 'No judgment. Tap "I can no longer sponsor" on your family page and we\'ll reopen the family right away so another sponsor can step in.'],
+    ['What is a Holiday Konnector?', 'Anyone who chooses a Konnection family and shops their children’s wish lists: individuals, families, churches, teams and companies.'],
+    ['Do I pay through this site?', 'No. Holiday Konnectors shop the wish lists themselves, then deliver the gifts to the family or drop them off with us. If you’d rather give money, you can chip in toward a family or give to the general fund.'],
+    ['How much does it cost to sponsor a child?', 'How much you spend is entirely up to you! Sponsors typically spend $100–$250 per child. If you sponsor a family with multiple children, we ask that you purchase the same number of gifts for each child so every child feels equally celebrated.'],
+    ["What if I can't follow through?", 'We understand that plans can change. If you’re unable to fulfill your sponsorship, please let us know at least 10 days before the gift deadline, whenever possible, so we have time to find another sponsor. Tap “I can no longer sponsor” on your family page to notify us and make the family available for another sponsor.'],
     ['Who are the families?', "Households already connected to The Konnection's programs. Every application is reviewed by staff before it appears here."],
-    ['Can my company or church sponsor several families?', "Yes — email us and we'll set aside a group of families and give you one shared tracker."],
+    ['Can my company or church sponsor several families?', `Yes! Email ${contact} and we'll set aside a group of families for your team.`],
   ];
   const donate = settings.data?.orgDonateUrl ?? 'https://thekonnection.org';
 
@@ -62,7 +66,7 @@ export default function Landing() {
             ))}
           </h1>
           <p className="anim-fade-up pretty mx-auto mt-5 max-w-[600px] text-[clamp(16px,1.4vw,19px)] leading-[1.55] text-ink-4" style={{ ['--d' as string]: '0.75s' }}>
-            Choose a Konnection household, shop their kids' wishlist, and drop it off. We handle delivery — and every reminder in between.
+            Choose a Konnection family and shop the children’s wish lists. Deliver your gifts directly to the family, or drop them off with us and we’ll handle delivery. We’ll guide you every step of the way.
           </p>
           <div className="anim-fade-up mt-8 flex flex-wrap justify-center gap-2.5" style={{ ['--d' as string]: '0.9s' }}>
             <Link to="/families"><ArrowButton>Find a family</ArrowButton></Link>
@@ -90,12 +94,14 @@ export default function Landing() {
               <div className="mt-1.5 text-[11px] text-ink-4">{blessedPct}% of the season matched</div>
             </div>
           </div>
-          <div className="float-b pointer-events-none absolute bottom-[clamp(12px,3vw,32px)] right-[clamp(12px,3vw,32px)] max-w-[46%]">
-            <div className="flex items-center gap-3 rounded-[24px] border border-white/12 bg-ink/72 py-3.5 pl-3.5 pr-[18px] text-white shadow-lift backdrop-blur-[18px]">
-              <span className="grid size-[38px] flex-none place-items-center rounded-full bg-lav font-bold text-ink">✓</span>
-              <div><div className="text-[13px] font-semibold">Gifts dropped off</div><div className="text-[11px] opacity-70">Greater Grace Youth Group · just now</div></div>
+          {latest && (
+            <div className="float-b pointer-events-none absolute bottom-[clamp(12px,3vw,32px)] right-[clamp(12px,3vw,32px)] max-w-[46%]">
+              <div className="flex items-center gap-3 rounded-[24px] border border-white/12 bg-ink/72 py-3.5 pl-3.5 pr-[18px] text-white shadow-lift backdrop-blur-[18px]">
+                <span className="grid size-[38px] flex-none place-items-center rounded-full bg-lav font-bold text-ink">✓</span>
+                <div className="min-w-0"><div className="text-[13px] font-semibold">Thank you, Holiday Konnector</div><div className="truncate text-[11px] opacity-70">{latest.name} · {latest.kids} {latest.kids === 1 ? 'child' : 'kids'} blessed · {timeAgo(latest.latestAt)}</div></div>
+              </div>
             </div>
-          </div>
+          )}
           {/* props overlapping the band's top corners (in front of the photo, behind nothing interactive) */}
           <Prop src={FESTIVE.gifts} motion="hover" depth={0.06} className="z-20 -left-1 -top-[clamp(52px,7vw,112px)] w-[clamp(92px,13vw,214px)] sm:-left-6" />
           <Prop src={FESTIVE.lantern} motion="hover" delay="-3s" depth={0.1} className="z-20 -right-1 -top-[clamp(64px,9vw,150px)] w-[clamp(54px,7vw,122px)] sm:-right-5" />
@@ -119,23 +125,23 @@ export default function Landing() {
         <div className="mx-auto max-w-[1180px]">
           <div className="reveal text-center"><SectionPill>How it works</SectionPill><h2 className="balance mt-4 text-[clamp(34px,4.6vw,60px)] leading-[1.05] tracking-[-.045em]">Three steps. We handle the rest.</h2></div>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
-            <HowCard n="01" title="Choose a family" body="Swipe through households. First names, ages, sizes, and a short story written by the parent.">
+            <HowCard n="01" title="Choose a family" body="Browse Konnection families. First names, ages, sizes, and a short story written by the parent.">
               <div className="flex h-[220px] items-center justify-center gap-2.5 overflow-hidden rounded-[22px] bg-soft-2">
                 <MiniCard tilt={-8} shift={18} color="#c9b8ff" />
                 <MiniCard tilt={4} color="#6c22dd" front />
               </div>
             </HowCard>
-            <HowCard n="02" title="Shop the wishlist" body="Your private family page keeps every size handy. Tap as you go — no forms, no calls." late>
+            <HowCard n="02" title="Shop the wish lists" body="Your private family page keeps every size handy. Same number of gifts for each child, wrapped and labeled with their name." late>
               <div className="flex h-[220px] flex-col justify-center gap-2 rounded-[22px] bg-soft-2 p-[22px]">
-                <Row label={<><b>Winter coat</b> · Youth 10</>} done />
-                <Row label={<><b>Sketchbook</b> · Art supplies</>} done />
+                <Row label={<><b>Winter coat</b> · wrapped, receipt in</>} done />
+                <Row label={<><b>Sketchbook</b> · labeled “Maya”</>} done />
                 <Row label={<><b>Boots</b> · Toddler 11</>} />
               </div>
             </HowCard>
-            <HowCard n="03" title={`Drop off by ${deadlineShort}`} body="We text gentle reminders, deliver to the family, and tell you the moment it lands." dark late>
+            <HowCard n="03" title={`Hand off by ${deadlineShort}`} body={`Deliver directly to the family, or drop off at ${settings.data?.dropoffLocation ?? 'our drop-off site'} and we deliver. Friendly reminders along the way.`} dark late>
               <div className="flex h-[220px] flex-col justify-center gap-2.5 rounded-[22px] bg-white/6 p-[22px]">
-                <div className="max-w-[85%] self-start rounded-[16px_16px_16px_4px] bg-white px-3 py-2.5 text-[12px] leading-[1.45] text-ink">12 days to drop-off. One bag per child with their first name. Thank you, Danielle!</div>
-                <div className="self-end rounded-[16px_16px_4px_16px] bg-lav px-3 py-2.5 text-[12px] font-semibold text-ink">Gifts dropped off ✓</div>
+                <div className="max-w-[85%] self-start rounded-[16px_16px_16px_4px] bg-white px-3 py-2.5 text-[12px] leading-[1.45] text-ink">12 days to go! Wrap each gift and label it with the child's name. Thank you, Holiday Konnector!</div>
+                <div className="self-end rounded-[16px_16px_4px_16px] bg-lav px-3 py-2.5 text-[12px] font-semibold text-ink">Gifts handed off ✓</div>
               </div>
             </HowCard>
           </div>
@@ -147,11 +153,11 @@ export default function Landing() {
         <Prop src={FESTIVE.gifts} motion="hover" depth={0.03} blur={1.5} opacity={0.8} className="left-[1%] bottom-[-40px] hidden w-[clamp(120px,12vw,190px)] lg:block" />
         <Prop src={FESTIVE.snowflake} motion="drift" opacity={0.5} blur={1} depth={-0.04} delay="-2s" className="right-[6%] top-[4%] hidden w-[56px] md:block" />
         <div className="mx-auto grid max-w-[1180px] items-stretch gap-4 md:grid-cols-2">
-          <div className="reveal relative min-h-[460px] overflow-hidden rounded-[32px]"><div className="parallax-img absolute inset-0"><Photo src={PHOTOS.stats} alt="Konnection program" className="size-full" /></div></div>
+          <CampaignCollage />
           <div className="reveal-late flex flex-col justify-center p-[clamp(8px,2vw,24px)]">
             <div><SectionPill>Why it matters</SectionPill></div>
-            <h2 className="balance mt-4 text-[clamp(32px,4vw,52px)] leading-[1.05] tracking-[-.045em]">Where a child starts shouldn't decide how far they go.</h2>
-            <p className="mt-4 max-w-[520px] text-base leading-[1.6] text-ink-4">The Konnection helps Detroit youth stay connected to school through mentoring, essential resources and unforgettable experiences. Bless-A-Family brings that care home for the holidays.</p>
+            <h2 className="balance mt-4 text-[clamp(32px,4vw,52px)] leading-[1.05] tracking-[-.045em]">Every child deserves to feel seen, loved, and celebrated.</h2>
+            <p className="mt-4 max-w-[520px] text-base leading-[1.6] text-ink-4">The Konnection helps Detroit youth stay connected to school through mentoring, essential resources and unforgettable experiences. Bless This Family brings that care home for the holidays. These are a few of the kids our Holiday Konnectors blessed last season.</p>
             <div className="mt-8 grid grid-cols-3 gap-3">
               <BigStat value="700+" label="youth impacted" />
               <BigStat value="4,000+" label="resources distributed" />
@@ -161,22 +167,14 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Testimonial */}
-      <section className="relative px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
-        <Prop src={FESTIVE.lantern} motion="hover" depth={0.05} className="right-[4%] top-[20%] hidden w-[clamp(70px,7vw,120px)] lg:block" />
-        <Prop src={FESTIVE.snowflake} motion="drift" opacity={0.55} depth={-0.03} delay="-6s" className="left-[6%] top-[10%] hidden w-[64px] lg:block" />
-        <div className="mx-auto max-w-[900px] text-center" style={{ viewTimelineName: '--quote' } as React.CSSProperties}>
-          <div className="balance text-[clamp(24px,3vw,40px)] font-medium leading-[1.3] tracking-[-.03em]">
-            “{QUOTE.map((w, i) => <span key={i}><span style={{ animation: 'ink linear both', animationTimeline: '--quote', animationRange: `cover ${10 + i * 1.7}% cover ${14 + i * 1.7}%` } as React.CSSProperties}>{w}</span>{i < QUOTE.length - 1 ? ' ' : ''}</span>)}”
-          </div>
-          <div className="reveal mt-7 flex items-center justify-center gap-3"><span className="grid size-11 place-items-center rounded-full bg-lav font-bold text-ink">TL</span><div className="text-left"><div className="text-[15px] font-semibold">Tina Lee</div><div className="text-[13px] text-ink-3">Sponsor, 2025</div></div></div>
-        </div>
-      </section>
+      {/* Quotes from Holiday Konnectors and families (approved by staff), then the wall of names */}
+      <Voices data={community.data} />
+      <KonnectorWall data={community.data} />
 
       {/* FAQ */}
       <section className="px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
         <div className="mx-auto grid max-w-[1180px] items-start gap-8 md:grid-cols-2">
-          <div className="reveal"><SectionPill>FAQ</SectionPill><h2 className="mt-4 text-[clamp(32px,4vw,52px)] leading-[1.05] tracking-[-.045em]">Questions, answered.</h2><p className="mt-3.5 max-w-[380px] text-[15px] leading-[1.6] text-ink-4">Still unsure? Email <a className="text-pri hover:text-ink" href={`mailto:${settings.data?.contactEmail ?? 'info@thekonnection.org'}`}>{settings.data?.contactEmail ?? 'info@thekonnection.org'}</a> and a real person will reply.</p></div>
+          <div className="reveal"><SectionPill>FAQ</SectionPill><h2 className="mt-4 text-[clamp(32px,4vw,52px)] leading-[1.05] tracking-[-.045em]">Questions, answered.</h2><p className="mt-3.5 max-w-[380px] text-[15px] leading-[1.6] text-ink-4">Still unsure? Email <a className="text-pri hover:text-ink" href={`mailto:${contact}`}>{contact}</a> and a real person will reply.</p></div>
           <div className="reveal-late grid gap-2.5">
             {FAQ.map(([q, a], i) => (
               <div key={q} className="overflow-hidden rounded-[22px] border border-line-2 bg-white transition-shadow hover:shadow-lift">
@@ -201,7 +199,7 @@ export default function Landing() {
           <Prop src={FESTIVE.gifts} motion="hover" delay="-2s" className="bottom-[-18px] right-[clamp(16px,8vw,120px)] hidden w-[clamp(120px,14vw,200px)] md:block" />
           <div className="relative max-w-[760px]">
             <h2 className="balance text-[clamp(36px,5.4vw,76px)] leading-none tracking-[-.05em] text-white">{counts.available} families are still waiting.</h2>
-            <p className="mt-[18px] max-w-[520px] text-[17px] leading-[1.55] text-white/72">Drop-off closes {deadlineLong}. Pick one today — it takes two minutes.</p>
+            <p className="mt-[18px] max-w-[520px] text-[17px] leading-[1.55] text-white/72">Gifts are due {deadlineLong}. Become a Holiday Konnector today. It takes two minutes.</p>
             <div className="mt-[30px] flex flex-wrap gap-2.5">
               <Link to="/families" className="inline-flex h-[54px] items-center rounded-full bg-white px-7 text-base font-semibold text-ink transition-colors hover:bg-lav">Find a family</Link>
               <a href={donate} target="_blank" rel="noreferrer" className="inline-flex h-[54px] items-center rounded-full border border-white/30 bg-white/6 px-6 text-base font-semibold text-white backdrop-blur-[10px]">Give to the general fund</a>
@@ -267,5 +265,112 @@ function BigStat({ value, label, pri }: { value: string; label: string; pri?: bo
       <div className={cx('text-[clamp(32px,3.4vw,44px)] font-bold leading-none tracking-[-.04em]', pri && 'text-pri')}>{value}</div>
       <div className="mt-1.5 text-[13px] text-ink-3">{label}</div>
     </div>
+  );
+}
+
+function timeAgo(iso: string) {
+  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 14 ? `${d} days ago` : fmtDate(iso, { month: 'short', day: 'numeric' });
+}
+
+/** Last season's hand-out photos, as a staggered, slightly tilted collage. */
+function CampaignCollage() {
+  const [a, b, c, d] = PHOTOS.campaign;
+  const tile = 'group relative overflow-hidden rounded-[26px] bg-lav shadow-[0_24px_48px_-28px_rgba(29,17,51,.55)] transition-transform duration-500 hover:z-10 hover:scale-[1.02]';
+  const img = 'size-full transition-transform duration-[1.2s] ease-[cubic-bezier(.16,1,.3,1)] group-hover:scale-[1.06]';
+  return (
+    <figure className="reveal relative grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid content-start gap-3 sm:gap-4">
+        <div className={cx(tile, 'aspect-[3/4] -rotate-[1.5deg]')}><Photo src={a.src} alt={a.alt} className={img} /></div>
+        <div className={cx(tile, 'aspect-square rotate-[1deg]')}><Photo src={c.src} alt={c.alt} className={img} /></div>
+      </div>
+      <div className="grid content-start gap-3 pt-10 sm:gap-4 sm:pt-16">
+        <div className={cx(tile, 'aspect-square rotate-[1.5deg]')}><Photo src={b.src} alt={b.alt} className={img} /></div>
+        <div className={cx(tile, 'aspect-[3/4] -rotate-[1deg]')}><Photo src={d.src} alt={d.alt} className={img} /></div>
+      </div>
+      <figcaption className="pointer-events-none absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/70 bg-white/88 px-4 py-2 text-[12px] font-semibold text-ink shadow-soft backdrop-blur-[10px]">
+        <span className="mr-1.5 inline-block size-2 rounded-full bg-pri align-middle" />Bless This Family, last season
+      </figcaption>
+    </figure>
+  );
+}
+
+/** Approved quotes from Holiday Konnectors and families. Hidden entirely until staff approve one. */
+function Voices({ data }: { data?: CommunityView }) {
+  const quotes = data?.quotes ?? [];
+  if (!data) return null;
+  if (!quotes.length) {
+    return (
+      <section className="px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+        <div className="reveal mx-auto flex max-w-[900px] flex-col items-center rounded-[32px] border border-dashed border-line bg-white/70 px-6 py-10 text-center backdrop-blur-[6px]">
+          <SectionPill>In their words</SectionPill>
+          <h2 className="balance mt-4 text-[clamp(26px,3vw,38px)] leading-[1.1] tracking-[-.04em]">Blessed a family, or been blessed? We'd love to hear it.</h2>
+          <Link to="/share" className="mt-6 inline-flex h-[50px] items-center rounded-full bg-ink px-6 text-[15px] font-semibold text-white transition-colors hover:bg-pri">Share your story</Link>
+        </div>
+      </section>
+    );
+  }
+  const [lead, ...rest] = quotes;
+  const words = lead.quote.split(' ');
+  return (
+    <section className="relative px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+      <Prop src={FESTIVE.lantern} motion="hover" depth={0.05} className="right-[4%] top-[18%] hidden w-[clamp(70px,7vw,120px)] lg:block" />
+      <Prop src={FESTIVE.snowflake} motion="drift" opacity={0.55} depth={-0.03} delay="-6s" className="left-[6%] top-[10%] hidden w-[64px] lg:block" />
+      <div className="mx-auto max-w-[900px] text-center" style={{ viewTimelineName: '--quote' } as React.CSSProperties}>
+        <div className="reveal"><SectionPill>In their words</SectionPill></div>
+        <blockquote className="balance mt-6 text-[clamp(24px,3vw,40px)] font-medium leading-[1.3] tracking-[-.03em]">
+          “{words.map((w, i) => <span key={i}><span style={{ animation: 'ink linear both', animationTimeline: '--quote', animationRange: `cover ${10 + i * (40 / words.length)}% cover ${14 + i * (40 / words.length)}%` } as React.CSSProperties}>{w}</span>{i < words.length - 1 ? ' ' : ''}</span>)}”
+        </blockquote>
+        <div className="reveal mt-7 flex items-center justify-center gap-3"><span className="grid size-11 place-items-center rounded-full bg-lav font-bold text-ink">{initials(lead.name)}</span><div className="text-left"><div className="text-[15px] font-semibold">{lead.name}</div><div className="text-[13px] text-ink-3">{lead.role}{lead.organization ? ` · ${lead.organization}` : ''}{lead.season ? ` · ${lead.season}` : ''}</div></div></div>
+      </div>
+      {rest.length > 0 && (
+        <div className="mx-auto mt-12 grid max-w-[1180px] gap-3.5 md:grid-cols-3">
+          {rest.slice(0, 3).map((q, i) => (
+            <figure key={q.id} className={cx(i ? 'reveal-late' : 'reveal', 'rounded-[28px] border border-line-2 bg-white p-6')}>
+              <blockquote className="text-[16px] leading-[1.55] text-ink-2">“{q.quote}”</blockquote>
+              <figcaption className="mt-4 text-[13px]"><b className="text-ink">{q.name}</b><span className="text-ink-3"> · {q.role}</span></figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+      <div className="mt-8 text-center text-[13px] text-ink-3">Were you part of it? <Link to="/share" className="font-semibold text-pri hover:text-ink">Share your story</Link></div>
+    </section>
+  );
+}
+const initials = (n: string) => n.replace(/^(the|a)\s+/i, '').split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('') || '♥';
+
+/** Wall of Holiday Konnectors: opted-in names, shown once their gifts are handed off. */
+function KonnectorWall({ data }: { data?: CommunityView }) {
+  if (!data) return null;
+  const { wall, totals } = data;
+  return (
+    <section className="px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
+      <div className="reveal relative mx-auto max-w-[1180px] overflow-hidden rounded-[40px] bg-soft-2 px-[clamp(20px,5vw,64px)] py-[clamp(40px,6vw,72px)]">
+        <Bokeh count={18} seed={21} edges={false} className="opacity-60" />
+        <Prop src={FESTIVE.ornament} motion="swing" className="right-[clamp(16px,6vw,80px)] -top-3 hidden w-[clamp(48px,5vw,80px)] sm:block" />
+        <div className="relative">
+          <SectionPill>Wall of Holiday Konnectors</SectionPill>
+          <h2 className="balance mt-4 max-w-[760px] text-[clamp(32px,4.4vw,56px)] leading-[1.02] tracking-[-.045em]">Thank you, Holiday Konnectors.</h2>
+          <p className="mt-3 max-w-[620px] text-[16px] leading-[1.55] text-ink-4">
+            {totals.familiesBlessed > 0
+              ? <>This season, <b className="text-ink">{totals.konnectors} {totals.konnectors === 1 ? 'Konnector has' : 'Konnectors have'}</b> blessed <b className="text-ink">{totals.familiesBlessed} {totals.familiesBlessed === 1 ? 'family' : 'families'}</b> and <b className="text-ink">{totals.kidsBlessed} kids</b>. Names appear here once gifts are handed off.</>
+              : <>Every Konnector who blesses a family can be thanked here by name once their gifts are handed off.</>}
+          </p>
+          {wall.length > 0 ? (
+            <ul className="mt-8 flex flex-wrap gap-2.5">
+              {wall.map((w, i) => (
+                <li key={w.name} className="anim-pop flex items-center gap-2.5 rounded-full border border-white bg-white py-2 pl-2 pr-4 shadow-soft" style={{ animationDelay: `${Math.min(i, 20) * 40}ms` }}>
+                  <span className="grid size-8 flex-none place-items-center rounded-full bg-pri text-[12px] font-bold text-white">{initials(w.name)}</span>
+                  <span className="text-[14px] font-semibold">{w.name}</span>
+                  <span className="text-[12px] text-ink-3">{w.families > 1 ? `${w.families} families` : `${w.kids} ${w.kids === 1 ? 'child' : 'kids'}`}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <Link to="/families" className="mt-8 inline-flex h-[50px] items-center rounded-full bg-ink px-6 text-[15px] font-semibold text-white transition-colors hover:bg-pri">Be the first name on the wall</Link>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

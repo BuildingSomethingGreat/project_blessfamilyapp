@@ -24,7 +24,7 @@ export default function Assistant() {
   const offNotice = disabledReason ?? (me.data && !me.data.assistantEnabled ? 'Assistant is off. Add ANTHROPIC_API_KEY to the API environment to enable it.' : null);
   const r = report.data;
   const opening = r
-    ? `Morning. ${r.pipeline.Available} families are still waiting, ${r.followUp.overdue.length} sponsor${r.followUp.overdue.length === 1 ? ' has' : 's have'} gone quiet, and ${r.deadline.daysLeft} days remain to drop-off. What do you need?`
+    ? `Morning. ${r.pipeline.Available} families are still waiting, ${r.followUp.overdue.length} Konnector${r.followUp.overdue.length === 1 ? " has" : "s have"} gone quiet, and ${r.deadline.daysLeft} days remain to drop-off. What do you need?`
     : 'Morning. Pulling the latest numbers…';
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [msgs, busy]);
@@ -80,7 +80,7 @@ export default function Assistant() {
             {PROMPTS.map((p) => <button key={p} type="button" disabled={!enabled || busy} onClick={() => send(p)} className="h-8 rounded-full border border-line bg-white px-3 text-[12px] font-semibold text-ink-2 transition-colors hover:border-pri hover:text-pri disabled:opacity-50">{p}</button>)}
           </div>
           <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(input); }}>
-            <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} disabled={!enabled || busy} placeholder={enabled ? 'Ask about families, sponsors, follow-ups…' : 'Assistant is unavailable'} className="h-[46px] min-w-0 flex-1 rounded-full border border-line bg-bg px-[18px] text-[14px] outline-none transition-colors focus:border-pri focus:bg-white disabled:opacity-60" />
+            <input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} disabled={!enabled || busy} placeholder={enabled ? 'Ask about families, Konnectors, follow-ups…' : 'Assistant is unavailable'} className="h-[46px] min-w-0 flex-1 rounded-full border border-line bg-bg px-[18px] text-[14px] outline-none transition-colors focus:border-pri focus:bg-white disabled:opacity-60" />
             <button type="submit" disabled={!enabled || busy || !input.trim()} className="h-[46px] rounded-full bg-pri px-[18px] text-[14px] font-bold text-white transition-colors hover:bg-pri-dark disabled:bg-disabled">Ask</button>
           </form>
         </div>

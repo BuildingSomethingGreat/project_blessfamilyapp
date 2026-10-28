@@ -15,6 +15,8 @@ const MyFamily = lazy(() => import('./pages/public/MyFamily.tsx'));
 const Register = lazy(() => import('./pages/public/Register.tsx'));
 const SponsorPortal = lazy(() => import('./pages/public/SponsorPortal.tsx'));
 const NotFound = lazy(() => import('./pages/public/NotFound.tsx'));
+const Share = lazy(() => import('./pages/public/Share.tsx'));
+const Community = lazy(() => import('./pages/admin/Community.tsx'));
 const AdminLogin = lazy(() => import('./pages/admin/AdminLogin.tsx'));
 const Dashboard = lazy(() => import('./pages/admin/Dashboard.tsx'));
 const Review = lazy(() => import('./pages/admin/Review.tsx'));
@@ -51,6 +53,7 @@ export default function App() {
               <Route path="families/:slug/chip-in" element={<ChipIn />} />
               <Route path="my-family" element={<MyFamily />} />
               <Route path="s/:token" element={<SponsorPortal />} />
+              <Route path="share" element={<Share />} />
             </Route>
             <Route path="register" element={<Register />} />
             <Route path="admin/login" element={<AdminLogin />} />
@@ -61,6 +64,7 @@ export default function App() {
               <Route path="families/:id" element={<AdminFamily />} />
               <Route path="follow-ups" element={<FollowUps />} />
               <Route path="assistant" element={<Assistant />} />
+              <Route path="community" element={<Community />} />
               <Route path="settings" element={<Settings />} />
             </Route>
             <Route path="*" element={<NotFound />} />

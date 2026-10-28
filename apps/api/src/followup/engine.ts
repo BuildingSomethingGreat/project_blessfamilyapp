@@ -126,7 +126,7 @@ export class FollowUpEngine {
     }
     await this.store.logActivity({
       type: opts.actor === 'sponsor' ? 'sponsor_response' : to === 'Released' ? 'release' : 'status_change', channel: opts.actor === 'sponsor' ? 'web' : 'system',
-      familyId: s.familyId, sponsorshipId: s.id, subject: `${opts.actor === 'sponsor' ? 'Sponsor' : opts.actor} marked: ${to}`, body: opts.note ?? opts.reason ?? '',
+      familyId: s.familyId, sponsorshipId: s.id, subject: `${opts.actor === 'sponsor' ? 'Konnector' : opts.actor} marked: ${to}`, body: opts.note ?? opts.reason ?? '',
       meta: { from: s.status, to, actor: opts.actor }, occurredAt: now,
     });
     // Thank-you dominoes fall automatically.

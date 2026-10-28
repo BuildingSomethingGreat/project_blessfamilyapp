@@ -64,5 +64,5 @@ export function daysSilent(lastResponseAt: string | null, claimedAt: string): nu
 export function copyText(text: string) {
   return navigator.clipboard?.writeText(text);
 }
-export const RELEASE_REASONS = ['Sponsor unresponsive', 'Sponsor asked to step back', 'Duplicate claim', 'Family withdrew', 'Other'];
+export const RELEASE_REASONS = ['Konnector unresponsive', 'Konnector asked to step back', 'Duplicate claim', 'Family withdrew', 'Other'];
 export { stagger, rise } from '@/components/ui/Page';
