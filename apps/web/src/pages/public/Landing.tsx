@@ -216,9 +216,13 @@ export default function Landing() {
 }
 
 /**
- * Partner logos scroll in a seamless loop. Logos come from /partners/manifest.json
- * (populate with `pnpm --filter @bless/web partners:fetch`); until then the combined
- * strip from thekonnection.org is used.
+ * Partner logos scroll in a seamless loop. Logos come from /partners/manifest.json, pulled from
+ * https://www.thekonnection.org/donate with `pnpm --filter @bless/web partners:fetch`; if that list is
+ * empty the combined strip from thekonnection.org is used.
+ *
+ * Grayscale, fade and multiply-blend sit on each logo (not the row): a filter or opacity on the row
+ * would isolate it and stop white logo backgrounds from blending into the page. The edge-fade mask
+ * isolates the row anyway, so the row carries the page background for the logos to multiply against.
  */
 function PartnersMarquee() {
   const manifest = useQuery({ queryKey: ['partners'], queryFn: async () => (await fetch('/partners/manifest.json')).json() as Promise<{ logos: { src: string; alt: string }[] }>, staleTime: Infinity, retry: false });
@@ -228,8 +232,8 @@ function PartnersMarquee() {
     <section className="reveal pt-16 text-center">
       <div className="px-4 text-[13px] font-medium text-ink-3">The Konnection is powered by partners who take action</div>
       <div className="mt-[22px] overflow-hidden" style={{ maskImage: 'linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)', WebkitMaskImage: 'linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)' }}>
-        <div className="marquee flex w-max items-center gap-16 opacity-70 grayscale" style={{ animationDuration: `${Math.max(20, row.length * 4)}s` }}>
-          {row.map((l, i) => <img key={i} src={l.src} alt={i < logos.length ? l.alt : ''} className="block h-[56px] w-auto max-w-[220px] object-contain sm:h-[72px]" loading="lazy" />)}
+        <div className="marquee flex w-max items-center gap-14 bg-bg py-2 sm:gap-16" style={{ animationDuration: `${Math.max(20, row.length * 2.6)}s` }}>
+          {row.map((l, i) => <img key={i} src={l.src} alt={i < logos.length ? l.alt : ''} aria-hidden={i >= logos.length || undefined} className="block h-[48px] w-auto max-w-[180px] object-contain opacity-60 mix-blend-multiply grayscale transition duration-300 hover:opacity-100 hover:grayscale-0 sm:h-[64px] sm:max-w-[210px]" loading="lazy" />)}
         </div>
       </div>
     </section>

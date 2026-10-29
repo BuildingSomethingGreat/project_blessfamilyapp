@@ -3,15 +3,15 @@
  * Pulls partner/sponsor logos from The Konnection's donate page into public/partners/
  * and writes public/partners/manifest.json for the landing-page marquee.
  *
- *   pnpm --filter @bless/web partners:fetch            # scrape https://www.thekonnection.org/donate
+ *   pnpm --filter @bless/web partners:fetch            # https://www.thekonnection.org/donate
  *   pnpm --filter @bless/web partners:fetch -- <url>   # another page
  *
- * Heuristics (the site is Wix): collect <img> tags whose src is on static.wixstatic.com,
- * skip the site logo / hero photos by preferring images that sit near a "partner" or
- * "sponsor" heading, are wide-ish, and carry an alt text. Everything it keeps is printed,
- * so review the list and delete anything that is not a logo.
+ * The site is Wix. Partner logos are gallery images whose alt text ends in "logo"
+ * ("Ballmer Group logo"); The Konnection's own logo is skipped. Each logo is saved as a
+ * small copy (fit inside 480×160) so the marquee stays light. Everything kept is printed,
+ * in page order, so review the list before committing.
  */
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const url = process.argv[2] ?? 'https://www.thekonnection.org/donate';
@@ -19,49 +19,43 @@ const outDir = path.resolve('public/partners');
 await mkdir(outDir, { recursive: true });
 
 const html = await (await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (bless-a-family partners fetch)' } })).text();
-const lower = html.toLowerCase();
-const anchor = Math.max(lower.indexOf('partner'), lower.indexOf('sponsor'));
-const imgs = [...html.matchAll(/<img\b[^>]*>/gi)].map((m) => ({ tag: m[0], index: m.index ?? 0 }));
-const attr = (tag, name) => tag.match(new RegExp(`${name}=["']([^"']+)["']`, 'i'))?.[1];
+const attr = (tag, name) => tag.match(new RegExp(`\\s${name}="([^"]*)"`, 'i'))?.[1];
+const decode = (s) => s.replace(/&amp;/g, '&').replace(/&#x27;|&#39;/g, "'").replace(/&quot;/g, '"');
 
-// Wix serves images as .../media/<id>~mv2.<ext>/v1/fill/w_..,h_..,.../<name>.<ext>; strip the transform to get the original.
-const original = (src) => src.replace(/\/v1\/(fill|fit|crop)\/[^/]+\/[^/]+$/i, '').replace(/\/v1\/.*$/i, '');
+const seen = new Set();
+const found = [];
+for (const [tag] of html.matchAll(/<img\b[^>]*>/gi)) {
+  const src = attr(tag, 'src') ?? '';
+  const alt = decode(attr(tag, 'alt') ?? '').trim();
+  const m = src.match(/^https:\/\/static\.wixstatic\.com\/media\/([^/]+?)\.(png|jpe?g|webp)/i);
+  if (!m || !/\blogo$/i.test(alt) || /konnection/i.test(alt)) continue;
+  const [, id, ext] = m;
+  if (seen.has(id)) continue;
+  seen.add(id);
+  found.push({ id: id.replace(/~mv2$/, ''), media: `${id}.${ext}`, ext: ext.toLowerCase().replace('jpeg', 'jpg'), name: alt.replace(/\s*logo$/i, '').trim() });
+}
 
-const candidates = imgs
-  .map(({ tag, index }) => {
-    const src = attr(tag, 'src') ?? attr(tag, 'data-src') ?? (attr(tag, 'srcset') ?? '').split(',')[0]?.trim().split(' ')[0];
-    if (!src || !/wixstatic\.com\/media\//i.test(src)) return null;
-    const w = Number(src.match(/w_(\d+)/)?.[1] ?? 0), h = Number(src.match(/h_(\d+)/)?.[1] ?? 0);
-    const alt = attr(tag, 'alt') ?? '';
-    const near = anchor >= 0 ? Math.abs(index - anchor) : Infinity;
-    return { src, alt, w, h, near, id: src.match(/media\/([^~/]+)/)?.[1] ?? String(index) };
-  })
-  .filter(Boolean)
-  .filter((c) => !/logo\.png$/i.test(c.src) || c.near < 20000) // keep logos that are in the partner block
-  .filter((c) => !c.alt.toLowerCase().includes('konnection'))
-  .filter((c) => !c.w || c.w <= 800) // photos are usually larger
-  .filter((c, i, arr) => arr.findIndex((x) => x.id === c.id) === i)
-  .sort((a, b) => a.near - b.near)
-  .slice(0, 30);
-
-if (!candidates.length) {
-  console.error(`No partner images found on ${url}. Open the page, right-click a logo → "Copy image address", and add it to public/partners/manifest.json by hand.`);
+if (!found.length) {
+  console.error(`No partner logos found on ${url}. The page layout may have changed: open it, right-click a logo → "Copy image address", and add it to public/partners/manifest.json by hand.`);
   process.exit(1);
 }
 
+// Replace the previous set so removed partners don't linger.
+for (const f of await readdir(outDir)) if (f !== 'manifest.json') await rm(path.join(outDir, f));
+
 const logos = [];
-for (const c of candidates) {
-  const ext = (c.src.match(/\.(png|jpe?g|webp|svg|avif)/i)?.[1] ?? 'png').toLowerCase();
-  const file = `${c.id}.${ext}`;
+for (const p of found) {
+  const file = `${p.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}.${p.ext}`;
+  const small = `https://static.wixstatic.com/media/${p.media}/v1/fit/w_480,h_160,q_90/${p.media}`;
   try {
-    const res = await fetch(original(c.src));
-    if (!res.ok) throw new Error(String(res.status));
+    const res = await fetch(small);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     await writeFile(path.join(outDir, file), Buffer.from(await res.arrayBuffer()));
-    logos.push({ src: `/partners/${file}`, alt: c.alt || 'Konnection partner' });
-    console.log('saved', file, c.alt ? `(${c.alt})` : '');
+    logos.push({ src: `/partners/${file}`, alt: p.name });
+    console.log('saved', file.padEnd(44), p.name);
   } catch (e) {
-    console.warn('skipped', c.src, (e instanceof Error ? e.message : e));
+    console.warn('skipped', p.name, e instanceof Error ? e.message : e);
   }
 }
-await writeFile(path.join(outDir, 'manifest.json'), JSON.stringify({ _comment: 'Generated by scripts/fetch-partners.mjs. Delete any entry that is not a partner logo.', logos }, null, 2));
+await writeFile(path.join(outDir, 'manifest.json'), JSON.stringify({ _comment: `Generated by scripts/fetch-partners.mjs from ${url}. Delete any entry that is not a partner logo.`, source: url, fetchedAt: new Date().toISOString().slice(0, 10), logos }, null, 2) + '\n');
 console.log(`\nWrote ${logos.length} logos to public/partners/manifest.json. Review them, then commit.`);
