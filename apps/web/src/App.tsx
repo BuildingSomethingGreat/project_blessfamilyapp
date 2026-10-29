@@ -13,6 +13,7 @@ const Claim = lazy(() => import('./pages/public/Claim.tsx'));
 const ChipIn = lazy(() => import('./pages/public/ChipIn.tsx'));
 const MyFamily = lazy(() => import('./pages/public/MyFamily.tsx'));
 const Login = lazy(() => import('./pages/public/Login.tsx'));
+const Legal = lazy(() => import('./pages/public/Legal.tsx'));
 const Emails = lazy(() => import('./pages/admin/Emails.tsx'));
 const Register = lazy(() => import('./pages/public/Register.tsx'));
 const SponsorPortal = lazy(() => import('./pages/public/SponsorPortal.tsx'));
@@ -55,6 +56,9 @@ export default function App() {
               <Route path="families/:slug/chip-in" element={<ChipIn />} />
               <Route path="my-family" element={<MyFamily />} />
               <Route path="login" element={<Login />} />
+              <Route path="legal" element={<Legal />} />
+              <Route path="privacy" element={<Navigate to="/legal#privacy" replace />} />
+              <Route path="terms" element={<Navigate to="/legal#terms" replace />} />
               <Route path="s/:token" element={<SponsorPortal />} />
               <Route path="share" element={<Share />} />
             </Route>

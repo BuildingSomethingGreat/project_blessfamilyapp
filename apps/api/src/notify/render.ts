@@ -95,7 +95,7 @@ export function renderEmail(spec: EmailSpec, footer: Footer): { html: string; te
     <tr><td style="padding:26px 10px 0;font-family:${FONT};font-size:12px;line-height:1.6;color:${P.ink3}">
       Questions? Reply to this email or write to <a href="mailto:${esc(footer.contactEmail)}" style="color:${P.ink2}">${esc(footer.contactEmail)}</a>.<br/>
       ${esc(footer.reason)}<br/>
-      <a href="${esc(footer.webUrl)}" style="color:${P.ink3}">The Konnection &middot; Detroit, MI</a>
+      <a href="${esc(footer.webUrl)}" style="color:${P.ink3}">The Konnection &middot; Detroit, MI</a> &middot; <a href="${esc(footer.webUrl)}/legal#privacy" style="color:${P.ink3}">Privacy</a> &middot; <a href="${esc(footer.webUrl)}/legal#terms" style="color:${P.ink3}">Terms</a>
     </td></tr>
   </table>
 </td></tr></table>
@@ -115,6 +115,7 @@ export function renderEmail(spec: EmailSpec, footer: Footer): { html: string; te
     '',
     `Questions? Reply or write to ${footer.contactEmail}.`,
     footer.reason,
+    `Privacy and terms: ${footer.webUrl}/legal`,
   ].filter((x) => x !== undefined).join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
 
   return { html, text };

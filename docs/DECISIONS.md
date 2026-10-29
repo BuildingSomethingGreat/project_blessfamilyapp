@@ -61,3 +61,8 @@ The public nav's purple button is **Log in** (one form for Konnectors and staff)
 
 ## Team alerts
 Admins (`ADMIN_EMAILS`) get an email for new applications, claims, releases, flagged Konnectors and hand-offs, plus a summary when they run follow-ups by hand. Turn it off with **Email the team about activity** in Settings (`adminAlerts`).
+
+## Legal page
+`/legal` (also `/privacy`, `/terms`) holds the Privacy Policy and Terms of Use in plain language, written from what the app actually does: the fields we collect, what is public, the vendors (Airtable, Netlify, Resend, Zeffy, Google Fonts, Anthropic for the staff assistant), no analytics or ad trackers, IPs used only in memory for spam and rate limits, Michigan law. The contact is the season contact email (Sharnese). It is linked from the site footers, the claim and registration forms, and every email footer. The text lives in `apps/web/src/pages/public/Legal.tsx`. Update it, and the effective date, whenever data handling changes (new fields, vendors or public surfaces).
+
+Open: have counsel review before launch, especially retention (we say up to three years), tax language (no 501(c)(3) claim or EIN is stated), and whether direct-delivery Konnectors ever receive a family's address.

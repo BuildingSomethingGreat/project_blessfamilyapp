@@ -244,6 +244,7 @@ export default function Register() {
                   ))}
                 </div>
                 <div className="mt-4"><Checkbox checked={a.eligible} onChange={(v) => set('eligible', v)}>I confirm all children live in my household and that we're part of The Konnection's programs.</Checkbox></div>
+                <p className="mt-3 text-[12px] leading-[1.5] text-ink-3">By submitting you agree to our <a href="/legal#terms" target="_blank" rel="noreferrer" className="font-semibold text-ink-2 underline">Terms</a> and <a href="/legal#privacy" target="_blank" rel="noreferrer" className="font-semibold text-ink-2 underline">Privacy Policy</a>. We never publish your name, address or phone.</p>
                 {error && <p className="mt-3 text-[13px] text-bad">{error}</p>}
               </>
             )}
@@ -251,7 +252,7 @@ export default function Register() {
               <div className="anim-pop mt-7 rounded-xl2 bg-ink p-7 text-bg">
                 <div className="text-[11px] font-semibold uppercase tracking-[.1em] text-lav">Your family ID</div>
                 <div className="mt-1 text-[40px] font-extrabold tracking-[-.04em] text-white">{submitted}</div>
-                <p className="mt-3 text-[14px] leading-[1.55] text-bg/75">We'll text you when it's reviewed — usually within 2 days — and again when a Holiday Konnector steps up. Keep this ID handy.</p>
+                <p className="mt-3 text-[14px] leading-[1.55] text-bg/75">{a.email ? "We'll email you when it's reviewed (usually within 2 days) and again when a Holiday Konnector steps up." : "Our team reviews every family, usually within 2 days, and will reach out if we need anything."} Keep this ID handy.</p>
               </div>
             )}
           </div>

@@ -12,4 +12,5 @@ pnpm monorepo. `packages/shared` (domain types/schemas), `apps/api` (Hono, Fly.i
 - Festive decor (branches, ornament, gifts, lantern, snow) lives in `apps/web/src/components/festive` with PNGs in `apps/web/public/festive`; it is decorative only (`aria-hidden`, `pointer-events-none`) and must never cover interactive UI.
 - Public copy calls sponsors "Holiday Konnectors"; code and Airtable keep `sponsor`. Admin calls the board "Sponsors" (`/admin/sponsors`, CSV at `/api/admin/sponsors.csv`). Konnectors log in by magic link (`routes/account.ts`, `/login`). Quotes and the Konnector wall are moderated (`/admin/community`).
 - Production never seeds demo data and returns 503 on writes without Airtable (`apps/api/src/app.ts`).
+- Privacy Policy and Terms live in `apps/web/src/pages/public/Legal.tsx` (`/legal`). If you add a field, vendor or public surface, update them and the effective date.
 - Decisions and open questions: `docs/DECISIONS.md`.

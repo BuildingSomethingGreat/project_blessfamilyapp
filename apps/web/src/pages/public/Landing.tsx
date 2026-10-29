@@ -208,7 +208,7 @@ export default function Landing() {
         </div>
         <div className="mx-auto mt-7 flex max-w-[1180px] flex-wrap items-center justify-between gap-4 text-[13px] text-ink-3">
           <div className="flex items-center gap-3"><img src="/brand/konnection-logo.png" alt="The Konnection" className="h-[26px] w-auto" /><span>© {settings.data?.season ?? ''} The Konnection · Detroit, MI</span></div>
-          <span>First names and ages only. Parent names, addresses and phone numbers are never published. <Link to="/admin" className="ml-2 text-ink-3/70 hover:text-ink">Admin</Link></span>
+          <span>First names and ages only. Parent names, addresses and phone numbers are never published. <Link to="/legal#privacy" className="ml-2 font-semibold text-ink-2 hover:text-ink">Privacy</Link> · <Link to="/legal#terms" className="font-semibold text-ink-2 hover:text-ink">Terms</Link> <Link to="/admin" className="ml-2 text-ink-3/70 hover:text-ink">Admin</Link></span>
         </div>
       </section>
     </div>

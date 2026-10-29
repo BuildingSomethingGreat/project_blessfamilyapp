@@ -40,7 +40,7 @@ export function PublicLayout() {
       {pathname !== '/' && (
         <footer className="mx-auto flex w-full max-w-[1180px] flex-wrap items-center justify-between gap-4 px-4 pb-24 pt-10 text-[13px] text-ink-3 sm:px-8 sm:pb-10">
           <div className="flex items-center gap-3"><img src="/brand/konnection-logo.png" alt="" className="h-[22px] w-auto" /><span>© {settings.data?.season ?? new Date().getFullYear()} The Konnection · Detroit, MI</span></div>
-          <span>First names and ages only. Parent names, addresses and phone numbers are never published.</span>
+          <span>First names and ages only. Parent names, addresses and phone numbers are never published. <Link to="/legal#privacy" className="ml-2 font-semibold text-ink-2 hover:text-ink">Privacy</Link> · <Link to="/legal#terms" className="font-semibold text-ink-2 hover:text-ink">Terms</Link></span>
         </footer>
       )}
       {/* Mobile tab bar */}

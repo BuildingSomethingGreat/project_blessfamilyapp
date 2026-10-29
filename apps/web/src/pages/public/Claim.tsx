@@ -84,6 +84,7 @@ export default function Claim() {
             <div className="mt-2.5"><Checkbox checked={form.agree} onChange={(v) => set('agree', v)}>I can support every child in this family, with the same number of gifts for each child.</Checkbox>{errors.agree && <span className="mt-1 block text-[13px] text-bad">{errors.agree}</span>}</div>
             {errors.form && <p className="mt-3 text-[13px] text-bad">{errors.form}</p>}
             <button onClick={submit} disabled={!valid || busy} className="mt-[22px] h-[54px] w-full rounded-full bg-pri text-base font-bold text-white transition-colors hover:bg-pri-dark disabled:bg-disabled">{busy ? 'Saving your family…' : 'Bless this family'}</button>
+            <p className="mt-3 text-center text-[12px] leading-[1.5] text-ink-3">By choosing this family you agree to our <Link to="/legal#terms" className="font-semibold text-ink-2 underline-offset-2 hover:underline">Terms</Link> and <Link to="/legal#privacy" className="font-semibold text-ink-2 underline-offset-2 hover:underline">Privacy Policy</Link>.</p>
           </>
         )}
       </div>
