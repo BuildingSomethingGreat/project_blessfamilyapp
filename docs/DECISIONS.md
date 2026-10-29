@@ -23,8 +23,8 @@ Codes are cold and stories need a subject. Each family gets a derived, non-ident
 ## 5. The follow-up system flags, it never auto-releases
 The dominoes engine nudges sponsors on a schedule (48h after a claim if they haven't started shopping, then every 5 days while shopping/purchased/wrapped, daily inside the last week). After two unanswered nudges it **flags** the sponsorship for a human and stops. Automatically reopening a family that someone may already be shopping for is a worse failure than a day of admin delay. Release is one click in the admin, with a reason, and it notifies the sponsor.
 
-## 6. Email first, SMS optional, no gamification
-Email via Resend is the default because it needs no carrier approval. Twilio SMS is wired behind a flag because texts get better response rates from sponsors who chose "Text". The "points" and social-feed ideas from the first inspiration shot don't fit a nonprofit holiday program; the equivalent motivation here is the live "families waiting / blessed" counter and the thank-you emails that close the loop.
+## 6. Email only, no gamification
+Every message goes out by email through Resend: it needs no carrier approval and one channel keeps the log complete. Holiday Konnectors no longer choose text vs email; the claim form asks them to confirm updates come by email, and still records a phone for urgent delivery questions (it's in the sponsors CSV). All emails share one layout (`apps/api/src/notify/render.ts`: lavender page, white rounded card, bold Poppins headline, purple pill button) and every send, success or failure, is written to Activity as `message_sent` and shown in Admin → Emails. Sign-in links are redacted from the log. The "points" and social-feed ideas from the first inspiration shot don't fit a nonprofit holiday program; the equivalent motivation here is the live "families waiting / blessed" counter and the thank-you emails that close the loop.
 
 ## 7. Airtable now, Postgres (Supabase) when it hurts
 Airtable is the system of record for this season because admins already use it and get a spreadsheet UI for free. The API talks to it through one adapter (`apps/api/src/store/airtable.ts`) behind a `Store` interface, with a short read cache to stay under Airtable's 5 req/s. Known limits: no transactions (the API serializes claims in-process; Fly runs one machine), and reporting gets slow past a few thousand activity rows. When that bites, the recommendation is **Supabase (Postgres)**, not Firebase: the data is relational (families → children → sponsorships → activity), reports are SQL, and row-level security covers the public/admin split. Implementing `Store` for Postgres is a contained job.
@@ -54,5 +54,10 @@ At a few hundred families and a few thousand activity rows, Airtable's 5 request
 - Direct delivery: should staff share the family's address with the Konnector, or meet them at the family's door?
 - Do you want families to be able to update a wishlist after submitting (today: contact staff)?
 - Should a sponsor be able to claim more than one family in one go (organizations often do)?
-- Text message follow-ups: worth a Twilio number this season?
 - Brand assets: I could not reach thekonnection.org from the build environment, so the palette (cream, ink, ember, pine, gold) is a proposal. Swap the tokens in `apps/web/src/styles.css`.
+
+## Konnector log in
+The public nav's purple button is **Log in** (one form for Konnectors and staff). We email a one-tap link: a Konnector's goes to `/login?token=…` (30 minutes) and sets a 60-day `bf_konnector` cookie; an admin's goes to the admin sign-in. The response is the same whether or not the email has an account, so the form can't be used to look people up. Claiming a family also signs the Konnector in on that device. Once signed in the button becomes "Hi, {first name}" and opens `/my-family`: one family opens its page directly, several show a list. The private family link (`/s/:token`) still works on its own.
+
+## Team alerts
+Admins (`ADMIN_EMAILS`) get an email for new applications, claims, releases, flagged Konnectors and hand-offs, plus a summary when they run follow-ups by hand. Turn it off with **Email the team about activity** in Settings (`adminAlerts`).

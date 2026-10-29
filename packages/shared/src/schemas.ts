@@ -61,7 +61,9 @@ export const ClaimRequestSchema = z.object({
   email: z.string().trim().email('Enter a valid email'),
   phone: z.union([z.literal(''), z.string().trim().regex(/^[+()\-.\s\d]{10,20}$/, 'Enter a valid phone number')]).default(''),
   organization: trimmed(120).default(''),
-  preferredContact: z.enum(['Email', 'Text', 'Call']).default('Email'),
+  /** Holiday Konnectors are contacted by email only; the phone is kept for urgent delivery questions. */
+  preferredContact: z.literal('Email').default('Email'),
+  emailConsent: z.literal(true, { errorMap: () => ({ message: 'Please confirm updates can come by email' }) }),
   note: trimmed(500).default(''),
   handoff: z.enum(HANDOFFS).default('Drop off'),
   /** Add my name to the Wall of Holiday Konnectors once gifts are in. */

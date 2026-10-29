@@ -179,6 +179,8 @@ export interface SeasonSettings {
   showPhotos: boolean;
   /** Ask families for an (optional) photo on the application. Off = the photo question is not shown. */
   askFamilyPhoto: boolean;
+  /** Email the admin team about new applications, claims, releases, flags, hand-offs and quotes. */
+  adminAlerts: boolean;
 }
 
 export const QUOTE_ROLES = ['Holiday Konnector', 'Konnection family'] as const;

@@ -16,7 +16,9 @@ The API maps fields **by name** (`apps/api/src/store/airtable.ts`). Renaming a f
 
 Status options must stay in sync with `packages/shared/src/status.ts`. The API writes with `typecast: true`, so new select values (e.g. `Purchased`, `Wrapped`, `Girl`, `Boy`, `Prefer not to say`, `chip_in`) are created on first write. The original `Confirmed`, `Male` and `Female` choices are unused and can be deleted by hand.
 
-Settings keys: season, dropoffDeadline, dropoffLocation, dropoffHours, contactEmail, contactPhone, catalogOpen, registrationOpen, perChildBudgetNote, orgDonateUrl, chipInsEnabled, chipInUrl, showPhotos, askFamilyPhoto.
+Settings keys: season, dropoffDeadline, dropoffLocation, dropoffHours, contactEmail, contactPhone, catalogOpen, registrationOpen, perChildBudgetNote, orgDonateUrl, chipInsEnabled, chipInUrl, showPhotos, askFamilyPhoto, adminAlerts.
+
+Every email is an Activity row with Type `message_sent`; Meta holds `kind`, `audience` (konnector, family, admin, test), `to`, `ok`, `error` and the Resend id. New Konnectors are saved with Preferred Contact = Email (the claim form no longer offers text).
 
 Privacy rules the API enforces: a family photo is public only when Photo Approved is on **and** Photo Private is off; a quote is public only when Status = Approved; a Konnector's name is on the public wall only when Wall Opt In is on, Wall Hidden is off, and one of their sponsorships reached Dropped Off or Delivered. Emails in Quotes and Sponsors never leave the admin API.
 

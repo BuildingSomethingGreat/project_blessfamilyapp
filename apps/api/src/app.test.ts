@@ -57,10 +57,10 @@ test('register → admin approve → claim → sponsor dominoes → report', asy
   // claim
   const bad = await json(await post(`/api/families/${fam!.slug}/claim`, { name: 'S', email: 'nope' }));
   assert.equal(bad.status, 400);
-  const claim = await json(await post(`/api/families/${fam!.slug}/claim`, { name: 'Sam Sponsor', email: 'sam@example.com', agree: true }));
+  const claim = await json(await post(`/api/families/${fam!.slug}/claim`, { name: 'Sam Sponsor', email: 'sam@example.com', agree: true, emailConsent: true }));
   assert.equal(claim.status, 200, JSON.stringify(claim.body));
   assert.ok(claim.body.token);
-  const again = await json(await post(`/api/families/${fam!.slug}/claim`, { name: 'Other', email: 'o@example.com', agree: true }));
+  const again = await json(await post(`/api/families/${fam!.slug}/claim`, { name: 'Other', email: 'o@example.com', agree: true, emailConsent: true }));
   assert.equal(again.status, 409);
 
   // sponsor portal + dominoes
@@ -119,7 +119,7 @@ test('a duplicate claim written by another instance loses to the earlier one', a
   // Simulate a second serverless instance that already wrote a claim a moment earlier but hasn't flipped the family yet.
   const rival = await store.createSponsor({ name: 'Early Bird', email: 'early@example.com', phone: '', organization: '', preferredContact: 'Email', notes: '', displayName: '', wallOptIn: false, wallHidden: false });
   await store.createSponsorship({ sponsorshipId: 'SP-T-1', familyId: fam.id, sponsorId: rival.id, status: 'Claimed', token: 'rival-token', handoff: 'Drop off', claimedAt: new Date(Date.now() - 1000).toISOString(), shoppingAt: null, purchasedAt: null, wrappedAt: null, droppedOffAt: null, deliveredAt: null, releasedAt: null, nextFollowUpAt: null, lastNudgedAt: null, lastResponseAt: null, followUpCount: 0, flagged: false, flagReason: '', releaseReason: '', sponsorNote: '', adminNotes: '' });
-  const res = await post(`/api/families/${fam.slug}/claim`, { name: 'Late Comer', email: 'late@example.com', agree: true });
+  const res = await post(`/api/families/${fam.slug}/claim`, { name: 'Late Comer', email: 'late@example.com', agree: true, emailConsent: true });
   assert.equal(res.status, 409);
   const mine = (await store.listSponsorships({ familyId: fam.id })).filter((s) => s.sponsorId !== rival.id);
   assert.ok(mine.every((s) => s.status === 'Released'), 'the later duplicate is released');
@@ -128,7 +128,7 @@ test('a duplicate claim written by another instance loses to the earlier one', a
 test('claim records hand-off choice and wall opt-in; the wall only shows names after hand-off', async () => {
   const taken = new Set((await store.listSponsorships({ status: ['Claimed'] })).map((s) => s.familyId));
   const fresh = (await store.listFamilies({ status: ['Available'] })).find((f) => !taken.has(f.id))!;
-  const res = await (await post(`/api/families/${fresh.slug}/claim`, { name: 'Wanda Wall', email: 'wanda@example.com', agree: true, handoff: 'Deliver directly', wallOptIn: true, displayName: 'The Wall Family' })).json();
+  const res = await (await post(`/api/families/${fresh.slug}/claim`, { name: 'Wanda Wall', email: 'wanda@example.com', agree: true, emailConsent: true, handoff: 'Deliver directly', wallOptIn: true, displayName: 'The Wall Family' })).json();
   assert.ok(res.token, JSON.stringify(res));
   const sp = (await store.getSponsorshipByToken(res.token))!;
   assert.equal(sp.handoff, 'Deliver directly');
@@ -151,4 +151,65 @@ test('quotes are pending until approved', async () => {
   const pub2 = await (await app.request('/api/community')).json();
   assert.ok(pub2.quotes.some((x: any) => x.name === 'A Konnection dad'));
   assert.equal((await post('/api/quotes', { role: 'Konnection family', name: 'X', quote: 'too short', consent: false })).status, 400);
+});
+
+test('claims require email consent; every email is logged and visible to admins', async () => {
+  const taken = new Set((await store.listSponsorships({ status: ['Claimed'] })).map((s) => s.familyId));
+  const fresh = (await store.listFamilies({ status: ['Available'] })).find((f) => !taken.has(f.id))!;
+  const noConsent = await post(`/api/families/${fresh.slug}/claim`, { name: 'Ellie Email', email: 'ellie@example.com', agree: true });
+  assert.equal(noConsent.status, 400);
+  const ok = await post(`/api/families/${fresh.slug}/claim`, { name: 'Ellie Email', email: 'ellie@example.com', phone: '313-555-0101', agree: true, emailConsent: true });
+  assert.equal(ok.status, 200);
+  assert.ok(ok.headers.get('set-cookie')?.includes('bf_konnector='), 'claiming signs the Konnector in');
+  const portal = await (await app.request(`/api/sponsor/${(await ok.json()).token}`)).json();
+  const emails = portal.timeline.filter((t: any) => t.type === 'message_sent');
+  assert.ok(emails.length >= 1, 'their claim confirmation is in the thread');
+  assert.ok(!JSON.stringify(portal.timeline).includes('admin team') && !JSON.stringify(portal.timeline).includes('Someone chose your family'), 'no team alerts or family emails in the Konnector thread');
+  const sponsor = (await store.findSponsorByEmail('ellie@example.com'))!;
+  assert.equal(sponsor.preferredContact, 'Email');
+  assert.equal(sponsor.phone, '313-555-0101', 'phone is still recorded');
+
+  const req = await json(await post('/api/admin/auth/request', { email: 'admin@example.com' }));
+  const verify = await post('/api/admin/auth/verify', { token: new URL(req.body.devLink).searchParams.get('token')! });
+  const admin = { cookie: verify.headers.get('set-cookie')!.split(';')[0] };
+
+  const log = await json(await app.request('/api/admin/emails', { headers: admin }));
+  assert.equal(log.status, 200);
+  const mine = log.body.filter((e: any) => e.to === 'ellie@example.com');
+  assert.ok(mine.some((e: any) => e.kind === 'claim_confirmation' && e.audience === 'konnector' && e.ok));
+  assert.ok(log.body.some((e: any) => e.kind === 'admin_family_claimed' && e.to === 'admin@example.com'), 'team is alerted');
+  assert.equal((await app.request('/api/admin/emails')).status, 401);
+
+  const test = await json(await post('/api/admin/emails/test', { to: 'someone@example.com' }, admin));
+  assert.equal(test.body.ok, true);
+  assert.equal(test.body.provider, 'console');
+
+  const csv = await app.request('/api/admin/sponsors.csv', { headers: admin });
+  assert.equal(csv.status, 200);
+  const text = await csv.text();
+  assert.ok(text.startsWith('"Sponsor","Email","Phone"'));
+  assert.ok(text.includes('ellie@example.com') && text.includes('313-555-0101'));
+});
+
+test('Konnector log in: magic link → session → my families; never reveals whether an email exists', async () => {
+  const unknown = await json(await post('/api/account/login', { email: 'nobody@example.com' }, { 'x-forwarded-for': '10.0.0.1' }));
+  assert.equal(unknown.status, 200);
+  assert.equal(unknown.body.devLink, undefined);
+  const known = await json(await post('/api/account/login', { email: 'ellie@example.com' }, { 'x-forwarded-for': '10.0.0.2' }));
+  assert.equal(known.status, 200);
+  assert.ok(known.body.devLink?.includes('/login?token='));
+  assert.equal((await app.request('/api/account/me')).status, 401);
+  const token = new URL(known.body.devLink).searchParams.get('token')!;
+  assert.equal((await post('/api/admin/auth/verify', { token })).status, 401, 'a Konnector link is not an admin link');
+  const v = await post('/api/account/verify', { token });
+  assert.equal(v.status, 200);
+  const cookie = v.headers.get('set-cookie')!.split(';')[0];
+  const me = await json(await app.request('/api/account/me', { headers: { cookie } }));
+  assert.equal(me.status, 200);
+  assert.equal(me.body.sponsor.email, 'ellie@example.com');
+  assert.equal(me.body.families.length, 1);
+  assert.ok(me.body.families[0].token);
+  assert.ok(!JSON.stringify(me.body).includes('Demo Guardian'));
+  const logged = (await store.listActivity({ types: ['message_sent'], limit: 50 })).find((a) => (a.meta as any).kind === 'konnector_login');
+  assert.ok(logged && !logged.body.includes('token='), 'sign-in links are not stored in the log');
 });

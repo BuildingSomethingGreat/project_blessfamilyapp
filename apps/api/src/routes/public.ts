@@ -3,6 +3,7 @@ import { ChipInSchema, ClaimRequestSchema, FamilyApplicationSchema, QuoteSubmitS
 import type { Services } from '../lib/services.ts';
 import { HttpError } from '../lib/services.ts';
 import { nowIso } from '../lib/ids.ts';
+import { setKonnectorSession } from './account.ts';
 
 const recentViews = new Map<string, number>();
 function dedupe(key: string, ms: number) {
@@ -60,7 +61,9 @@ export function publicRoutes(services: Services) {
     if (!allow(`claim:${ip(c)}`, 8, 60_000)) throw new HttpError(429, 'Slow down a moment and try again.');
     const parsed = ClaimRequestSchema.safeParse(await c.req.json());
     if (!parsed.success) return c.json({ error: 'Please check the form', issues: parsed.error.flatten() }, 400);
-    return c.json(await services.claim(c.req.param('slug'), parsed.data));
+    const { sponsorEmail, ...res } = await services.claim(c.req.param('slug'), parsed.data);
+    setKonnectorSession(c, sponsorEmail); // choosing a family signs you in on this device
+    return c.json(res);
   });
 
   r.post('/families/:slug/chip-in', async (c) => {

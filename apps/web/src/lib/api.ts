@@ -21,6 +21,9 @@ export type AdminFamily = Family & { public: PublicFamily; sponsorship: (Sponsor
 export type AdminFamilyDetail = Family & { public: PublicFamily; sponsorships: (Sponsorship & { sponsor: Sponsor | null })[]; activity: Activity[] };
 export type AdminSponsorship = Sponsorship & { family: { familyId: string; nickname: string; childCount: number; slug: string; id: string } | null; sponsor: Sponsor | null };
 export type WallAdminRow = { id: string; name: string; email: string; organization: string; displayName: string; publicName: string; wallOptIn: boolean; wallHidden: boolean; active: number; done: number; showing: boolean };
+export type AccountFamily = { token: string; sponsorshipId: string; status: SponsorshipStatus; handoff: string; claimedAt: string; nickname: string; kidLine: string; kidNames: string; colors: string[] };
+export type AccountMe = { sponsor: { name: string; email: string; displayName: string; wallOptIn: boolean }; families: AccountFamily[] };
+export type EmailLogRow = { id: string; at: string; subject: string; body: string; kind: string; to: string; ok: boolean; error: string | null; provider: string; actor: string; audience: 'konnector' | 'family' | 'admin' | 'test'; family: { id: string; familyId: string; nickname: string } | null; sponsorshipId: string | null };
 export type AgentTurn = { conversationId: string; reply: string; actions: { tool: string; summary: string }[] };
 
 /** The sponsor's magic-link token lives on the device so "My family page" works without sign-in. */
@@ -38,6 +41,12 @@ export const api = {
   register: (body: FamilyApplication) => post<{ familyId: string }>('/register', body),
   community: () => req<CommunityView>('/community'),
   submitQuote: (body: QuoteSubmit) => post<{ ok: true }>('/quotes', body),
+  account: {
+    login: (email: string) => post<{ ok: true; devLink?: string }>('/account/login', { email }),
+    verify: (token: string) => post<{ ok: true }>('/account/verify', { token }),
+    me: () => req<AccountMe>('/account/me'),
+    logout: () => post<{ ok: true }>('/account/logout'),
+  },
   sponsor: {
     get: (token: string) => req<SponsorPortalView>(`/sponsor/${token}`),
     status: (token: string, status: SponsorshipStatus, note = '', reason = '') => post<SponsorPortalView>(`/sponsor/${token}/status`, { status, note, reason }),
@@ -49,7 +58,7 @@ export const api = {
     passcode: (email: string, passcode: string) => post<{ ok: true; email: string }>('/admin/auth/passcode', { email, passcode }),
     verify: (token: string) => post<{ ok: true; email: string }>('/admin/auth/verify', { token }),
     logout: () => post<{ ok: true }>('/admin/auth/logout'),
-    me: () => req<{ email: string; assistantEnabled: boolean; store: string }>('/admin/me'),
+    me: () => req<{ email: string; assistantEnabled: boolean; store: string; mail: { provider: 'resend' | 'console'; from: string } }>('/admin/me'),
     report: () => req<AdminReport>('/admin/report'),
     families: () => req<AdminFamily[]>('/admin/families'),
     family: (id: string) => req<AdminFamilyDetail>(`/admin/families/${id}`),
@@ -57,6 +66,9 @@ export const api = {
     sponsorships: () => req<AdminSponsorship[]>('/admin/sponsorships'),
     patchSponsorship: (id: string, body: Partial<{ status: SponsorshipStatus; adminNotes: string; flagged: boolean; flagReason: string; reason: string }>) => patch<Sponsorship>(`/admin/sponsorships/${id}`, body),
     nudge: (id: string, message?: string) => post<{ ok: boolean; subject?: string; text?: string; error?: string }>(`/admin/sponsorships/${id}/nudge`, { message }),
+    emailFamily: (id: string, message: string) => post<{ ok: boolean; subject?: string; error?: string }>(`/admin/families/${id}/email`, { message }),
+    emails: (limit = 400) => req<EmailLogRow[]>(`/admin/emails?limit=${limit}`),
+    testEmail: (to: string) => post<{ ok: boolean; error?: string; id?: string; provider: string }>('/admin/emails/test', { to }),
     activity: (limit = 100) => req<Activity[]>(`/admin/activity?limit=${limit}`),
     settings: () => req<SeasonSettings>('/admin/settings'),
     patchSettings: (body: Partial<SeasonSettings>) => patch<SeasonSettings>('/admin/settings', body),
@@ -68,6 +80,7 @@ export const api = {
     wall: () => req<WallAdminRow[]>('/admin/wall'),
     patchSponsor: (id: string, body: Partial<{ wallHidden: boolean; wallOptIn: boolean; displayName: string }>) => patch<Sponsor>(`/admin/sponsors/${id}`, body),
     exportUrl: '/api/admin/export.csv',
+    sponsorsCsvUrl: '/api/admin/sponsors.csv',
   },
 };
 

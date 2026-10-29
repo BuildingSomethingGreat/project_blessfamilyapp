@@ -1,4 +1,5 @@
 const env = (k: string, d = ''): string => process.env[k] ?? d;
+const fromAddress = (v: string) => (v.includes('<') ? v : `Bless This Family <${v.trim()}>`);
 
 export const config = {
   port: Number(env('PORT', '8787')),
@@ -23,11 +24,13 @@ export const config = {
   /** Optional shared passcode so admins can sign in before an email provider is configured. */
   adminPasscode: env('ADMIN_PASSCODE'),
   notify: {
-    driver: env('NOTIFY_DRIVER', 'console') as 'console' | 'resend',
+    /** Resend sends every email once RESEND_API_KEY is set; otherwise emails print to the server log. */
+    driver: (env('NOTIFY_DRIVER') || (env('RESEND_API_KEY') ? 'resend' : 'console')) as 'console' | 'resend',
     resendKey: env('RESEND_API_KEY'),
-    from: env('EMAIL_FROM', 'The Konnection <bless@thekonnection.org>'),
-    replyTo: env('EMAIL_REPLY_TO', 'sharnese@thekonnection.org'),
-    twilio: { sid: env('TWILIO_ACCOUNT_SID'), token: env('TWILIO_AUTH_TOKEN'), from: env('TWILIO_FROM') },
+    /** RESEND_EMAIL is the verified sender, e.g. bless@thekonnection.org (a display name is added if missing). */
+    from: fromAddress(env('RESEND_EMAIL') || env('EMAIL_FROM') || 'bless@thekonnection.org'),
+    /** Optional fixed reply-to. Empty = the contact email from admin Settings. */
+    replyTo: env('EMAIL_REPLY_TO'),
   },
   anthropic: {
     apiKey: env('ANTHROPIC_API_KEY'),

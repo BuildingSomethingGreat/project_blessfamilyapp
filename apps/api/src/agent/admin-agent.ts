@@ -28,7 +28,8 @@ What the program is: families in the organization submit a holiday wishlist per 
 How to behave:
 - Lead with the answer. Use the tools to get real numbers; never guess. Keep replies short and skimmable — plain sentences, short lists, no headers for short answers.
 - When asked "what should we do", give a recommendation with the 1–3 highest-leverage actions and why.
-- Reads are free. For writes: nudge, flag, approve, status changes are fine when the admin asks. Releasing a sponsorship (reopening a family) is irreversible — ask the admin to confirm first unless they already said "release" explicitly in this message.
+- Every message you send goes out by email (Konnectors and families) and is logged in Admin → Emails.
+- Reads are free. For writes: nudge, email a family, flag, approve, status changes are fine when the admin asks. Releasing a sponsorship (reopening a family) is irreversible — ask the admin to confirm first unless they already said "release" explicitly in this message.
 - Never reveal guardian names, phone numbers, or addresses in a reply unless the admin explicitly asks for that family's contact info.
 - Dates: the drop-off deadline matters for everything; mention days left when relevant.`;
 
@@ -37,10 +38,11 @@ const tools: BetaTool[] = [
   { name: 'list_families', description: 'List families with status, child count, nickname, views, days waiting. Filter by status or free-text query (nickname, family id, child name, city).', input_schema: { type: 'object', properties: { status: { type: 'array', items: { type: 'string', enum: [...FAMILY_STATUSES] } }, query: { type: 'string' } }, required: [], additionalProperties: false } },
   { name: 'get_family', description: 'Full detail for one family by family id (BF-2026-001) including children wishlists, sponsorship, and recent activity. Includes private contact info — only surface it if asked.', input_schema: { type: 'object', properties: { familyId: { type: 'string' } }, required: ['familyId'], additionalProperties: false }, strict: true },
   { name: 'list_sponsorships', description: 'List sponsorships (the dominoes tracker) with sponsor name, status, follow-up count, last response, flagged. Filter by status or onlyOverdue.', input_schema: { type: 'object', properties: { status: { type: 'array', items: { type: 'string', enum: [...SPONSORSHIP_STATUSES] } }, onlyOverdue: { type: 'boolean' } }, required: [], additionalProperties: false } },
-  { name: 'send_nudge', description: 'Send a follow-up message to a sponsor now, on their preferred channel. Optionally provide a custom message body; otherwise the right template for their step is used.', input_schema: { type: 'object', properties: { sponsorshipId: { type: 'string' }, message: { type: 'string' } }, required: ['sponsorshipId'], additionalProperties: false } },
+  { name: 'send_nudge', description: 'Email a Holiday Konnector now. Optionally provide a custom message body (sent as a short note from the team); otherwise the right template for their step is used.', input_schema: { type: 'object', properties: { sponsorshipId: { type: 'string' }, message: { type: 'string' } }, required: ['sponsorshipId'], additionalProperties: false } },
   { name: 'update_sponsorship', description: 'Move a sponsorship to a new step (e.g. mark Delivered after staff delivered gifts) or flag/unflag it with a reason. Releasing requires confirmed=true.', input_schema: { type: 'object', properties: { sponsorshipId: { type: 'string' }, status: { type: 'string', enum: [...SPONSORSHIP_STATUSES] }, flagged: { type: 'boolean' }, reason: { type: 'string' }, confirmed: { type: 'boolean' } }, required: ['sponsorshipId'], additionalProperties: false } },
   { name: 'update_family', description: 'Approve a family (status Available), decline, mark needs info, approve its story or photo for public display, or add admin notes.', input_schema: { type: 'object', properties: { familyId: { type: 'string' }, status: { type: 'string', enum: [...FAMILY_STATUSES] }, storyApproved: { type: 'boolean' }, photoApproved: { type: 'boolean' }, adminNotes: { type: 'string' }, nickname: { type: 'string' } }, required: ['familyId'], additionalProperties: false } },
-  { name: 'draft_message', description: 'Draft (do not send) a message to a sponsor or family for the admin to review.', input_schema: { type: 'object', properties: { to: { type: 'string' }, intent: { type: 'string' } }, required: ['to', 'intent'], additionalProperties: false }, strict: true },
+  { name: 'email_family', description: 'Email a family (guardian) a short custom note from the team, e.g. asking for missing info or confirming pick-up. Only call when the admin asks you to send it. Never include the Konnector\'s personal details.', input_schema: { type: 'object', properties: { familyId: { type: 'string' }, message: { type: 'string' } }, required: ['familyId', 'message'], additionalProperties: false }, strict: true },
+  { name: 'draft_message', description: 'Draft (do not send) an email to a Konnector or family for the admin to review. Send it with send_nudge or email_family once the admin approves.', input_schema: { type: 'object', properties: { to: { type: 'string' }, intent: { type: 'string' } }, required: ['to', 'intent'], additionalProperties: false }, strict: true },
 ];
 
 const conversations = new Map<string, { messages: BetaMessageParam[]; updatedAt: number }>();
@@ -98,7 +100,8 @@ export class AdminAgent {
         const res = await followUp.send(kind, s, { custom: input.message, actor: 'agent' });
         await store.updateSponsorship(s.id, { lastNudgedAt: nowIso(), followUpCount: s.followUpCount + 1 });
         await log(`Agent sent ${kind} to ${s.sponsorshipId}`, { sponsorshipId: s.id, familyId: s.familyId });
-        return { result: JSON.stringify(res), summary: `Sent "${res.subject}" to sponsor of ${s.sponsorshipId}` };
+        if (!res.ok) return { result: `Not sent: ${res.error}` };
+        return { result: JSON.stringify(res), summary: `Emailed "${res.subject}" to the Konnector of ${s.sponsorshipId}` };
       }
       case 'update_sponsorship': {
         const s = await store.getSponsorshipByCode(input.sponsorshipId);
@@ -130,9 +133,17 @@ export class AdminAgent {
         if (input.adminNotes) patch.adminNotes = (f.adminNotes ? f.adminNotes + '\n' : '') + `[${new Date().toLocaleDateString()}] ${input.adminNotes}`;
         if (input.nickname) patch.nickname = input.nickname;
         await store.updateFamily(f.id, patch);
-        if (input.status === 'Available' && f.status !== 'Available') followUp.sendToFamily('family_approved', { ...f, ...patch } as any).catch(() => {});
+        if (input.status === 'Available' && f.status !== 'Available') await followUp.sendToFamily('family_approved', { ...f, ...patch } as any, { actor: 'agent' }).catch(() => {});
         await log(`Agent updated ${f.familyId}: ${Object.keys(patch).join(', ')}`, { familyId: f.id, patch });
         return { result: `Updated ${f.familyId}: ${Object.keys(patch).join(', ')}`, summary: `${f.familyId}: ${Object.keys(patch).join(', ')}` };
+      }
+      case 'email_family': {
+        const f = await store.getFamilyByCode(input.familyId);
+        if (!f) return { result: 'No such family' };
+        const res = await followUp.sendToFamily('family_note', f, { custom: String(input.message), actor: 'agent' });
+        if (!res.ok) return { result: `Not sent: ${res.error}` };
+        await log(`Agent emailed family ${f.familyId}`, { familyId: f.id });
+        return { result: JSON.stringify(res), summary: `Emailed ${f.familyId}` };
       }
       case 'draft_message':
         return { result: 'Write the draft yourself in the reply, clearly labeled as a draft. The admin will copy or ask you to send it.' };

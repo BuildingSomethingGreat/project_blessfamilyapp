@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react';
-import { Route, Routes, useLocation } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { PublicLayout } from './pages/public/PublicLayout.tsx';
 import { AdminLayout } from './pages/admin/AdminLayout.tsx';
@@ -12,6 +12,8 @@ const FamilyDetail = lazy(() => import('./pages/public/FamilyDetail.tsx'));
 const Claim = lazy(() => import('./pages/public/Claim.tsx'));
 const ChipIn = lazy(() => import('./pages/public/ChipIn.tsx'));
 const MyFamily = lazy(() => import('./pages/public/MyFamily.tsx'));
+const Login = lazy(() => import('./pages/public/Login.tsx'));
+const Emails = lazy(() => import('./pages/admin/Emails.tsx'));
 const Register = lazy(() => import('./pages/public/Register.tsx'));
 const SponsorPortal = lazy(() => import('./pages/public/SponsorPortal.tsx'));
 const NotFound = lazy(() => import('./pages/public/NotFound.tsx'));
@@ -22,7 +24,7 @@ const Dashboard = lazy(() => import('./pages/admin/Dashboard.tsx'));
 const Review = lazy(() => import('./pages/admin/Review.tsx'));
 const AdminFamilies = lazy(() => import('./pages/admin/Families.tsx'));
 const AdminFamily = lazy(() => import('./pages/admin/FamilyDetail.tsx'));
-const FollowUps = lazy(() => import('./pages/admin/FollowUps.tsx'));
+const Sponsors = lazy(() => import('./pages/admin/Sponsors.tsx'));
 const Assistant = lazy(() => import('./pages/admin/Assistant.tsx'));
 const Settings = lazy(() => import('./pages/admin/Settings.tsx'));
 
@@ -52,6 +54,7 @@ export default function App() {
               <Route path="families/:slug/claim" element={<Claim />} />
               <Route path="families/:slug/chip-in" element={<ChipIn />} />
               <Route path="my-family" element={<MyFamily />} />
+              <Route path="login" element={<Login />} />
               <Route path="s/:token" element={<SponsorPortal />} />
               <Route path="share" element={<Share />} />
             </Route>
@@ -62,7 +65,9 @@ export default function App() {
               <Route path="review" element={<Review />} />
               <Route path="families" element={<AdminFamilies />} />
               <Route path="families/:id" element={<AdminFamily />} />
-              <Route path="follow-ups" element={<FollowUps />} />
+              <Route path="sponsors" element={<Sponsors />} />
+              <Route path="follow-ups" element={<Navigate to="/admin/sponsors" replace />} />
+              <Route path="emails" element={<Emails />} />
               <Route path="assistant" element={<Assistant />} />
               <Route path="community" element={<Community />} />
               <Route path="settings" element={<Settings />} />

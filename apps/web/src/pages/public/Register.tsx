@@ -20,10 +20,12 @@ function buildSteps(a: Ans, askPhoto: boolean): Step[] {
   const s: Step[] = [
     { t: 'welcome', title: 'Tell us about your family.', help: "Bless This Family matches Konnection households with Holiday Konnectors who shop your children's wish lists. Answer a few questions and we'll take it from there." },
     { t: 'text', key: 'guardian', kicker: 'About you', title: "What's your name?", help: 'Parent or guardian. Holiday Konnectors never see this.', ph: 'First and last name' },
-    { t: 'text', key: 'phone', kicker: 'About you', title: 'Best number to reach you?', help: "We'll text when your family is reviewed and when a Holiday Konnector steps up.", ph: '(313) 555-0100', type: 'tel' },
+    { t: 'text', key: 'phone', kicker: 'About you', title: 'Best number to reach you?', help: 'So our team can reach you about your application or gift delivery.', ph: '(313) 555-0100', type: 'tel' },
     { t: 'choice', key: 'contact', kicker: 'About you', title: 'How do you prefer we reach you?', opts: CONTACT_METHODS },
   ];
-  if (a.contact === 'Email') s.push({ t: 'text', key: 'email', kicker: 'About you', title: "What's your email?", help: "We'll only use it for updates about your application.", ph: 'you@example.com', type: 'email' });
+  s.push(a.contact === 'Email'
+    ? { t: 'text', key: 'email', kicker: 'About you', title: "What's your email?", help: "We'll email you when your family is approved and when a Holiday Konnector chooses you.", ph: 'you@example.com', type: 'email' }
+    : { t: 'text', key: 'email', kicker: 'About you', title: 'Email for updates? (optional)', help: "We'll email you when your family is approved and when a Holiday Konnector chooses you. Skip if you don't have one.", ph: 'you@example.com', type: 'email' });
   s.push(
     { t: 'text', key: 'city', kicker: 'Your household', title: 'What city do you live in?', help: 'Holiday Konnectors see the city only, never your street address.', ph: 'Detroit' },
     { t: 'address', kicker: 'Your household', title: "What's your home address?", help: 'Private. Only our team sees it, to arrange delivery.' },
@@ -99,7 +101,7 @@ export default function Register() {
 
   const valid = (() => {
     switch (q.t) {
-      case 'text': { const v = String(a[q.key as keyof Ans] ?? '').trim(); if (q.key === 'phone') return /^[+()\-.\s\d]{10,20}$/.test(v); if (q.key === 'email') return /\S+@\S+\.\S+/.test(v); return v.length >= 2; }
+      case 'text': { const v = String(a[q.key as keyof Ans] ?? '').trim(); if (q.key === 'phone') return /^[+()\-.\s\d]{10,20}$/.test(v); if (q.key === 'email') return /\S+@\S+\.\S+/.test(v) || (!v && a.contact !== 'Email'); return v.length >= 2; }
       case 'choice': return !!a[q.key as keyof Ans];
       case 'address': return a.address.trim().length >= 3 && /^\d{5}(?:-\d{4})?$/.test(a.zip.trim());
       case 'who': return !!kid.name.trim() && Number.isInteger(Number(kid.age)) && kid.age !== '' && Number(kid.age) >= 0 && Number(kid.age) <= 17;
@@ -237,7 +239,7 @@ export default function Register() {
             {q.t === 'confirm' && (
               <>
                 <div className="mt-6 rounded-[20px] bg-bg px-[18px] py-1">
-                  {[['Guardian', a.guardian || '—'], ['Contact', `${a.contact || '—'} · ${a.contact === 'Email' ? a.email : a.phone}`], ['Children', a.kids.slice(0, Number(a.kidCount) || 0).map((k) => `${k.name}, ${k.age}`).join(' · ') || '—'], ['Public story', a.story ? 'Yes' : 'None'], ...(askPhoto ? [['Photo', a.photo === 'Share a photo' && a.photoDataUrl ? (a.photoPrivate ? 'Staff only' : 'Shared after review') : 'None']] : []), ['Gifts', a.transport || '—']].map(([k, v], i, arr) => (
+                  {[['Guardian', a.guardian || '—'], ['Contact', `${a.contact || '—'} · ${a.phone}${a.email ? ` · ${a.email}` : ''}`], ['Children', a.kids.slice(0, Number(a.kidCount) || 0).map((k) => `${k.name}, ${k.age}`).join(' · ') || '—'], ['Public story', a.story ? 'Yes' : 'None'], ...(askPhoto ? [['Photo', a.photo === 'Share a photo' && a.photoDataUrl ? (a.photoPrivate ? 'Staff only' : 'Shared after review') : 'None']] : []), ['Gifts', a.transport || '—']].map(([k, v], i, arr) => (
                     <div key={k} className={cx('flex justify-between gap-4 py-3 text-[14px]', i < arr.length - 1 && 'border-b border-line')}><span className="text-ink-3">{k}</span><b className="text-right">{v}</b></div>
                   ))}
                 </div>

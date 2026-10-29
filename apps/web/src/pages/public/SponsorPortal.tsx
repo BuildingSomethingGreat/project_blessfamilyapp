@@ -6,6 +6,8 @@ import { api, ApiError, setSponsorToken } from '@/lib/api';
 import { Checkbox, Dominoes, Select, Sheet, Skeleton, useToast } from '@/components/ui';
 import { cx, fmtDate, fmtDateTime } from '@/lib/format';
 import { GIFT_RULES, KidMini, shell, wrap } from './shared.tsx';
+import { SignedInAs } from './MyFamily.tsx';
+import { useAccount } from '@/lib/account';
 import { ShareForm } from './Share.tsx';
 
 const REASONS = ["Can't afford it right now", 'Travel or timing', 'Other'];
@@ -14,6 +16,7 @@ export default function SponsorPortal() {
   const { token = '' } = useParams();
   const qc = useQueryClient();
   const toast = useToast();
+  const { me } = useAccount();
   const q = useQuery({ queryKey: ['portal', token], queryFn: () => api.sponsor.get(token), retry: false });
   const [releaseOpen, setReleaseOpen] = useState(false);
   const [reason, setReason] = useState(REASONS[0]);
@@ -25,7 +28,7 @@ export default function SponsorPortal() {
   });
   const release = useMutation({
     mutationFn: () => api.sponsor.status(token, 'Released', '', reason),
-    onSuccess: (data) => { qc.setQueryData(['portal', token], data); setSponsorToken(null); setReleaseOpen(false); toast('Family reopened. Thank you for telling us.'); },
+    onSuccess: (data) => { qc.setQueryData(['portal', token], data); setSponsorToken(null); qc.invalidateQueries({ queryKey: ['account'] }); setReleaseOpen(false); toast('Family reopened. Thank you for telling us.'); },
     onError: (e) => toast(e instanceof ApiError ? e.message : 'Could not update', 'bad'),
   });
   const wall = useMutation({
@@ -106,7 +109,7 @@ export default function SponsorPortal() {
           </div>
           <div className="grid gap-3.5">
             <div className="rounded-xl3 border border-line bg-white p-6">
-              <div className="flex items-baseline justify-between"><h2 className="text-[20px]">Check-ins</h2><span className="text-[12px] text-ink-3">via {sponsor.preferredContact === 'Text' ? 'SMS' : 'Email'}</span></div>
+              <div className="flex items-baseline justify-between"><h2 className="text-[20px]">Check-ins</h2><span className="text-[12px] text-ink-3">by email</span></div>
               <div className="mt-3.5 grid gap-2.5">
                 {thread.length === 0 && <div className="text-[13px] text-ink-3">Your first check-in lands shortly after claiming.</div>}
                 {thread.map((m, i) => {
@@ -137,6 +140,7 @@ export default function SponsorPortal() {
               <div className="rounded-xl3 border border-line bg-white p-5"><h3 className="text-[15px]">Share a few words?</h3><p className="mt-1 text-[13px] leading-[1.5] text-ink-3">How did it feel to bless {f.nickname}? With your OK we may feature it to inspire next year's Konnectors.</p><div className="mt-3"><ShareForm token={token} compact defaults={{ name: sponsor.displayName || sponsor.name, role: 'Holiday Konnector' }} /></div></div>
             )}
             <div className="text-[12px] text-ink-3">Tip: add this page to your home screen (Share → Add to Home Screen) so it's one tap away. Your link stays private.</div>
+            {me && <SignedInAs email={me.sponsor.email} className="text-left" />}
           </div>
         </div>
       </div>

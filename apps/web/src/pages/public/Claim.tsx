@@ -1,9 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClaimRequestSchema } from '@bless/shared';
 import { api, ApiError, setSponsorToken } from '@/lib/api';
-import { Checkbox, Seg } from '@/components/ui';
+import { Checkbox } from '@/components/ui';
 import type { Handoff } from '@bless/shared';
 import { fmtDate } from '@/lib/format';
 import { BackButton, shell } from './shared.tsx';
@@ -13,14 +13,15 @@ const input = 'mt-1.5 h-[50px] w-full rounded-2xl border border-line bg-bg px-4 
 export default function Claim() {
   const { slug = '' } = useParams();
   const nav = useNavigate();
+  const qc = useQueryClient();
   const fam = useQuery({ queryKey: ['family', slug], queryFn: () => api.family(slug), retry: false });
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings, staleTime: 5 * 60_000 });
-  const [form, setForm] = useState({ name: '', phone: '', email: '', organization: '', preferredContact: 'Text' as 'Text' | 'Email', note: '', handoff: 'Drop off' as Handoff, wallOptIn: true, displayName: '', agree: false });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', organization: '', note: '', handoff: 'Drop off' as Handoff, wallOptIn: true, displayName: '', agree: false, emailConsent: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [gone, setGone] = useState<string | null>(null);
   const set = (k: keyof typeof form, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
-  const valid = form.name.trim().length >= 2 && /\S+@\S+\.\S+/.test(form.email) && form.agree;
+  const valid = form.name.trim().length >= 2 && /\S+@\S+\.\S+/.test(form.email) && form.agree && form.emailConsent;
   const s = settings.data;
   const f = fam.data;
 
@@ -31,6 +32,7 @@ export default function Claim() {
     try {
       const res = await api.claim(slug, parsed.data);
       setSponsorToken(res.token);
+      qc.invalidateQueries({ queryKey: ['account'] });
       nav(`/s/${res.token}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setGone(err.message);
@@ -54,10 +56,9 @@ export default function Claim() {
               <label className="block"><span className="text-[13px] font-semibold text-ink-2">Your name</span><input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="First and last name" autoComplete="name" className={input} />{errors.name && <span className="mt-1 block text-[13px] text-bad">{errors.name}</span>}</label>
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="block"><span className="text-[13px] font-semibold text-ink-2">Email</span><input value={form.email} onChange={(e) => set('email', e.target.value)} type="email" placeholder="you@example.com" className={input} />{errors.email && <span className="mt-1 block text-[13px] text-bad">{errors.email}</span>}</label>
-                <label className="block"><span className="text-[13px] font-semibold text-ink-2">Mobile <span className="font-normal text-ink-3">(optional)</span></span><input value={form.phone} onChange={(e) => set('phone', e.target.value)} type="tel" placeholder="(313) 555-0100" className={input} />{errors.phone && <span className="mt-1 block text-[13px] text-bad">{errors.phone}</span>}</label>
+                <label className="block"><span className="text-[13px] font-semibold text-ink-2">Phone <span className="font-normal text-ink-3">(optional)</span></span><input value={form.phone} onChange={(e) => set('phone', e.target.value)} type="tel" placeholder="(313) 555-0100" className={input} />{errors.phone && <span className="mt-1 block text-[13px] text-bad">{errors.phone}</span>}</label>
               </div>
               <label className="block"><span className="text-[13px] font-semibold text-ink-2">Organization <span className="font-normal text-ink-3">(optional)</span></span><input value={form.organization} onChange={(e) => set('organization', e.target.value)} placeholder="Church, company, friend group" className={input} /></label>
-              <div><span className="text-[13px] font-semibold text-ink-2">How should we check in?</span><div className="mt-2 flex gap-2"><Seg grow active={form.preferredContact === 'Text'} onClick={() => set('preferredContact', 'Text')}>Text me</Seg><Seg grow active={form.preferredContact === 'Email'} onClick={() => set('preferredContact', 'Email')}>Email me</Seg></div></div>
             </div>
             <div className="mt-5"><span className="text-[13px] font-semibold text-ink-2">How will the gifts reach the family?</span>
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -79,7 +80,8 @@ export default function Claim() {
               {form.wallOptIn && <input value={form.displayName} onChange={(e) => set('displayName', e.target.value.slice(0, 80))} placeholder={`Show my name as… (e.g. ${form.organization || 'The Carter Family'})`} aria-label="Name to show on the wall" className="mt-2.5 h-11 w-full rounded-xl border border-line bg-bg px-3.5 text-[14px] outline-none focus:border-pri focus:bg-white" />}
               <div className="mt-1.5 text-[12px] text-ink-3">Leave it blank and we'll use your first name and last initial. You can change this anytime.</div>
             </div>
-            <div className="mt-4"><Checkbox checked={form.agree} onChange={(v) => set('agree', v)}>I can support every child in this family, with the same number of gifts for each child.</Checkbox>{errors.agree && <span className="mt-1 block text-[13px] text-bad">{errors.agree}</span>}</div>
+            <div className="mt-4"><Checkbox checked={form.emailConsent} onChange={(v) => set('emailConsent', v)}>I understand updates and reminders will come by email{form.email ? <> to <b className="text-ink">{form.email}</b></> : ''}. We only call if there's a delivery question.</Checkbox>{errors.emailConsent && <span className="mt-1 block text-[13px] text-bad">{errors.emailConsent}</span>}</div>
+            <div className="mt-2.5"><Checkbox checked={form.agree} onChange={(v) => set('agree', v)}>I can support every child in this family, with the same number of gifts for each child.</Checkbox>{errors.agree && <span className="mt-1 block text-[13px] text-bad">{errors.agree}</span>}</div>
             {errors.form && <p className="mt-3 text-[13px] text-bad">{errors.form}</p>}
             <button onClick={submit} disabled={!valid || busy} className="mt-[22px] h-[54px] w-full rounded-full bg-pri text-base font-bold text-white transition-colors hover:bg-pri-dark disabled:bg-disabled">{busy ? 'Saving your family…' : 'Bless this family'}</button>
           </>

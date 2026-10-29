@@ -69,4 +69,5 @@ export const DEFAULT_SETTINGS: SeasonSettings = {
   chipInUrl: 'https://www.zeffy.com/en-US/donation-form/support-the-konnection-general-fund',
   showPhotos: true,
   askFamilyPhoto: false,
+  adminAlerts: true,
 };

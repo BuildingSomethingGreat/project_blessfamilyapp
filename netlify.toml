@@ -5,8 +5,9 @@
 #   SESSION_SECRET   long random string (admin sessions)
 #   ADMIN_EMAILS     comma-separated admin emails
 #   ADMIN_PASSCODE   team passcode for admin sign-in until an email provider exists
-#   RESEND_API_KEY   optional, enables magic-link emails and sponsor follow-ups
-#   ANTHROPIC_API_KEY optional, enables the admin assistant and message personalization
+#   RESEND_API_KEY   enables all transactional email (without it emails are only logged)
+#   RESEND_EMAIL     sender address on a domain verified in Resend, e.g. bless@thekonnection.org
+#   ANTHROPIC_API_KEY optional, enables the admin assistant
 [build]
   base = "."
   command = "corepack enable && pnpm install --frozen-lockfile && pnpm --filter @bless/api build:netlify && pnpm --filter @bless/web build"

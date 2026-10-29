@@ -7,11 +7,19 @@ import { isAdminEmail, loginToken, sessionToken, verifyToken, SESSION_COOKIE } f
 import { buildReport } from '../lib/reporting.ts';
 import type { Services } from '../lib/services.ts';
 import { HttpError, wallName } from '../lib/services.ts';
-import { getNotifier } from '../notify/index.ts';
+import { adminAlert, adminLoginEmail, testEmail } from '../followup/messages.ts';
 import { nowIso } from '../lib/ids.ts';
 import { AdminAgent } from '../agent/admin-agent.ts';
 
 type Env = { Variables: { admin: string } };
+
+/** Quoted CSV. Cells that a spreadsheet would run as a formula (public form input) get a leading apostrophe. */
+const toCsv = (rows: string[][]) =>
+  rows.map((row) => row.map((v) => {
+    const t = String(v ?? '');
+    const safe = /^[=@\t\r]|^[+-][^\d\s(]/.test(t) ? `'${t}` : t;
+    return '"' + safe.replace(/"/g, '""') + '"';
+  }).join(',')).join('\r\n');
 
 export function adminRoutes(services: Services) {
   const r = new Hono<Env>();
@@ -25,7 +33,8 @@ export function adminRoutes(services: Services) {
     // Always answer the same way so the endpoint can't be used to enumerate admins.
     if (isAdminEmail(e)) {
       const link = `${config.webUrl}/admin/login?token=${encodeURIComponent(loginToken(e))}`;
-      const res = await getNotifier().sendEmail({ to: e, subject: 'Your Bless-A-Family admin sign-in link', text: `Tap to sign in (valid 15 minutes):\n${link}\n\nIf you didn't request this, ignore it.` });
+      const m = adminLoginEmail(link);
+      const res = await services.mailer.send({ to: e, subject: m.subject, spec: m.spec, kind: 'admin_login', audience: 'admin', logBody: 'Admin sign-in link (hidden from the log).' });
       if (!config.isProd && config.notify.driver === 'console') return c.json({ ok: true, devLink: link, sent: res.ok, passcodeEnabled: !!config.adminPasscode });
     }
     return c.json({ ok: true, passcodeEnabled: !!config.adminPasscode, emailConfigured: config.notify.driver !== 'console' });
@@ -60,7 +69,7 @@ export function adminRoutes(services: Services) {
     await next();
   });
 
-  r.get('/me', (c) => c.json({ email: c.get('admin'), assistantEnabled: agent.enabled, store: store.kind }));
+  r.get('/me', (c) => c.json({ email: c.get('admin'), assistantEnabled: agent.enabled, store: store.kind, mail: { provider: config.notify.driver, from: config.notify.from } }));
   r.get('/report', async (c) => c.json(await buildReport(store)));
 
   // ---- families ----
@@ -95,8 +104,14 @@ export function adminRoutes(services: Services) {
     if (patch.status === 'Available' && !f.approvedAt) full.approvedAt = nowIso();
     const updated = await store.updateFamily(f.id, full);
     await store.logActivity({ type: 'admin_action', channel: 'system', familyId: f.id, sponsorshipId: null, subject: `${c.get('admin')} updated ${f.familyId}`, body: '', meta: { patch, from: f.status }, occurredAt: nowIso() });
-    if (patch.status === 'Available' && f.status !== 'Available') followUp.sendToFamily('family_approved', updated).catch(() => {});
+    if (patch.status === 'Available' && f.status !== 'Available') await followUp.sendToFamily('family_approved', updated, { actor: 'admin' }).catch(() => {});
     return c.json({ ...updated, public: toPublicFamily(updated) });
+  });
+  r.post('/families/:id/email', async (c) => {
+    const f = await store.getFamily(c.req.param('id'));
+    if (!f) throw new HttpError(404, 'Not found');
+    const { message } = z.object({ message: z.string().trim().min(2).max(2000) }).parse(await c.req.json());
+    return c.json(await followUp.sendToFamily('family_note', f, { custom: message, actor: 'admin' }));
   });
 
   // ---- sponsorships ----
@@ -139,7 +154,7 @@ export function adminRoutes(services: Services) {
   r.get('/settings', async (c) => c.json(await store.getSettings()));
   r.patch('/settings', async (c) => {
     const body = (await c.req.json()) as Partial<SeasonSettings>;
-    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos', 'askFamilyPhoto'];
+    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos', 'askFamilyPhoto', 'adminAlerts'];
     const patch: Partial<SeasonSettings> = {};
     for (const k of allowed) if (k in body) (patch as any)[k] = body[k];
     return c.json(await store.updateSettings(patch));
@@ -184,7 +199,57 @@ export function adminRoutes(services: Services) {
     return c.json(p);
   });
 
-  r.post('/followups/run', async (c) => c.json(await followUp.tick()));
+  r.post('/followups/run', async (c) => {
+    const result = await followUp.tick();
+    const m = adminAlert({ kind: 'admin_followup_run', ...result, by: c.get('admin') });
+    await services.mailer.send({ to: c.get('admin'), subject: m.subject, spec: m.spec, kind: 'admin_followup_run', audience: 'admin', actor: c.get('admin') });
+    return c.json(result);
+  });
+
+  // ---- email log ----
+  r.get('/emails', async (c) => {
+    const limit = Math.min(1000, Number(c.req.query('limit') ?? 400));
+    const [rows, fams, sps] = await Promise.all([store.listActivity({ types: ['message_sent'], limit }), store.listFamilies(), store.listSponsorships()]);
+    const fm = new Map(fams.map((f) => [f.id, f]));
+    const sm = new Map(sps.map((s) => [s.id, s]));
+    return c.json(rows.map((a) => {
+      const m = a.meta as Record<string, any>;
+      const f = a.familyId ? fm.get(a.familyId) : undefined;
+      return {
+        id: a.id, at: a.occurredAt, subject: a.subject, body: a.body, kind: m.kind ?? '', to: m.to ?? '', ok: m.ok !== false, error: m.error ?? '', provider: m.provider ?? '', actor: m.actor ?? 'system',
+        channel: a.channel, audience: m.audience ?? (m.kind?.startsWith('family') ? 'family' : a.sponsorshipId ? 'konnector' : 'admin'),
+        family: f ? { id: f.id, familyId: f.familyId, nickname: toPublicFamily(f).nickname } : null, sponsorshipId: a.sponsorshipId ? sm.get(a.sponsorshipId)?.sponsorshipId ?? null : null,
+      };
+    }));
+  });
+  r.post('/emails/test', async (c) => {
+    const { to } = (await c.req.json().catch(() => ({}))) as { to?: string };
+    const addr = String(to ?? c.get('admin')).trim();
+    if (!/^\S+@\S+\.\S+$/.test(addr)) throw new HttpError(400, 'Enter a valid email.');
+    const m = testEmail(c.get('admin'));
+    const res = await services.mailer.send({ to: addr, subject: m.subject, spec: m.spec, kind: 'test', audience: 'test', actor: c.get('admin') });
+    return c.json({ ok: res.ok, error: res.error, id: res.id, provider: config.notify.driver });
+  });
+
+  // ---- sponsors export ----
+  r.get('/sponsors.csv', async (c) => {
+    const settings = await store.getSettings();
+    const [sponsors, sps, fams] = await Promise.all([store.listSponsors(), store.listSponsorships(), store.listFamilies({ season: settings.season })]);
+    const fm = new Map(fams.map((f) => [f.id, f]));
+    const rows = [['Sponsor', 'Email', 'Phone', 'Organization', 'Public name', 'On the wall', 'Sponsorship ID', 'Family ID', 'Family', 'Kids', 'Status', 'Hand-off', 'Claimed', 'Shopping', 'Purchased', 'Wrapped', 'Handed off', 'Delivered', 'Released', 'Release reason', 'Follow-ups unanswered', 'Flagged', 'Sponsor note', 'Admin notes']];
+    for (const p of sponsors) {
+      const mine = sps.filter((s) => s.sponsorId === p.id && fm.has(s.familyId)).sort((a, b) => a.claimedAt.localeCompare(b.claimedAt));
+      const base = [p.name, p.email, p.phone, p.organization, wallName(p), p.wallOptIn && !p.wallHidden ? 'Yes' : 'No'];
+      if (!mine.length) { rows.push([...base, ...Array(18).fill('')]); continue; }
+      for (const s of mine) {
+        const f = fm.get(s.familyId)!;
+        const d = (x: string | null) => (x ? x.slice(0, 10) : '');
+        rows.push([...base, s.sponsorshipId, f.familyId, toPublicFamily(f).nickname, String(f.children.length), s.status, s.handoff, d(s.claimedAt), d(s.shoppingAt), d(s.purchasedAt), d(s.wrappedAt), d(s.droppedOffAt), d(s.deliveredAt), d(s.releasedAt), s.releaseReason, String(s.followUpCount), s.flagged ? 'Yes' : 'No', s.sponsorNote, s.adminNotes]);
+      }
+    }
+    const csv = toCsv(rows);
+    return c.body(csv, 200, { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="bless-this-family-sponsors-${settings.season}.csv"` });
+  });
   r.get('/export.csv', async (c) => {
     const settings = await store.getSettings();
     const fams = await store.listFamilies({ season: settings.season });
@@ -196,7 +261,7 @@ export function adminRoutes(services: Services) {
       const sp = s ? sponsors.get(s.sponsorId) : null;
       for (const k of f.children) rows.push([f.familyId, toPublicFamily(f).nickname, f.status, f.guardianName, f.phone, f.email, f.address, f.city, f.state, f.zip, f.transportation, k.name, String(k.age), k.gender, k.clothingCategory, k.shirtSize, k.pantsSize, k.shoeCategory, k.shoeSize, k.sizeNotes, k.favoriteColor, k.hobbies, k.clothingWishlist.join('; '), k.otherClothing, k.giftTypes.join('; '), k.specificGifts, sp?.name ?? '', sp?.email ?? '', sp?.phone ?? '', s?.handoff ?? '', s?.status ?? '']);
     }
-    const csv = rows.map((row) => row.map((v) => '"' + String(v ?? '').replace(/"/g, '""') + '"').join(',')).join('\r\n');
+    const csv = toCsv(rows);
     return c.body(csv, 200, { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="bless-a-family-${settings.season}.csv"` });
   });
 

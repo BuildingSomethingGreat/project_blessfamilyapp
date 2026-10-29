@@ -17,7 +17,8 @@ const matches = (s: AdminSponsorship, f: Filter) =>
   f === 'all' ? true : f === 'attention' ? isAttention(s) : f === 'active' ? ACTIVE_SPONSORSHIP_STATUSES.includes(s.status) : f === 'dropped' ? s.status === 'Dropped Off' : f === 'delivered' ? s.status === 'Delivered' : s.status === 'Released';
 const COLS = 'grid-cols-[1.2fr_1.2fr_150px_110px_90px_120px_200px]';
 
-export default function FollowUps() {
+/** Sponsors: every Holiday Konnector and where their family is in the dominoes, plus the sponsor export. */
+export default function Sponsors() {
   const qc = useQueryClient();
   const toast = useToast();
   const sps = useQuery({ queryKey: ['admin', 'sponsorships'], queryFn: api.admin.sponsorships });
@@ -34,7 +35,7 @@ export default function FollowUps() {
   });
   const run = useMutation({
     mutationFn: api.admin.runFollowUps,
-    onSuccess: (r) => { toast(`Follow-ups: ${r.sent} sent · ${r.flagged} flagged · ${r.skipped} skipped`, 'ok'); invalidate(); },
+    onSuccess: (r) => { toast(`Follow-ups: ${r.sent} emailed · ${r.flagged} flagged · ${r.skipped} skipped. Summary sent to your inbox.`, 'ok'); invalidate(); },
     onError: (e: Error) => toast(e.message, 'bad'),
   });
 
@@ -55,7 +56,7 @@ export default function FollowUps() {
 
   return (
     <div className="anim-rise">
-      <PageHead title="Dominoes board" sub="Every active sponsorship, where it is, and when the system reaches out next." right={<Button variant="dark" size="sm" className="h-10 px-4" onClick={() => run.mutate()} loading={run.isPending}>Run follow-ups now</Button>} />
+      <PageHead title="Sponsors" sub="Every Holiday Konnector, where their family is, and when the next email goes out." right={<><a href={api.admin.sponsorsCsvUrl} download className="inline-flex h-10 items-center rounded-full border border-line bg-paper px-4 text-[13px] font-semibold text-ink transition-colors hover:border-ink">Export sponsors CSV</a><Button variant="dark" size="sm" className="h-10 px-4" onClick={() => run.mutate()} loading={run.isPending}>Run follow-ups now</Button></>} />
 
       <div className="rail mt-[22px] -mx-4 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
         {FILTERS.map((f) => <Chip key={f.key} size="lg" active={filter === f.key} onClick={() => setFilter(f.key)} tone={f.key === 'attention' && counts.attention > 0 ? 'bad' : 'outline'} className={filter === f.key ? '' : 'bg-white'}>{f.label} <span className="opacity-60">{counts[f.key] ?? 0}</span></Chip>)}
@@ -67,7 +68,7 @@ export default function FollowUps() {
         {!sps.isPending && rows.length === 0 && <div className="py-8 text-center text-[13px] text-ink-3">{filter === 'attention' ? 'Nothing is stalled. Every active Holiday Konnector has responded since their last nudge.' : 'Nothing here.'}</div>}
         {rows.map((s) => (
           <div key={s.id} className={cx('grid min-w-[960px] items-center gap-3 border-b border-soft py-3.5 text-[13px]', COLS)} style={{ background: s.flagged ? '#fdf3f3' : 'transparent' }}>
-            <div className="min-w-0"><b className="block truncate">{s.sponsor?.name ?? 'Unknown Konnector'}</b><div className="text-[11px] text-ink-3">{s.sponsor?.preferredContact === 'Text' ? 'SMS' : s.sponsor?.preferredContact === 'Call' ? 'Call' : 'Email'} · {s.sponsorshipId}</div></div>
+            <div className="min-w-0"><b className="block truncate">{s.sponsor?.name ?? 'Unknown Konnector'}</b><div className="truncate text-[11px] text-ink-3" title={s.sponsor?.email}>{s.sponsorshipId}</div></div>
             <div className="min-w-0">{s.family ? <Link to={`/admin/families/${s.family.id}`} className="block truncate font-bold hover:underline">{s.family.nickname}</Link> : <b>—</b>}<div className="text-[11px] text-ink-3">{s.family ? (s.family.childCount === 1 ? '1 child' : `${s.family.childCount} kids`) : ''}</div></div>
             <div><Dominoes status={s.status} compact /><div className="mt-1 text-[11px] text-ink-3">{STATUS_LABEL[s.status]}</div></div>
             <span className={s.lastResponseAt ? '' : 'text-bad'}>{lastLabel(s)}</span>

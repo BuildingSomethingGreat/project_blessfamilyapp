@@ -1,9 +1,9 @@
 import { ACTIVE_SPONSORSHIP_STATUSES, SHOPPING_STATUSES, familyStatusFor, toPublicFamily, type Family, type SeasonSettings, type Sponsorship, type SponsorshipStatus, type Sponsor } from '@bless/shared';
 import { config } from '../config.ts';
-import { getNotifier } from '../notify/index.ts';
+import type { Mailer } from '../notify/mailer.ts';
 import type { Store } from '../store/types.ts';
 import { nowIso } from '../lib/ids.ts';
-import { personalize, template, type MessageContext, type MessageKind } from './messages.ts';
+import { adminAlert, template, type AdminAlert, type MessageContext, type MessageKind } from './messages.ts';
 
 /**
  * The dominoes engine.
@@ -57,7 +57,13 @@ export function messageKindFor(s: Sponsorship, settings: SeasonSettings, now = n
 }
 
 export class FollowUpEngine {
-  constructor(private store: Store) {}
+  constructor(private store: Store, readonly mailer: Mailer) {}
+
+  /** Email the admin team (ADMIN_EMAILS) about something that needs their attention. */
+  async alert(a: AdminAlert, ids: { familyId?: string | null; sponsorshipId?: string | null } = {}) {
+    const msg = adminAlert(a);
+    return this.mailer.toAdmins({ subject: msg.subject, spec: msg.spec, kind: a.kind, familyId: ids.familyId, sponsorshipId: ids.sponsorshipId }).catch((e) => console.error('[alert] failed', e));
+  }
 
   async context(kind: MessageKind, s: Sponsorship | null, family: Family, sponsor: Sponsor | null, extra: Partial<MessageContext> = {}): Promise<MessageContext> {
     const settings = await this.store.getSettings();
@@ -67,32 +73,22 @@ export class FollowUpEngine {
     };
   }
 
-  /** Send a message to a sponsor on the channel they prefer and log it. */
+  /** Email a Holiday Konnector. A custom body (from staff or the assistant) goes out as a "note" email. */
   async send(kind: MessageKind, s: Sponsorship, opts: { custom?: string; reason?: string; actor?: 'system' | 'admin' | 'agent' } = {}) {
     const [family, sponsor] = await Promise.all([this.store.getFamily(s.familyId), this.store.getSponsor(s.sponsorId)]);
-    if (!family || !sponsor) return { ok: false, error: 'missing family or sponsor' };
-    const ctx = await this.context(kind, s, family, sponsor, { custom: opts.custom, reason: opts.reason });
-    const base = template(ctx);
-    const msg = opts.custom ? { ...base, text: opts.custom, sms: opts.custom.slice(0, 300) } : await personalize(ctx, base);
-    const n = getNotifier();
-    const wantsSms = sponsor.preferredContact === 'Text' && sponsor.phone && n.smsEnabled;
-    const res = wantsSms ? await n.sendSms({ to: sponsor.phone, body: msg.sms }) : await n.sendEmail({ to: sponsor.email, subject: msg.subject, text: msg.text });
-    await this.store.logActivity({
-      type: 'message_sent', channel: wantsSms ? 'sms' : 'email', familyId: family.id, sponsorshipId: s.id, subject: msg.subject, body: msg.text,
-      meta: { kind, ok: res.ok, error: res.error, actor: opts.actor ?? 'system', followUpCount: s.followUpCount }, occurredAt: nowIso(),
-    });
-    return { ok: res.ok, error: res.error, subject: msg.subject, text: msg.text };
+    if (!family || !sponsor) return { ok: false, error: 'missing family or sponsor', subject: '', text: '' };
+    const k: MessageKind = opts.custom ? 'staff_note' : kind;
+    const ctx = await this.context(k, s, family, sponsor, { custom: opts.custom, reason: opts.reason });
+    const msg = template(ctx);
+    return this.mailer.send({ to: sponsor.email, subject: msg.subject, spec: msg.spec, kind: k, audience: 'konnector', familyId: family.id, sponsorshipId: s.id, actor: opts.actor ?? 'system' });
   }
 
-  /** Send to the family (application received / approved). */
-  async sendToFamily(kind: 'family_received' | 'family_approved', family: Family) {
-    if (!family.email && !(family.phone && getNotifier().smsEnabled)) return { ok: false, error: 'no contact channel' };
-    const ctx = await this.context(kind, null, family, null);
+  /** Email the family (received, approved, matched, or a custom note). Families without an email are skipped. */
+  async sendToFamily(kind: 'family_received' | 'family_approved' | 'family_matched' | 'family_note', family: Family, opts: { custom?: string; actor?: 'system' | 'admin' | 'agent' } = {}) {
+    if (!family.email) return { ok: false, error: 'No email on file for this family', subject: '' };
+    const ctx = await this.context(kind, null, family, null, { custom: opts.custom });
     const msg = template(ctx);
-    const n = getNotifier();
-    const res = family.email ? await n.sendEmail({ to: family.email, subject: msg.subject, text: msg.text }) : await n.sendSms({ to: family.phone, body: msg.sms });
-    await this.store.logActivity({ type: 'message_sent', channel: family.email ? 'email' : 'sms', familyId: family.id, sponsorshipId: null, subject: msg.subject, body: msg.text, meta: { kind, ok: res.ok, error: res.error }, occurredAt: nowIso() });
-    return res;
+    return this.mailer.send({ to: family.email, subject: msg.subject, spec: msg.spec, kind, audience: 'family', familyId: family.id, actor: opts.actor ?? 'system' });
   }
 
   /** Called whenever the sponsor moves a domino (from the portal or an admin). */
@@ -129,10 +125,18 @@ export class FollowUpEngine {
       familyId: s.familyId, sponsorshipId: s.id, subject: `${opts.actor === 'sponsor' ? 'Konnector' : opts.actor} marked: ${to}`, body: opts.note ?? opts.reason ?? '',
       meta: { from: s.status, to, actor: opts.actor }, occurredAt: now,
     });
-    // Thank-you dominoes fall automatically.
-    if (to === 'Dropped Off' && opts.actor === 'sponsor') await this.send('dropoff_thanks', updated, { actor: 'system' });
+    // Emails fall like dominoes: thank-yous to the Konnector, alerts to the team.
+    const sponsor = await this.store.getSponsor(s.sponsorId);
+    const ids = { familyId: s.familyId, sponsorshipId: s.id };
+    if (to === 'Dropped Off') {
+      if (opts.actor === 'sponsor') await this.send('dropoff_thanks', updated, { actor: 'system' });
+      if (family) await this.alert({ kind: 'admin_handed_off', family, pub: toPublicFamily(family), sponsor, sponsorship: updated }, ids);
+    }
     if (to === 'Delivered') await this.send('delivered_thanks', updated, { actor: 'system' });
-    if (to === 'Released' && opts.actor !== 'sponsor') await this.send('released_notice', updated, { actor: 'system', reason: opts.reason });
+    if (to === 'Released') {
+      await this.send(opts.actor === 'sponsor' ? 'release_confirmation' : 'released_notice', updated, { actor: 'system', reason: opts.reason });
+      if (family && opts.actor !== 'admin') await this.alert({ kind: 'admin_family_released', family, pub: toPublicFamily(family), sponsor, reason: patch.releaseReason ?? '', by: opts.actor === 'sponsor' ? 'The Konnector' : opts.actor === 'agent' ? 'Assistant' : 'System' }, ids);
+    }
     return updated;
   }
 
@@ -149,7 +153,9 @@ export class FollowUpEngine {
       if (count >= config.followUp.flagAfterNudges && !s.flagged) {
         // Hand it to a human instead of nudging forever.
         await this.store.updateSponsorship(s.id, { flagged: true, flagReason: `No response after ${count} follow-ups`, nextFollowUpAt: null });
-        await this.store.logActivity({ type: 'flag', channel: 'system', familyId: s.familyId, sponsorshipId: s.id, subject: 'Flagged for admin: unresponsive sponsor', body: '', meta: { followUpCount: count }, occurredAt: nowIso() });
+        await this.store.logActivity({ type: 'flag', channel: 'system', familyId: s.familyId, sponsorshipId: s.id, subject: 'Flagged for admin: unresponsive Konnector', body: '', meta: { followUpCount: count }, occurredAt: nowIso() });
+        const [family, sponsor] = await Promise.all([this.store.getFamily(s.familyId), this.store.getSponsor(s.sponsorId)]);
+        if (family) await this.alert({ kind: 'admin_flagged', family, pub: toPublicFamily(family), sponsor, sponsorship: s, count }, { familyId: s.familyId, sponsorshipId: s.id });
         flagged++;
         continue;
       }

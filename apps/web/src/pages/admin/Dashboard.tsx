@@ -128,7 +128,7 @@ export default function Dashboard() {
             </div>
           )}
           <div className="mt-3.5 flex flex-wrap justify-between gap-2 text-[13px]">
-            <Link to="/admin/follow-ups" className="font-semibold text-ink hover:text-pri">Open the dominoes board →</Link>
+            <Link to="/admin/sponsors" className="font-semibold text-ink hover:text-pri">Open Sponsors →</Link>
             <span className="text-ink-3">{r.followUp.nudgesSent} nudges · {r.followUp.responses} responses · {r.followUp.nudgesSent ? pct(r.followUp.responseRate) : '—'}</span>
           </div>
         </Panel>

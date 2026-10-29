@@ -1,6 +1,7 @@
 import { ACTIVE_SPONSORSHIP_STATUSES, deriveNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type CommunityView, type FamilyApplication, type Family, type PublicFamily, type QuoteSubmit, type Sponsor, type SponsorPortalView, type WallEntry } from '@bless/shared';
 import type { Store } from '../store/types.ts';
 import { FollowUpEngine, nextFollowUp } from '../followup/engine.ts';
+import { Mailer } from '../notify/mailer.ts';
 import { familyCode, nowIso, shortId, token as newToken } from './ids.ts';
 
 export class HttpError extends Error {
@@ -36,10 +37,15 @@ async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Waits for side-effect emails without letting one failure break the request (serverless can't finish work after responding). */
+const settle = (...ps: Promise<unknown>[]) => Promise.allSettled(ps).then((rs) => rs.forEach((r) => r.status === 'rejected' && console.error('[email] failed', r.reason)));
+
 export class Services {
   readonly followUp: FollowUpEngine;
+  readonly mailer: Mailer;
   constructor(public store: Store) {
-    this.followUp = new FollowUpEngine(store);
+    this.mailer = new Mailer(store);
+    this.followUp = new FollowUpEngine(store, this.mailer);
   }
 
   async registerFamily(app: FamilyApplication): Promise<Family> {
@@ -66,7 +72,7 @@ export class Services {
       }
     }
     await this.store.logActivity({ type: 'status_change', channel: 'web', familyId: family.id, sponsorshipId: null, subject: `Application received: ${code}`, body: '', meta: { to: 'Submitted' }, occurredAt: nowIso() });
-    this.followUp.sendToFamily('family_received', family).catch(() => {});
+    await settle(this.followUp.sendToFamily('family_received', family), this.followUp.alert({ kind: 'admin_new_application', family, pub: toPublicFamily(family) }, { familyId: family.id }));
     return family;
   }
 
@@ -104,7 +110,7 @@ export class Services {
     await this.store.logActivity({ type: 'claim_start', channel: 'web', familyId: f.id, sponsorshipId: null, subject: 'Started claim', body: '', meta: {}, occurredAt: nowIso() });
   }
 
-  async claim(slug: string, req: ClaimRequest): Promise<{ token: string; sponsorshipId: string; family: PublicFamily }> {
+  async claim(slug: string, req: ClaimRequest): Promise<{ sponsorEmail: string; token: string; sponsorshipId: string; family: PublicFamily }> {
     return withLock(`claim:${slug}`, async () => {
       const settings = await this.store.getSettings();
       if (!settings.catalogOpen) throw new HttpError(403, 'Sponsorships are closed for this season.');
@@ -116,7 +122,7 @@ export class Services {
       if (existing.some((x) => x.familyId === f.id && ACTIVE_SPONSORSHIP_STATUSES.includes(x.status))) throw new HttpError(409, taken);
       const wall = req.wallOptIn ? { wallOptIn: true, displayName: req.displayName } : {};
       let sponsor = await this.store.findSponsorByEmail(req.email);
-      if (!sponsor) sponsor = await this.store.createSponsor({ name: req.name, email: req.email.toLowerCase(), phone: req.phone, organization: req.organization, preferredContact: req.preferredContact, notes: '', displayName: '', wallOptIn: false, wallHidden: false, ...wall });
+      if (!sponsor) sponsor = await this.store.createSponsor({ name: req.name, email: req.email.toLowerCase(), phone: req.phone, organization: req.organization, preferredContact: 'Email', notes: '', displayName: '', wallOptIn: false, wallHidden: false, ...wall });
       else if (req.wallOptIn) sponsor = await this.store.updateSponsor(sponsor.id, wall);
       const seq = existing.length + 1;
       const now = nowIso();
@@ -135,8 +141,13 @@ export class Services {
       }
       await this.store.updateFamily(f.id, { status: 'Claimed' });
       await this.store.logActivity({ type: 'claim_complete', channel: 'web', familyId: f.id, sponsorshipId: s.id, subject: `${sponsor.name} claimed ${f.familyId}`, body: req.note, meta: { sponsorId: sponsor.id }, occurredAt: now });
-      this.followUp.send('claim_confirmation', s, { actor: 'system' }).catch((e) => console.error('claim email failed', e));
-      return { token: s.token, sponsorshipId: s.sponsorshipId, family: toPublicFamily({ ...f, status: 'Claimed' }) };
+      const claimed = { ...f, status: 'Claimed' as const };
+      await settle(
+        this.followUp.send('claim_confirmation', s, { actor: 'system' }),
+        this.followUp.sendToFamily('family_matched', claimed),
+        this.followUp.alert({ kind: 'admin_family_claimed', family: claimed, pub: toPublicFamily(claimed), sponsor: sponsor!, sponsorship: s }, { familyId: f.id, sponsorshipId: s.id }),
+      );
+      return { sponsorEmail: sponsor!.email, token: s.token, sponsorshipId: s.sponsorshipId, family: toPublicFamily({ ...f, status: 'Claimed' }) };
     });
   }
 
@@ -163,7 +174,9 @@ export class Services {
       sponsor: { name: sponsor.name, email: sponsor.email, preferredContact: sponsor.preferredContact, displayName: sponsor.displayName, wallOptIn: sponsor.wallOptIn },
       family: toPublicFamily(family),
       settings,
-      timeline: timeline.filter((a) => a.type !== 'family_view').map((a) => ({ type: a.type, subject: a.subject, body: a.type === 'message_sent' ? a.body : '', occurredAt: a.occurredAt, channel: a.channel })),
+      // Only what the Konnector should see: emails sent to them, and their own updates. Team alerts,
+      // family emails and staff actions share the sponsorship id but stay out of this view.
+      timeline: timeline.filter((a) => a.type === 'sponsor_response' || a.type === 'status_change' || (a.type === 'message_sent' && ((a.meta as { audience?: string })?.audience ?? 'konnector') === 'konnector' && !String((a.meta as { kind?: string })?.kind ?? '').endsWith('_login'))).map((a) => ({ type: a.type, subject: a.subject, body: a.type === 'message_sent' ? a.body : '', occurredAt: a.occurredAt, channel: a.channel })),
     };
   }
 
@@ -184,6 +197,7 @@ export class Services {
       season: settings.season, familyId: s?.familyId ?? null, sponsorshipId: s?.id ?? null, submittedAt: nowIso(),
     });
     await this.store.logActivity({ type: 'quote', channel: 'web', familyId: q.familyId, sponsorshipId: q.sponsorshipId, subject: `New ${q.role === 'Konnection family' ? 'family' : 'Konnector'} quote from ${q.name}`, body: q.quote, meta: { quoteId: q.id }, occurredAt: q.submittedAt });
+    await settle(this.followUp.alert({ kind: 'admin_quote', name: q.name, role: q.role, quote: q.quote }, { familyId: q.familyId, sponsorshipId: q.sponsorshipId }));
     return { ok: true };
   }
 

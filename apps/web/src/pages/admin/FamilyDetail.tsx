@@ -34,6 +34,7 @@ export default function FamilyDetail() {
   const [nudgeOpen, setNudgeOpen] = useState<Sp | null>(null);
   const [releaseOpen, setReleaseOpen] = useState<Sp | null>(null);
   const [showOld, setShowOld] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
 
   useEffect(() => { if (q.data) { setNick(q.data.public.nickname); setNotes(q.data.adminNotes); setGoal(String(q.data.public.goal)); } }, [q.data]);
 
@@ -95,7 +96,7 @@ export default function FamilyDetail() {
       <div className="mt-5 grid gap-3.5 lg:grid-cols-5">
         <div className="space-y-3.5 lg:col-span-3">
           <Panel>
-            <PanelTitle right={<Chip tone="outline" size="sm">Private</Chip>}>Household</PanelTitle>
+            <PanelTitle right={<span className="flex items-center gap-2">{f.email && <button onClick={() => setEmailOpen(true)} className="text-[12px] font-semibold text-pri hover:text-pri-dark">Email family</button>}<Chip tone="outline" size="sm">Private</Chip></span>}>Household</PanelTitle>
             <dl className="mt-3.5 grid grid-cols-1 gap-x-6 gap-y-2.5 text-[13px] sm:grid-cols-2">
               <Row k="Guardian" v={f.guardianName} />
               <Row k="Phone" v={<a className="text-pri hover:underline" href={`tel:${f.phone}`}>{f.phone}</a>} />
@@ -185,7 +186,7 @@ export default function FamilyDetail() {
                     {active.sponsor?.organization && <div>{active.sponsor.organization}</div>}
                     {active.sponsor?.email && <a className="block text-pri hover:underline" href={`mailto:${active.sponsor.email}`}>{active.sponsor.email}</a>}
                     {active.sponsor?.phone && <a className="block text-pri hover:underline" href={`tel:${active.sponsor.phone}`}>{active.sponsor.phone}</a>}
-                    <div className="text-ink-3">Prefers {active.sponsor?.preferredContact?.toLowerCase() ?? 'email'} · {active.sponsorshipId}</div>
+                    <div className="text-ink-3">Updates by email · {active.sponsorshipId}</div>
                     <div className={active.handoff === 'Deliver directly' ? 'mt-1 font-semibold text-warn' : 'mt-1 text-ink-3'}>{active.handoff === 'Deliver directly' ? 'Will deliver directly: share the family\'s address with them privately' : 'Dropping off gifts with us'}</div>
                     {active.sponsor && <div className="text-ink-3">Wall: {active.sponsor.wallOptIn ? (active.sponsor.wallHidden ? 'opted in, hidden by staff' : 'opted in') : 'not opted in'}</div>}
                   </div>
@@ -224,6 +225,7 @@ export default function FamilyDetail() {
         </div>
       </div>
 
+      <FamilyEmailSheet open={emailOpen} familyId={f.id} to={f.email} name={f.guardianName} onClose={() => setEmailOpen(false)} onDone={invalidate} />
       <NudgeSheet sp={nudgeOpen} onClose={() => setNudgeOpen(null)} onDone={invalidate} />
       <ReleaseSheet sp={releaseOpen} familyName={f.public.nickname} onClose={() => setReleaseOpen(null)} pending={patchSp.isPending} onConfirm={(reason) => releaseOpen && patchSp.mutate({ spId: releaseOpen.id, body: { status: 'Released', reason } })} />
     </div>
@@ -272,7 +274,7 @@ export function NudgeSheet({ sp, onClose, onDone }: { sp: Sp | null; onClose: ()
     <Sheet open={!!sp} onClose={onClose} title="Send a nudge">
       {sp && (
         <div className="space-y-4">
-          <p className="text-[14px] text-ink-2">To <b>{sp.sponsor?.name}</b> via {sp.sponsor?.preferredContact === 'Text' && sp.sponsor.phone ? 'text (if SMS is configured, otherwise email)' : 'email'}. Leave the message empty to send the right template for their step ({STATUS_LABEL[sp.status]}).</p>
+          <p className="text-[14px] text-ink-2">Emails <b>{sp.sponsor?.name}</b>{sp.sponsor?.email ? ` (${sp.sponsor.email})` : ''}. Leave the message empty to send the right template for their step ({STATUS_LABEL[sp.status]}).</p>
           <div>
             <Label htmlFor="nudge" hint="(optional)">Custom message</Label>
             <Textarea id="nudge" value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Hi! Quick check-in from The Konnection…" />
@@ -280,6 +282,28 @@ export function NudgeSheet({ sp, onClose, onDone }: { sp: Sp | null; onClose: ()
           <Button full size="xl" onClick={() => m.mutate()} loading={m.isPending}>{msg.trim() ? 'Send custom message' : 'Send template'}</Button>
         </div>
       )}
+    </Sheet>
+  );
+}
+
+function FamilyEmailSheet({ open, familyId, to, name, onClose, onDone }: { open: boolean; familyId: string; to: string; name: string; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [msg, setMsg] = useState('');
+  const m = useMutation({
+    mutationFn: () => api.admin.emailFamily(familyId, msg.trim()),
+    onSuccess: (r) => { toast(r.ok ? 'Email sent to the family' : `Not sent: ${r.error}`, r.ok ? 'ok' : 'bad'); if (r.ok) { setMsg(''); onClose(); } onDone(); },
+    onError: (e: Error) => toast(e.message, 'bad'),
+  });
+  return (
+    <Sheet open={open} onClose={onClose} title="Email the family">
+      <div className="space-y-4">
+        <p className="text-[14px] text-ink-2">To <b>{name}</b> ({to}). It goes out as a short note from The Konnection team and is saved in Emails.</p>
+        <div>
+          <Label htmlFor="fam-email">Message</Label>
+          <Textarea id="fam-email" value={msg} onChange={(e) => setMsg(e.target.value.slice(0, 2000))} placeholder="Hi! We need one more size for…" />
+        </div>
+        <Button full size="xl" onClick={() => m.mutate()} loading={m.isPending} disabled={msg.trim().length < 2}>Send email</Button>
+      </div>
     </Sheet>
   );
 }

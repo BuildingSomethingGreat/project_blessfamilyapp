@@ -6,6 +6,7 @@ import { ZodError } from 'zod';
 import { config } from './config.ts';
 import { Services, HttpError } from './lib/services.ts';
 import { adminRoutes } from './routes/admin.ts';
+import { accountRoutes } from './routes/account.ts';
 import { publicRoutes } from './routes/public.ts';
 import { sponsorRoutes } from './routes/sponsor.ts';
 import type { Store } from './store/types.ts';
@@ -23,13 +24,14 @@ export function createApp(store: Store) {
   // instead of accepting an application or claim into a throwaway in-memory store.
   app.use('/api/*', async (c, next) => {
     const write = c.req.method !== 'GET' && c.req.method !== 'HEAD' && c.req.method !== 'OPTIONS';
-    if (write && config.isProd && store.kind !== 'airtable' && !c.req.path.startsWith('/api/admin/auth')) {
+    if (write && config.isProd && store.kind !== 'airtable' && !c.req.path.startsWith('/api/admin/auth') && !c.req.path.startsWith('/api/account/logout')) {
       return c.json({ error: 'Bless This Family is not connected to its database yet. Please try again soon or email us.' }, 503);
     }
     await next();
   });
   app.route('/api', publicRoutes(services));
   app.route('/api/sponsor', sponsorRoutes(services));
+  app.route('/api/account', accountRoutes(services));
   app.route('/api/admin', adminRoutes(services));
 
   app.notFound((c) => c.json({ error: 'Not found' }, 404));
