@@ -16,7 +16,7 @@ The API maps fields **by name** (`apps/api/src/store/airtable.ts`). Renaming a f
 
 Status options must stay in sync with `packages/shared/src/status.ts`. The API writes with `typecast: true`, so new select values (e.g. `Purchased`, `Wrapped`, `Girl`, `Boy`, `Prefer not to say`, `chip_in`) are created on first write. The original `Confirmed`, `Male` and `Female` choices are unused and can be deleted by hand.
 
-Settings keys: season, dropoffDeadline, dropoffLocation, dropoffHours, contactEmail, contactPhone, catalogOpen, registrationOpen, perChildBudgetNote, orgDonateUrl, chipInsEnabled, chipInUrl, showPhotos, askFamilyPhoto, adminAlerts.
+Settings keys: season, dropoffDeadline, dropoffLocation, dropoffHours, contactEmail, contactPhone, catalogOpen, registrationOpen, perChildBudgetNote, orgDonateUrl, chipInsEnabled, chipInUrl, showPhotos, askFamilyPhoto, adminAlerts, alertEmails (team email recipients; empty = ADMIN_EMAILS), contactName.
 
 Every email is an Activity row with Type `message_sent`; Meta holds `kind`, `audience` (konnector, family, admin, test), `to`, `ok`, `error` and the Resend id. New Konnectors are saved with Preferred Contact = Email (the claim form no longer offers text).
 

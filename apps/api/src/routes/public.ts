@@ -33,7 +33,7 @@ export function publicRoutes(services: Services) {
   const ip = (c: any) => c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || c.req.header('fly-client-ip') || 'local';
 
   r.get('/settings', async (c) => {
-    const s = await services.store.getSettings();
+    const { alertEmails: _private, ...s } = await services.store.getSettings();
     return c.json(s);
   });
 

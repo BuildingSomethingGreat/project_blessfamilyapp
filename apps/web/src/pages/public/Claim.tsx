@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClaimRequestSchema } from '@bless/shared';
 import { api, ApiError, setSponsorToken } from '@/lib/api';
 import { Checkbox } from '@/components/ui';
 import type { Handoff } from '@bless/shared';
 import { fmtDate } from '@/lib/format';
+import { useAccount } from '@/lib/account';
 import { BackButton, shell } from './shared.tsx';
 
 const input = 'mt-1.5 h-[50px] w-full rounded-2xl border border-line bg-bg px-4 text-[15px] outline-none focus:border-pri focus:bg-white';
@@ -21,6 +22,20 @@ export default function Claim() {
   const [busy, setBusy] = useState(false);
   const [gone, setGone] = useState<string | null>(null);
   const set = (k: keyof typeof form, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
+  // Signed-in sponsors start from their account details. They can still change anything, e.g. to
+  // sponsor on behalf of another group or pick a different hand-off.
+  const { me } = useAccount();
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (!me || prefilled.current) return;
+    prefilled.current = true;
+    const p = me.sponsor;
+    setForm((f) => ({
+      ...f,
+      name: f.name || p.name, email: f.email || p.email, phone: f.phone || p.phone || '', organization: f.organization || p.organization || '',
+      wallOptIn: p.wallOptIn || f.wallOptIn, displayName: f.displayName || p.displayName || '', emailConsent: true,
+    }));
+  }, [me]);
   const valid = form.name.trim().length >= 2 && /\S+@\S+\.\S+/.test(form.email) && form.agree && form.emailConsent;
   const s = settings.data;
   const f = fam.data;
@@ -52,6 +67,12 @@ export default function Claim() {
             <div className="mt-[22px] text-[12px] font-semibold uppercase tracking-[.1em] text-pri">Become a Holiday Konnector</div>
             <h1 className="mt-1.5 text-[clamp(30px,4vw,40px)] font-extrabold leading-[1.02] tracking-[-.045em]">You're blessing <span className="text-pri">{f?.nickname ?? '…'}</span>.</h1>
             <p className="mt-3 text-[15px] leading-[1.5] text-ink-2">{f ? `${f.kidLine}: ${f.kidNames}. ` : ''}No payment here. Tell us who you are and we'll send your private family page with every size and wish.</p>
+            {me && prefilled.current && (
+              <div className="mt-5 flex items-start gap-3 rounded-2xl bg-soft px-4 py-3.5 text-[13px] leading-[1.5] text-ink-2">
+                <span aria-hidden className="mt-px grid size-6 flex-none place-items-center rounded-full bg-pri text-[12px] font-bold text-white">{(me.sponsor.name.trim()[0] ?? '♥').toUpperCase()}</span>
+                <span><b className="text-ink">Welcome back, {me.sponsor.name.trim().split(/\s+/)[0]}.</b> We filled in your details. Sponsoring for another person or group, or handing off differently this time? Just change anything below.</span>
+              </div>
+            )}
             <div className="mt-6 grid gap-3">
               <label className="block"><span className="text-[13px] font-semibold text-ink-2">Your name</span><input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="First and last name" autoComplete="name" className={input} />{errors.name && <span className="mt-1 block text-[13px] text-bad">{errors.name}</span>}</label>
               <div className="grid gap-3 sm:grid-cols-2">

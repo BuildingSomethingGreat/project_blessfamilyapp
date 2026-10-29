@@ -1,4 +1,4 @@
-import type { Family, PublicFamily, SeasonSettings, Sponsor, Sponsorship } from '@bless/shared';
+import { STATUS_LABEL, type Family, type PublicFamily, type SeasonSettings, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
 import { config } from '../config.ts';
 import type { EmailSpec } from '../notify/render.ts';
 
@@ -112,7 +112,7 @@ export function template(ctx: MessageContext): ComposedMessage {
           intro: `Hi ${name}. Mark your progress for ${f.nickname} as you go: purchased, wrapped, handed off.`,
           details: [{ label: 'Gifts due', value: due(s) }, { label: 'Time left', value: daysLine(ctx.daysToDeadline) }],
           cta: page,
-          note: 'Questions about sizes or wishes? Everything is on your family page, or just reply.',
+          note: `Questions about sizes or wishes? Everything is on your family page, or email ${s.contactName || 'us'} at ${s.contactEmail}.`,
         },
       };
     case 'deadline_reminder': {
@@ -127,7 +127,7 @@ export function template(ctx: MessageContext): ComposedMessage {
           details: [{ label: 'Gifts due', value: due(s) }, handoffRow(ctx)],
           list: GIFT_RULES,
           cta: ctx.portalUrl ? { label: 'Mark your progress', url: ctx.portalUrl } : undefined,
-          note: "Running late? Reply to this email and we'll figure it out together.",
+          note: `Running late? Email ${s.contactName || 'us'} at ${s.contactEmail} and we'll figure it out together.`,
         },
       };
     }
@@ -162,7 +162,7 @@ export function template(ctx: MessageContext): ComposedMessage {
           eyebrow: 'Family reopened',
           title: `${f.nickname} has been reopened.`,
           intro: `Hi ${name}. We reopened the family so another Konnector can step in${ctx.reason ? ` (${ctx.reason.toLowerCase()})` : ''}.`,
-          paragraphs: ["If this was a mistake, reply and we'll sort it out right away. Thank you for considering them."],
+          paragraphs: [`If this was a mistake, email ${s.contactName || 'us'} at ${s.contactEmail} and we'll sort it out right away. Thank you for considering them.`],
         },
       };
     case 'release_confirmation':
@@ -223,7 +223,7 @@ export function template(ctx: MessageContext): ComposedMessage {
           title: `Hi ${guardian}.`,
           quote: { text: ctx.custom ?? '', by: 'The Konnection team' },
           details: [{ label: 'Family number', value: f.familyId }],
-          note: 'Questions? Just reply to this email.',
+          note: `Questions? Email ${s.contactName || 'us'} at ${s.contactEmail}.`,
         },
       };
     case 'family_matched': {
@@ -236,7 +236,7 @@ export function template(ctx: MessageContext): ComposedMessage {
           title: 'Someone chose your family.',
           intro: `${guardian}, a Holiday Konnector is shopping for ${kidNames(f)} right now.`,
           details: [{ label: 'Family number', value: f.familyId }, { label: 'Gifts', value: pickup ? `Pick up. We'll send pick-up details before ${shortDue(s)}.` : `Delivery. We'll contact you to arrange it.` }],
-          note: "Questions? Just reply. We'll keep you posted.",
+          note: "We'll keep you posted by email.",
         },
       };
     }
@@ -261,14 +261,15 @@ export function konnectorLoginEmail(link: string): ComposedMessage {
 
 export function konnectorNoAccountEmail(email: string): ComposedMessage {
   return {
-    subject: 'No family found for this email',
+    subject: "You're not a sponsor yet",
     spec: {
-      preheader: 'Choose a family to get started.',
-      eyebrow: 'Sign in',
-      title: "We couldn't find a family.",
-      intro: `Nobody has chosen a family with ${email} yet. Choose one and your account is created automatically.`,
-      cta: { label: 'Find a family', url: `${config.webUrl}/families` },
-      note: 'Used a different email when you chose your family? Sign in with that one.',
+      preheader: 'Choose a family to bless and your sponsor page is ready in two minutes.',
+      eyebrow: 'Sponsor log in',
+      title: "Doesn't look like you're a sponsor yet.",
+      intro: `There's no family sponsored with ${email}. Choose a family to bless and your sponsor page is created right away. That's where you'll log in.`,
+      paragraphs: ['It takes about two minutes, and there is no payment on the site.'],
+      cta: { label: 'Sponsor a family', url: `${config.webUrl}/families` },
+      note: 'Already sponsoring with a different email? Log in with that one.',
     },
   };
 }
@@ -293,6 +294,8 @@ export type AdminAlert =
   | { kind: 'admin_family_released'; family: Family; pub: PublicFamily; sponsor: Sponsor | null; reason: string; by: string }
   | { kind: 'admin_flagged'; family: Family; pub: PublicFamily; sponsor: Sponsor | null; sponsorship: Sponsorship; count: number }
   | { kind: 'admin_handed_off'; family: Family; pub: PublicFamily; sponsor: Sponsor | null; sponsorship: Sponsorship }
+  | { kind: 'admin_konnector_update'; family: Family; pub: PublicFamily; sponsor: Sponsor | null; sponsorship: Sponsorship; from: string; note?: string }
+  | { kind: 'admin_konnector_note'; family: Family; pub: PublicFamily; sponsor: Sponsor | null; sponsorship: Sponsorship; note: string }
   | { kind: 'admin_quote'; name: string; role: string; quote: string }
   | { kind: 'admin_followup_run'; sent: number; flagged: number; skipped: number; by: string };
 
@@ -314,7 +317,7 @@ export function adminAlert(a: AdminAlert): ComposedMessage {
         spec: {
           preheader: a.sponsorship.handoff === 'Deliver directly' ? 'They will deliver directly. Connect them with the family.' : 'They will drop off gifts with us.',
           eyebrow: 'Family chosen', title: `${a.pub.nickname} has a Konnector.`,
-          details: [{ label: 'Konnector', value: a.sponsor.name }, { label: 'Email', value: a.sponsor.email }, ...(a.sponsor.phone ? [{ label: 'Phone', value: a.sponsor.phone }] : []), ...(a.sponsor.organization ? [{ label: 'Organization', value: a.sponsor.organization }] : []), { label: 'Hand-off', value: a.sponsorship.handoff === 'Deliver directly' ? 'Delivers directly. Share the address privately.' : 'Drops off with us' }, { label: 'Family', value: `${a.family.familyId} · ${a.pub.kidLine}` }],
+          details: [{ label: 'Konnector', value: a.sponsor.name }, { label: 'Email', value: a.sponsor.email }, ...(a.sponsor.phone ? [{ label: 'Phone', value: a.sponsor.phone }] : []), ...(a.sponsor.organization ? [{ label: 'Organization', value: a.sponsor.organization }] : []), { label: 'Hand-off', value: a.sponsorship.handoff === 'Deliver directly' ? 'Delivers directly. Share the address privately.' : 'Drops off with us' }, { label: 'Family', value: `${a.family.familyId} · ${a.pub.kidLine}` }, ...(a.sponsorship.adminNotes ? [{ label: 'For this family', value: a.sponsorship.adminNotes }] : []), ...(a.sponsorship.sponsorNote ? [{ label: 'Their note', value: a.sponsorship.sponsorNote }] : [])],
           cta: famLink(a.family),
         },
       };
@@ -344,6 +347,30 @@ export function adminAlert(a: AdminAlert): ComposedMessage {
           preheader: a.sponsorship.handoff === 'Deliver directly' ? 'Confirm with the family, then mark it delivered.' : 'Schedule delivery to the family.',
           eyebrow: 'Gifts handed off', title: a.sponsorship.handoff === 'Deliver directly' ? 'Delivered by the Konnector.' : 'Gifts are in.',
           details: [{ label: 'Family', value: `${a.family.familyId} · ${a.pub.nickname}` }, { label: 'Konnector', value: a.sponsor?.name ?? 'Unknown' }, { label: 'Next', value: a.sponsorship.handoff === 'Deliver directly' ? 'Confirm with the family, then mark Delivered.' : a.family.transportation === 'Yes' ? 'Family picks up. Send pick-up details.' : 'Schedule delivery, then mark Delivered.' }],
+          cta: famLink(a.family),
+        },
+      };
+    case 'admin_konnector_update': {
+      const step = STATUS_LABEL[a.sponsorship.status as SponsorshipStatus] ?? a.sponsorship.status;
+      return {
+        subject: `${a.sponsor?.name ?? 'A Konnector'}: ${step} (${a.family.familyId})`,
+        spec: {
+          preheader: a.note ? a.note.slice(0, 90) : `${a.pub.nickname} moved to ${step}.`,
+          eyebrow: 'Konnector update', title: `${step}.`,
+          intro: `${a.sponsor?.name ?? 'The Konnector'} updated ${a.pub.nickname}.`,
+          ...(a.note ? { quote: { text: a.note, by: a.sponsor?.name } } : {}),
+          details: [{ label: 'Family', value: `${a.family.familyId} · ${a.pub.kidLine}` }, { label: 'Konnector', value: a.sponsor ? `${a.sponsor.name} (${a.sponsor.email})` : 'Unknown' }, { label: 'Step', value: `${STATUS_LABEL[a.from as SponsorshipStatus] ?? a.from} → ${step}` }, { label: 'Hand-off', value: a.sponsorship.handoff === 'Deliver directly' ? 'Delivers directly' : 'Drops off with us' }],
+          cta: famLink(a.family),
+        },
+      };
+    }
+    case 'admin_konnector_note':
+      return {
+        subject: `Note from ${a.sponsor?.name ?? 'a Konnector'} (${a.family.familyId})`,
+        spec: {
+          preheader: a.note.slice(0, 90), eyebrow: 'Konnector note', title: 'A Konnector left a note.',
+          quote: { text: a.note, by: a.sponsor?.name },
+          details: [{ label: 'Family', value: `${a.family.familyId} · ${a.pub.nickname}` }, { label: 'Konnector', value: a.sponsor ? `${a.sponsor.name} (${a.sponsor.email})` : 'Unknown' }, { label: 'Step', value: STATUS_LABEL[a.sponsorship.status as SponsorshipStatus] ?? a.sponsorship.status }],
           cta: famLink(a.family),
         },
       };

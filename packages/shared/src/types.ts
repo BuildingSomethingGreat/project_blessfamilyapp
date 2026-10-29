@@ -181,6 +181,10 @@ export interface SeasonSettings {
   askFamilyPhoto: boolean;
   /** Email the admin team about new applications, claims, releases, flags, hand-offs and quotes. */
   adminAlerts: boolean;
+  /** Who gets team emails (comma-separated). Empty = everyone in ADMIN_EMAILS. Never sent to the public site. */
+  alertEmails: string;
+  /** First name shown in email footers next to the contact email ("Questions? Email Sharnese at …"). */
+  contactName: string;
 }
 
 export const QUOTE_ROLES = ['Holiday Konnector', 'Konnection family'] as const;

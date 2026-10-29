@@ -44,8 +44,9 @@ export default function Settings() {
           <Panel>
             <PanelTitle>Contact & giving</PanelTitle>
             <div className="mt-3.5 grid gap-4 sm:grid-cols-2">
+              <div><Label htmlFor="cname" hint="shown in email footers">Contact name</Label><Input id="cname" value={form.contactName ?? ''} onChange={(e) => set('contactName', e.target.value)} placeholder="Sharnese" /></div>
               <div><Label htmlFor="email">Contact email</Label><Input id="email" type="email" value={form.contactEmail} onChange={(e) => set('contactEmail', e.target.value)} /></div>
-              <div><Label htmlFor="phone">Contact phone</Label><Input id="phone" type="tel" value={form.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} /></div>
+              <div className="sm:col-span-2"><Label htmlFor="phone">Contact phone</Label><Input id="phone" type="tel" value={form.contactPhone} onChange={(e) => set('contactPhone', e.target.value)} /></div>
               <div className="sm:col-span-2"><Label htmlFor="donate" hint="general fund">Organization donate URL</Label><Input id="donate" type="url" value={form.orgDonateUrl} onChange={(e) => set('orgDonateUrl', e.target.value)} /></div>
               <div className="sm:col-span-2"><Label htmlFor="chip" hint="opened after a chip-in pledge (Zeffy or Stripe link)">Chip-in checkout URL</Label><Input id="chip" type="url" value={form.chipInUrl} onChange={(e) => set('chipInUrl', e.target.value)} /></div>
             </div>
@@ -60,7 +61,18 @@ export default function Settings() {
               <Row title="Chip-ins" body='Show "Chip in" on family pages for partial giving.' k="chipInsEnabled" />
               <Row title="Ask families for a photo" body="Adds an optional photo question to the application. Families can skip it or keep the photo staff-only." k="askFamilyPhoto" />
               <Row title="Show family photos" body="Show approved, non-private photos in the catalog. Off hides every photo." k="showPhotos" />
-              <Row title="Email the team about activity" body="New applications, claims, releases, flagged Konnectors and hand-offs go to every admin email. Every email is listed in Emails." k="adminAlerts" />
+            </div>
+          </Panel>
+          <Panel>
+            <PanelTitle>Team emails</PanelTitle>
+            <div className="mt-3.5 space-y-4">
+              <div>
+                <Label htmlFor="alerts" hint="comma-separated">Send team emails to</Label>
+                <Textarea id="alerts" className="min-h-[72px]" value={form.alertEmails ?? ''} onChange={(e) => set('alertEmails', e.target.value)} placeholder={me.data?.adminEmails?.join(', ') ?? 'Admin emails'} />
+                <div className="mt-1.5 text-[12px] leading-[1.5] text-ink-3">{(form.alertEmails ?? '').trim() ? 'Only these addresses get team emails.' : <>Empty means every admin: <b className="text-ink-2">{me.data?.adminEmails?.join(', ') || '…'}</b></>}</div>
+              </div>
+              <div className="rounded-[14px] bg-soft-2 px-3.5 py-3 text-[13px] leading-[1.5] text-ink-2"><b className="text-ink">Always sent:</b> every Konnector update (shopping, purchased, wrapped, handed off, released) and every note they leave.</div>
+              <Row title="Also email activity" body="New applications, new claims and flagged Konnectors. Every email is listed in Emails." k="adminAlerts" />
             </div>
           </Panel>
           <Panel>

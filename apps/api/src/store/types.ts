@@ -70,4 +70,6 @@ export const DEFAULT_SETTINGS: SeasonSettings = {
   showPhotos: true,
   askFamilyPhoto: false,
   adminAlerts: true,
+  alertEmails: '',
+  contactName: 'Sharnese',
 };

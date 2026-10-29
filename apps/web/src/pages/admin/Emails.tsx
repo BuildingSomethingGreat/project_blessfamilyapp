@@ -17,8 +17,8 @@ const KIND: Record<string, string> = {
   claim_confirmation: 'Claim confirmation', confirm_nudge: 'Confirm nudge', shopping_checkin: 'Shopping check-in', deadline_reminder: 'Deadline reminder',
   dropoff_thanks: 'Hand-off thanks', delivered_thanks: 'Delivered thanks', released_notice: 'Released (staff)', release_confirmation: 'Release confirmation', staff_note: 'Note from staff',
   family_received: 'Application received', family_approved: 'Family approved', family_matched: 'Family matched', family_note: 'Note to family',
-  konnector_login: 'Sign-in link', konnector_no_account: 'Sign-in (no account)', admin_login: 'Admin sign-in',
-  admin_new_application: 'New application', admin_family_claimed: 'Family claimed', admin_family_released: 'Family released', admin_flagged: 'Konnector flagged', admin_handed_off: 'Gifts handed off', admin_quote: 'New quote', admin_followup_run: 'Follow-up run', test: 'Test email',
+  konnector_login: 'Sign-in link', konnector_no_account: 'Not a sponsor yet', admin_login: 'Admin sign-in',
+  admin_new_application: 'New application', admin_family_claimed: 'Family claimed', admin_family_released: 'Family released', admin_flagged: 'Konnector flagged', admin_handed_off: 'Gifts handed off', admin_konnector_update: 'Konnector update', admin_konnector_note: 'Konnector note', admin_quote: 'New quote', admin_followup_run: 'Follow-up run', test: 'Test email',
 };
 const AUDIENCE: Record<EmailLogRow['audience'], string> = { konnector: 'Konnector', family: 'Family', admin: 'Team', test: 'Test' };
 const when = (iso: string) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });

@@ -6,8 +6,8 @@ import { Button, Input, Label } from '@/components/ui';
 import { shell } from './shared.tsx';
 
 /**
- * One "Log in" for Holiday Konnectors (and staff). We email a one-tap link; a Konnector's link
- * comes back here with ?token= and lands on their family page.
+ * "Sponsor log in" for Holiday Konnectors. We email a one-tap link that comes back here with ?token=
+ * and lands on their family page. Staff use the privately shared /admin/login instead.
  */
 export default function Login() {
   const [params] = useSearchParams();
@@ -52,8 +52,8 @@ export default function Login() {
           <div>
             <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">Check your inbox</div>
             <h1 className="mt-1.5 text-[clamp(30px,4vw,38px)] font-extrabold leading-[1.02] tracking-[-.045em]">Your link is on its way.</h1>
-            <p className="mt-3 text-[15px] leading-[1.55] text-ink-2">We sent a sign-in link to <b className="text-ink">{email}</b>. Tap it on this device. It works for 30 minutes.</p>
-            <p className="mt-2 text-[13px] leading-[1.5] text-ink-3">Nothing there? Check spam, or make sure it's the email you used to choose your family.</p>
+            <p className="mt-3 text-[15px] leading-[1.55] text-ink-2">We sent an email to <b className="text-ink">{email}</b>. If you're sponsoring a family, it has your sign-in link. It works for 30 minutes.</p>
+            <p className="mt-2 text-[13px] leading-[1.5] text-ink-3">Nothing there? Check spam, or make sure it's the email you used to sponsor your family.</p>
             {devLink && (
               <div className="mt-5 rounded-2xl bg-soft p-4">
                 <div className="text-[11px] font-semibold uppercase tracking-[.08em] text-pri-dark">Local development only</div>
@@ -67,7 +67,7 @@ export default function Login() {
 
         {(state === 'idle' || state === 'sending' || state === 'error') && (
           <form onSubmit={submit}>
-            <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">Log in</div>
+            <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">Sponsor log in</div>
             <h1 className="mt-1.5 text-[clamp(30px,4vw,38px)] font-extrabold leading-[1.02] tracking-[-.045em]">Welcome back.</h1>
             <p className="mt-3 text-[15px] leading-[1.55] text-ink-2">Enter the email you used to choose your family. We'll send a one-tap link. No password needed.</p>
             <div className="mt-6">
@@ -78,7 +78,6 @@ export default function Login() {
             <div className="mt-6 border-t border-line pt-5 text-center text-[13px] text-ink-3">
               Haven't chosen a family yet? <Link to="/families" className="font-semibold text-pri">Find a family</Link>
             </div>
-            <div className="mt-2 text-center text-[12px] text-ink-3">Team member? Use your staff email, the same form works.</div>
           </form>
         )}
       </div>

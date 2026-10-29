@@ -60,9 +60,9 @@ export class FollowUpEngine {
   constructor(private store: Store, readonly mailer: Mailer) {}
 
   /** Email the admin team (ADMIN_EMAILS) about something that needs their attention. */
-  async alert(a: AdminAlert, ids: { familyId?: string | null; sponsorshipId?: string | null } = {}) {
+  async alert(a: AdminAlert, ids: { familyId?: string | null; sponsorshipId?: string | null } = {}, opts: { force?: boolean } = {}) {
     const msg = adminAlert(a);
-    return this.mailer.toAdmins({ subject: msg.subject, spec: msg.spec, kind: a.kind, familyId: ids.familyId, sponsorshipId: ids.sponsorshipId }).catch((e) => console.error('[alert] failed', e));
+    return this.mailer.toAdmins({ subject: msg.subject, spec: msg.spec, kind: a.kind, familyId: ids.familyId, sponsorshipId: ids.sponsorshipId }, opts).catch((e) => console.error('[alert] failed', e));
   }
 
   async context(kind: MessageKind, s: Sponsorship | null, family: Family, sponsor: Sponsor | null, extra: Partial<MessageContext> = {}): Promise<MessageContext> {
@@ -128,14 +128,18 @@ export class FollowUpEngine {
     // Emails fall like dominoes: thank-yous to the Konnector, alerts to the team.
     const sponsor = await this.store.getSponsor(s.sponsorId);
     const ids = { familyId: s.familyId, sponsorshipId: s.id };
+    // Anything the Konnector does is a key update: it always reaches the team, even with activity alerts off.
+    const byKonnector = { force: opts.actor === 'sponsor' };
     if (to === 'Dropped Off') {
       if (opts.actor === 'sponsor') await this.send('dropoff_thanks', updated, { actor: 'system' });
-      if (family) await this.alert({ kind: 'admin_handed_off', family, pub: toPublicFamily(family), sponsor, sponsorship: updated }, ids);
+      if (family) await this.alert({ kind: 'admin_handed_off', family, pub: toPublicFamily(family), sponsor, sponsorship: updated }, ids, byKonnector);
+    } else if (opts.actor === 'sponsor' && to !== 'Released' && family) {
+      await this.alert({ kind: 'admin_konnector_update', family, pub: toPublicFamily(family), sponsor, sponsorship: updated, from: s.status, note: opts.note }, ids, byKonnector);
     }
     if (to === 'Delivered') await this.send('delivered_thanks', updated, { actor: 'system' });
     if (to === 'Released') {
       await this.send(opts.actor === 'sponsor' ? 'release_confirmation' : 'released_notice', updated, { actor: 'system', reason: opts.reason });
-      if (family && opts.actor !== 'admin') await this.alert({ kind: 'admin_family_released', family, pub: toPublicFamily(family), sponsor, reason: patch.releaseReason ?? '', by: opts.actor === 'sponsor' ? 'The Konnector' : opts.actor === 'agent' ? 'Assistant' : 'System' }, ids);
+      if (family && opts.actor !== 'admin') await this.alert({ kind: 'admin_family_released', family, pub: toPublicFamily(family), sponsor, reason: patch.releaseReason ?? '', by: opts.actor === 'sponsor' ? 'The Konnector' : opts.actor === 'agent' ? 'Assistant' : 'System' }, ids, byKonnector);
     }
     return updated;
   }

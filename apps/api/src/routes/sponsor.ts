@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { SponsorUpdateSchema, canTransition } from '@bless/shared';
+import { SponsorUpdateSchema, canTransition, toPublicFamily } from '@bless/shared';
 import type { Services } from '../lib/services.ts';
 import { HttpError } from '../lib/services.ts';
 import { nowIso } from '../lib/ids.ts';
@@ -34,6 +34,8 @@ export function sponsorRoutes(services: Services) {
     if (!text) return c.json({ error: 'Empty note' }, 400);
     await services.store.updateSponsorship(s.id, { sponsorNote: text, lastResponseAt: nowIso(), followUpCount: 0, flagged: false, flagReason: '' });
     await services.store.logActivity({ type: 'sponsor_response', channel: 'web', familyId: s.familyId, sponsorshipId: s.id, subject: 'Konnector left a note', body: text, meta: {}, occurredAt: nowIso() });
+    const [family, sponsor] = await Promise.all([services.store.getFamily(s.familyId), services.store.getSponsor(s.sponsorId)]);
+    if (family) await services.followUp.alert({ kind: 'admin_konnector_note', family, pub: toPublicFamily(family), sponsor, sponsorship: s, note: text }, { familyId: s.familyId, sponsorshipId: s.id }, { force: true });
     return c.json(await services.sponsorPortal(s.token));
   });
 

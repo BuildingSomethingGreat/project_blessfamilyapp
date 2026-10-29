@@ -7,6 +7,7 @@ import { isAdminEmail, loginToken, sessionToken, verifyToken, SESSION_COOKIE } f
 import { buildReport } from '../lib/reporting.ts';
 import type { Services } from '../lib/services.ts';
 import { HttpError, wallName } from '../lib/services.ts';
+import { parseEmails } from '../notify/mailer.ts';
 import { adminAlert, adminLoginEmail, testEmail } from '../followup/messages.ts';
 import { nowIso } from '../lib/ids.ts';
 import { AdminAgent } from '../agent/admin-agent.ts';
@@ -69,7 +70,7 @@ export function adminRoutes(services: Services) {
     await next();
   });
 
-  r.get('/me', (c) => c.json({ email: c.get('admin'), assistantEnabled: agent.enabled, store: store.kind, mail: { provider: config.notify.driver, from: config.notify.from } }));
+  r.get('/me', (c) => c.json({ email: c.get('admin'), assistantEnabled: agent.enabled, store: store.kind, mail: { provider: config.notify.driver, from: config.notify.from }, adminEmails: config.adminEmails }));
   r.get('/report', async (c) => c.json(await buildReport(store)));
 
   // ---- families ----
@@ -154,9 +155,15 @@ export function adminRoutes(services: Services) {
   r.get('/settings', async (c) => c.json(await store.getSettings()));
   r.patch('/settings', async (c) => {
     const body = (await c.req.json()) as Partial<SeasonSettings>;
-    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos', 'askFamilyPhoto', 'adminAlerts'];
+    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos', 'askFamilyPhoto', 'adminAlerts', 'alertEmails', 'contactName'];
     const patch: Partial<SeasonSettings> = {};
     for (const k of allowed) if (k in body) (patch as any)[k] = body[k];
+    if (typeof patch.alertEmails === 'string') {
+      const list = parseEmails(patch.alertEmails);
+      const bad = patch.alertEmails.split(/[,;\s]+/).filter((e) => e && !/^\S+@\S+\.\S+$/.test(e));
+      if (bad.length) throw new HttpError(400, `Not a valid email: ${bad.join(', ')}`);
+      patch.alertEmails = list.join(', ');
+    }
     return c.json(await store.updateSettings(patch));
   });
   // ---- community: quotes + Wall of Holiday Konnectors ----

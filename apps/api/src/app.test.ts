@@ -213,3 +213,49 @@ test('Konnector log in: magic link → session → my families; never reveals wh
   const logged = (await store.listActivity({ types: ['message_sent'], limit: 50 })).find((a) => (a.meta as any).kind === 'konnector_login');
   assert.ok(logged && !logged.body.includes('token='), 'sign-in links are not stored in the log');
 });
+
+test('sponsor log in treats staff emails like any other address', async () => {
+  const before = (await store.listActivity({ types: ['message_sent'], limit: 500 })).length;
+  const res = await json(await post('/api/account/login', { email: 'admin@example.com' }, { 'x-forwarded-for': '10.0.0.3' }));
+  assert.equal(res.status, 200);
+  assert.equal(res.body.devLink, undefined, 'no admin link from the sponsor form');
+  const sent = (await store.listActivity({ types: ['message_sent'], limit: 500 })).slice(0, (await store.listActivity({ types: ['message_sent'], limit: 500 })).length - before);
+  assert.ok(sent.some((a) => (a.meta as any).kind === 'konnector_no_account' && a.subject.includes('not a sponsor')));
+  assert.ok(!sent.some((a) => (a.meta as any).kind === 'admin_login'));
+});
+
+test('Konnector updates and notes reach the team recipients from Settings, even with activity alerts off', async () => {
+  const req = await json(await post('/api/admin/auth/request', { email: 'admin@example.com' }));
+  const verify = await post('/api/admin/auth/verify', { token: new URL(req.body.devLink).searchParams.get('token')! });
+  const admin = { cookie: verify.headers.get('set-cookie')!.split(';')[0] };
+  const patch = (body: unknown) => app.request('/api/admin/settings', { method: 'PATCH', body: JSON.stringify(body), headers: { 'content-type': 'application/json', ...admin } });
+  assert.equal((await patch({ alertEmails: 'not-an-email' })).status, 400);
+  assert.equal((await patch({ alertEmails: 'Ops@Example.com, lead@example.com', adminAlerts: false })).status, 200);
+  const pub = await (await app.request('/api/settings')).json();
+  assert.equal(pub.alertEmails, undefined, 'team recipients are never public');
+
+  const sp = (await store.listSponsorships({ status: ['Claimed'] })).find((s) => !s.flagged)!;
+  assert.equal((await post(`/api/sponsor/${sp.token}/note`, { note: 'Shopping this weekend!' })).status, 200);
+  assert.equal((await post(`/api/sponsor/${sp.token}/status`, { status: 'Shopping' })).status, 200);
+  const log = (await store.listActivity({ types: ['message_sent'], limit: 50 })).filter((a) => a.sponsorshipId === sp.id).map((a) => a.meta as any);
+  for (const kind of ['admin_konnector_note', 'admin_konnector_update']) {
+    assert.deepEqual(log.filter((m) => m.kind === kind).map((m) => m.to).sort(), ['lead@example.com', 'ops@example.com'], kind);
+  }
+  await patch({ alertEmails: '', adminAlerts: true });
+});
+
+test('a signed-in sponsor claiming for another org keeps their account and the difference is noted', async () => {
+  const taken = new Set((await store.listSponsorships({ status: ['Claimed'] })).map((s) => s.familyId));
+  const fresh = (await store.listFamilies({ status: ['Available'] })).find((f) => !taken.has(f.id))!;
+  const res = await (await post(`/api/families/${fresh.slug}/claim`, { name: 'Ellie Email', email: 'ellie@example.com', organization: 'Eastside Rotary', agree: true, emailConsent: true }, { 'x-forwarded-for': '10.0.1.1' })).json();
+  const sp = (await store.getSponsorshipByToken(res.token))!;
+  assert.ok(sp.adminNotes === '' || !sp.adminNotes.includes('Name given'), 'same name is not noted');
+  const sponsor = (await store.findSponsorByEmail('ellie@example.com'))!;
+  assert.equal(sponsor.organization, 'Eastside Rotary', 'a blank organization is filled in');
+  const fresh2 = (await store.listFamilies({ status: ['Available'] })).find((f) => f.id !== fresh.id && !taken.has(f.id))!;
+  const res2 = await (await post(`/api/families/${fresh2.slug}/claim`, { name: 'Ellie Email', email: 'ellie@example.com', organization: 'Westside Church', agree: true, emailConsent: true }, { 'x-forwarded-for': '10.0.1.2' })).json();
+  assert.ok(res2.token, JSON.stringify(res2));
+  const sp2 = (await store.getSponsorshipByToken(res2.token))!;
+  assert.match(sp2.adminNotes, /On behalf of: Westside Church/);
+  assert.equal((await store.findSponsorByEmail('ellie@example.com'))!.organization, 'Eastside Rotary');
+});

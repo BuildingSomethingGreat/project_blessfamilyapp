@@ -122,15 +122,27 @@ export class Services {
       if (existing.some((x) => x.familyId === f.id && ACTIVE_SPONSORSHIP_STATUSES.includes(x.status))) throw new HttpError(409, taken);
       const wall = req.wallOptIn ? { wallOptIn: true, displayName: req.displayName } : {};
       let sponsor = await this.store.findSponsorByEmail(req.email);
+      // A returning sponsor may claim for someone else (another org, a relative). Their account keeps its
+      // details; anything different for this family is noted on the sponsorship so the team sees it.
+      const forThisFamily: string[] = [];
       if (!sponsor) sponsor = await this.store.createSponsor({ name: req.name, email: req.email.toLowerCase(), phone: req.phone, organization: req.organization, preferredContact: 'Email', notes: '', displayName: '', wallOptIn: false, wallHidden: false, ...wall });
-      else if (req.wallOptIn) sponsor = await this.store.updateSponsor(sponsor.id, wall);
+      else {
+        const fill: Partial<Sponsor> = { ...wall };
+        if (req.phone && !sponsor.phone) fill.phone = req.phone;
+        if (req.organization && !sponsor.organization) fill.organization = req.organization;
+        const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+        if (req.name.trim() && !same(req.name, sponsor.name)) forThisFamily.push(`Name given: ${req.name.trim()}`);
+        if (req.organization && sponsor.organization && !same(req.organization, sponsor.organization)) forThisFamily.push(`On behalf of: ${req.organization.trim()}`);
+        if (req.phone && sponsor.phone && req.phone.replace(/\D/g, '') !== sponsor.phone.replace(/\D/g, '')) forThisFamily.push(`Phone for this family: ${req.phone.trim()}`);
+        if (Object.keys(fill).length) sponsor = await this.store.updateSponsor(sponsor.id, fill);
+      }
       const seq = existing.length + 1;
       const now = nowIso();
       const next = nextFollowUp('Claimed', settings);
       const s = await this.store.createSponsorship({
         sponsorshipId: `SP-${settings.season}-${String(seq).padStart(3, '0')}`, familyId: f.id, sponsorId: sponsor.id, status: 'Claimed', token: newToken(), handoff: req.handoff, claimedAt: now,
         shoppingAt: null, purchasedAt: null, wrappedAt: null, droppedOffAt: null, deliveredAt: null, releasedAt: null, nextFollowUpAt: next ? next.toISOString() : null, lastNudgedAt: null,
-        lastResponseAt: null, followUpCount: 0, flagged: false, flagReason: '', releaseReason: '', sponsorNote: req.note, adminNotes: '',
+        lastResponseAt: null, followUpCount: 0, flagged: false, flagReason: '', releaseReason: '', sponsorNote: req.note, adminNotes: forThisFamily.join('\n'),
       });
       // Duplicate guard: another instance may have claimed the same family in the same few seconds.
       // The earliest claim wins; a later duplicate is released and the Konnector is told the family is taken.
