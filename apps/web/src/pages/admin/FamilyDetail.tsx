@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { familyArt, colorSwatch, nicknameProblem, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, familyArt, colorSwatch, nicknameProblem, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
 import { api } from '@/lib/api';
 import { Button, Chip, Dominoes, FamilyArt, Input, Kicker, Label, Select, Sheet, Skeleton, Textarea, Toggle, useToast } from '@/components/ui';
 import { NicknameField } from '@/components/NicknameField';
@@ -190,7 +190,13 @@ export default function FamilyDetail() {
                     {active.sponsor?.email && <a className="block text-pri hover:underline" href={`mailto:${active.sponsor.email}`}>{active.sponsor.email}</a>}
                     {active.sponsor?.phone && <a className="block text-pri hover:underline" href={`tel:${active.sponsor.phone}`}>{active.sponsor.phone}</a>}
                     <div className="text-ink-3">Updates by email · {active.sponsorshipId}</div>
-                    <div className={active.handoff === 'Deliver directly' ? 'mt-1 font-semibold text-warn' : 'mt-1 text-ink-3'}>{active.handoff === 'Deliver directly' ? 'Will deliver directly: share the family\'s address with them privately' : 'Dropping off gifts with us'}</div>
+                    <div className={active.handoff === 'Deliver directly' ? 'mt-1 font-semibold text-warn' : 'mt-1 text-ink-3'}>{active.handoff === 'Deliver directly' ? 'Delivers directly: share the family\'s address with them privately' : `Drops off gifts with us`}</div>
+                    {ACTIVE_SPONSORSHIP_STATUSES.includes(active.status) && (
+                      <button className="mt-1 text-[12px] font-semibold text-pri hover:text-pri-dark" disabled={patchSp.isPending}
+                        onClick={() => { const to = active.handoff === 'Deliver directly' ? 'Drop off' : 'Deliver directly'; if (to === 'Drop off' || window.confirm(`Let ${active.sponsor?.name ?? 'this Konnector'} deliver directly to the family? Only do this for someone your team knows and trusts. You'll share the address with them privately.`)) patchSp.mutate({ spId: active.id, body: { handoff: to } }); }}>
+                        {active.handoff === 'Deliver directly' ? 'Switch back to drop-off' : 'Allow direct delivery (trusted only)'}
+                      </button>
+                    )}
                     {active.sponsor && <div className="text-ink-3">Wall: {active.sponsor.wallOptIn ? (active.sponsor.wallHidden ? 'opted in, hidden by staff' : 'opted in') : 'not opted in'}</div>}
                   </div>
                   {active.sponsorNote && <p className="mt-2 rounded-[14px] bg-bg px-3 py-2 text-[13px] italic">“{active.sponsorNote}”</p>}

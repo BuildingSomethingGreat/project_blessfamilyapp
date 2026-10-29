@@ -22,7 +22,7 @@ export function PublicLayout() {
           <Link to="/" className="flex items-center gap-2.5 text-ink no-underline">
             <img src="/brand/konnection-logo.png" alt="The Konnection" className="block h-[30px] w-auto" />
             <span className="hidden h-[18px] w-px bg-line sm:block" />
-            <span className="hidden text-[14px] font-semibold sm:block">Bless This Family</span>
+            <span className="hidden text-[14px] font-semibold sm:block">Bless-A-Family</span>
           </Link>
           <nav className="flex items-center gap-0.5">
             <NavLink to="/families" className={cx(pill(onFamilies), 'hidden sm:block')}>Find family</NavLink>

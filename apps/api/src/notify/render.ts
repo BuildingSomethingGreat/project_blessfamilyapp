@@ -88,7 +88,7 @@ export function renderEmail(spec: EmailSpec, footer: Footer): { html: string; te
     <tr><td style="padding:0 6px 18px">
       <table role="presentation" cellpadding="0" cellspacing="0"><tr>
         <td style="width:32px;height:32px;border-radius:10px;background:${P.pri};text-align:center;vertical-align:middle;font-family:${FONT};font-size:17px;font-weight:800;color:#fff">K</td>
-        <td style="padding-left:10px;font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:-.01em;color:${P.ink}">Bless This Family <span style="font-weight:400;color:${P.ink3}">&middot; The Konnection</span></td>
+        <td style="padding-left:10px;font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:-.01em;color:${P.ink}">Bless-A-Family <span style="font-weight:400;color:${P.ink3}">&middot; The Konnection</span></td>
       </tr></table>
     </td></tr>
     <tr><td class="card" style="background:#ffffff;border-radius:28px;padding:38px 36px;border:1px solid ${P.line}">${parts.join('\n')}</td></tr>

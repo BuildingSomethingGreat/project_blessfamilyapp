@@ -1,4 +1,4 @@
-# Bless This Family · The Konnection
+# Bless-A-Family · The Konnection
 
 A PWA for The Konnection's holiday giving program. Families in the organization share what their kids need; sponsors pick a whole household from a public catalog; the system does the follow-up so staff don't have to.
 
@@ -7,7 +7,7 @@ A PWA for The Konnection's holiday giving program. Families in the organization 
 - **Admins**: dashboard with the reports that matter (families left, follow-up response rate, overdue sponsors, matching, views), one-click nudges and releases, a Claude-powered assistant that answers questions and takes actions, and CSV export.
 - **Follow-up engine**: automatic, deadline-aware email nudges (Resend, logged in Admin → Emails); flags unresponsive sponsors for a human instead of auto-releasing.
 
-Design: the "Bless This Family v3" prototype (Konnection purple, Poppins, loading page). Stack: React 19 + Vite + Tailwind v4 + motion (Netlify) · Hono on Node 22 (Fly.io) · Airtable now, Postgres later · Claude for the assistant.
+Design: the "Bless-A-Family v3" prototype (Konnection purple, Poppins, loading page). Stack: React 19 + Vite + Tailwind v4 + motion (Netlify) · Hono on Node 22 (Fly.io) · Airtable now, Postgres later · Claude for the assistant.
 
 ```bash
 pnpm install && pnpm dev      # web http://localhost:5173, api :8787 with demo data

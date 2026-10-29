@@ -1,5 +1,5 @@
 const env = (k: string, d = ''): string => process.env[k] ?? d;
-const fromAddress = (v: string) => (v.includes('<') ? v : `Bless This Family <${v.trim()}>`);
+const fromAddress = (v: string) => (v.includes('<') ? v : `Bless-A-Family <${v.trim()}>`);
 
 export const config = {
   port: Number(env('PORT', '8787')),

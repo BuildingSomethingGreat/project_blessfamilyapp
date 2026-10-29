@@ -1,6 +1,6 @@
 # Decisions and pushback
 
-> **October 23 update — v3 redesign.** The product now follows the "Bless This Family v3" prototype (purple Konnection palette, Poppins, loading page, swipe deck). Three earlier decisions changed with it: chip-ins exist (as pledges that hand off to the org's existing Zeffy checkout, see §1), families may opt in to a photo that staff approve before it shows (§2), and the dominoes have six steps (Claimed → Shopping → Purchased → Wrapped → Dropped Off → Delivered). Everything else below still holds.
+> **October 23 update — v3 redesign.** The product now follows the "Bless-A-Family v3" prototype (purple Konnection palette, Poppins, loading page, swipe deck). Three earlier decisions changed with it: chip-ins exist (as pledges that hand off to the org's existing Zeffy checkout, see §1), families may opt in to a photo that staff approve before it shows (§2), and the dominoes have six steps (Claimed → Shopping → Purchased → Wrapped → Dropped Off → Delivered). Everything else below still holds.
 
 Short record of where the build deliberately departs from the brief, and why. Each one is reversible.
 
@@ -79,3 +79,8 @@ The once-per-session loader deals last season's campaign photos (`PHOTOS.campaig
 
 ## Partner logos
 The landing marquee shows the 25 partner logos from https://www.thekonnection.org/donate ("And join our other amazing partners."), saved as small copies in `apps/web/public/partners/` with `manifest.json`. Refresh them with `pnpm --filter @bless/web partners:fetch` (it picks gallery images whose alt text ends in "logo", skips The Konnection's own, and replaces the old set). In a cloud session run it as `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt pnpm --filter @bless/web partners:fetch` with `www.thekonnection.org` and `static.wixstatic.com` allowed. Logos stay grayscale and faded, and go full color on hover.
+
+## Gift hand-off: drop-off by default
+The Konnection handles delivery. Every public claim is a drop-off at the season's drop-off site (Durfee Elementary-Middle School), and the API ignores any other choice from the public form. Direct delivery is only for Konnectors the team knows and trusts: the claim form invites them to email the season contact, and staff switch that sponsorship with "Allow direct delivery (trusted only)" on the admin family page (`PATCH /api/admin/sponsorships/:id { handoff }`). Public copy everywhere reads: "Drop off your wrapped and labeled gifts at Durfee Elementary-Middle School, and we'll deliver them to your adopted family. We'll send friendly reminders along the way!"
+
+The program name is **Bless-A-Family** everywhere (site, PWA, emails, legal pages). "Bless this family" stays only as the call-to-action phrase on buttons and the loader.

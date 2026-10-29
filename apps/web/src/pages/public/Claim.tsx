@@ -4,7 +4,6 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ClaimRequestSchema } from '@bless/shared';
 import { api, ApiError, setSponsorToken } from '@/lib/api';
 import { Checkbox } from '@/components/ui';
-import type { Handoff } from '@bless/shared';
 import { fmtDate } from '@/lib/format';
 import { useAccount } from '@/lib/account';
 import { BackButton, shell } from './shared.tsx';
@@ -17,7 +16,7 @@ export default function Claim() {
   const qc = useQueryClient();
   const fam = useQuery({ queryKey: ['family', slug], queryFn: () => api.family(slug), retry: false });
   const settings = useQuery({ queryKey: ['settings'], queryFn: api.settings, staleTime: 5 * 60_000 });
-  const [form, setForm] = useState({ name: '', phone: '', email: '', organization: '', note: '', handoff: 'Drop off' as Handoff, wallOptIn: true, displayName: '', agree: false, emailConsent: false });
+  const [form, setForm] = useState({ name: '', phone: '', email: '', organization: '', note: '', wallOptIn: true, displayName: '', agree: false, emailConsent: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [gone, setGone] = useState<string | null>(null);
@@ -81,21 +80,13 @@ export default function Claim() {
               </div>
               <label className="block"><span className="text-[13px] font-semibold text-ink-2">Organization <span className="font-normal text-ink-3">(optional)</span></span><input value={form.organization} onChange={(e) => set('organization', e.target.value)} placeholder="Church, company, friend group" className={input} /></label>
             </div>
-            <div className="mt-5"><span className="text-[13px] font-semibold text-ink-2">How will the gifts reach the family?</span>
-              <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                {([['Drop off', 'Drop off with us', `At ${s?.dropoffLocation ?? 'our drop-off site'}. We deliver to the family.`], ['Deliver directly', 'Deliver them myself', 'Our team connects you with the family privately.']] as const).map(([v, t, sub]) => (
-                  <button key={v} type="button" onClick={() => set('handoff', v)} aria-pressed={form.handoff === v} className={`rounded-2xl border px-4 py-3 text-left transition-colors ${form.handoff === v ? 'border-pri bg-soft-2' : 'border-line bg-white hover:border-ink-3'}`}>
-                    <div className="text-[14px] font-semibold">{form.handoff === v ? '● ' : '○ '}{t}</div><div className="mt-0.5 text-[12px] leading-[1.4] text-ink-3">{sub}</div>
-                  </button>
-                ))}
-              </div>
+            {/* All gifts come through The Konnection. Staff switch a sponsorship to direct delivery only for Konnectors they know. */}
+            <div className="mt-5 rounded-2xl bg-soft px-4 py-3.5 text-[13px] leading-[1.55] text-ink-2">
+              <div className="text-[14px] font-semibold text-ink">How gifts reach the family</div>
+              <p className="mt-1">Drop off your wrapped and labeled gifts at <b className="text-ink">{s?.dropoffLocation ?? 'Durfee Elementary-Middle School'}</b> by <b className="text-ink">{s ? fmtDate(s.dropoffDeadline, { month: 'long', day: 'numeric' }) : '…'}</b> ({s?.dropoffHours ?? 'Monday–Friday, 10 a.m.–6 p.m.'}), and we’ll deliver them to your adopted family. We’ll send friendly reminders along the way!</p>
+              <p className="mt-2">Label every gift with the child's name, and include a gift receipt for each clothing item in case it doesn't fit.</p>
             </div>
-            <div className="mt-[18px] rounded-2xl bg-soft px-4 py-3.5 text-[13px] leading-[1.55] text-ink-2">
-              {form.handoff === 'Drop off'
-                ? <>Please drop off gifts at <b className="text-ink">{s?.dropoffLocation ?? 'Durfee Elementary-Middle School'}</b> by <b className="text-ink">{s ? fmtDate(s.dropoffDeadline, { month: 'long', day: 'numeric' }) : '…'}</b>, during drop-off hours: {s?.dropoffHours ?? 'Monday–Friday, 10 a.m.–6 p.m.'}</>
-                : <>Our team will reach out to arrange delivery to the family before <b className="text-ink">{s ? fmtDate(s.dropoffDeadline, { month: 'long', day: 'numeric' }) : '…'}</b>. The family's address stays private until then.</>}
-              {' '}All gifts should be wrapped and individually labeled with the child's name. Please include a gift receipt for each clothing item in case it doesn't fit. We'll send friendly reminders along the way!
-            </div>
+            <p className="mt-2 px-1 text-[12px] leading-[1.5] text-ink-3">Already know this family personally? Email {s?.contactName || 'our team'} at <a href={`mailto:${s?.contactEmail ?? 'sharnese@thekonnection.org'}`} className="font-semibold text-ink-2">{s?.contactEmail ?? 'sharnese@thekonnection.org'}</a> after choosing them and we can arrange for you to deliver.</p>
             <div className="mt-4 rounded-2xl border border-line px-4 py-3.5">
               <Checkbox checked={form.wallOptIn} onChange={(v) => set('wallOptIn', v)}>Thank me on the Wall of Holiday Konnectors once my gifts are in.</Checkbox>
               {form.wallOptIn && <input value={form.displayName} onChange={(e) => set('displayName', e.target.value.slice(0, 80))} placeholder={`Show my name as… (e.g. ${form.organization || 'The Carter Family'})`} aria-label="Name to show on the wall" className="mt-2.5 h-11 w-full rounded-xl border border-line bg-bg px-3.5 text-[14px] outline-none focus:border-pri focus:bg-white" />}

@@ -67,6 +67,7 @@ export const ClaimRequestSchema = z.object({
   preferredContact: z.literal('Email').default('Email'),
   emailConsent: z.literal(true, { errorMap: () => ({ message: 'Please confirm updates can come by email' }) }),
   note: trimmed(500).default(''),
+  /** Ignored on public claims: every claim starts as a drop-off. Staff switch trusted Konnectors to direct delivery. */
   handoff: z.enum(HANDOFFS).default('Drop off'),
   /** Add my name to the Wall of Holiday Konnectors once gifts are in. */
   wallOptIn: z.boolean().default(false),

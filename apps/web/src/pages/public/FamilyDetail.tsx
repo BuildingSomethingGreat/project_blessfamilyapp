@@ -65,7 +65,7 @@ export default function FamilyDetail() {
                       </button>
                       <div className="mt-2.5 text-center text-[12px] text-bg/65">Takes about two minutes. No payment on this site.</div>
                       <ol className="mt-5 grid gap-2 text-[13px] text-bg/80">
-                        {['Tell us who you are. We hold the family for you right away.', 'Get your private family page with every size and wish.', `Shop, wrap, and hand off the gifts by ${deadline}. We'll guide you.`].map((t, i) => (
+                        {['Tell us who you are. We hold the family for you right away.', 'Get your private family page with every size and wish.', `Shop, wrap and label the gifts, then drop them off by ${deadline}. We’ll deliver them to the family.`].map((t, i) => (
                           <li key={i} className="flex gap-2.5"><span className="grid size-5 flex-none place-items-center rounded-full bg-white/12 text-[11px] font-bold text-white">{i + 1}</span>{t}</li>
                         ))}
                       </ol>
@@ -94,7 +94,7 @@ export default function FamilyDetail() {
                   <h2 className="text-[18px] tracking-[-.03em]">Good to know</h2>
                   <p className="mt-1.5 text-[13px] leading-[1.5] text-ink-2">{s?.perChildBudgetNote ?? 'How much you spend is up to you. Holiday Konnectors typically spend $100–$250 per child.'}</p>
                   <ul className="mt-3 grid gap-2 text-[13px] leading-[1.5] text-ink-2">{GIFT_RULES.map((r) => <li key={r} className="flex gap-2"><span className="text-pri">✓</span>{r}</li>)}</ul>
-                  <div className="mt-3 text-[13px] leading-[1.5] text-ink-2"><b className="text-ink">Hand-off:</b> deliver to the family yourself (we'll connect you privately), or drop off at {s?.dropoffLocation ?? 'our drop-off site'} by {deadline}, {(s?.dropoffHours ?? '').replace(/\.$/, '')}.</div>
+                  <div className="mt-3 text-[13px] leading-[1.5] text-ink-2"><b className="text-ink">Hand-off:</b> drop off your wrapped and labeled gifts at {s?.dropoffLocation ?? 'Durfee Elementary-Middle School'} by {deadline}, {(s?.dropoffHours ?? '').replace(/\.$/, '')}, and we’ll deliver them to your adopted family.</div>
                 </div>
               </div>
               <div>

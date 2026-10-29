@@ -8,7 +8,7 @@ export function Logo({ className, to = '/', light }: { className?: string; to?: 
     <Link to={to} className={cx('inline-flex items-center gap-2.5 no-underline', light ? 'text-white' : 'text-ink', className)}>
       <img src="/brand/konnection-logo.png" alt="The Konnection" className="block h-[30px] w-auto" />
       <span className={cx('h-[18px] w-px', light ? 'bg-white/30' : 'bg-line')} />
-      <span className="text-[14px] font-semibold">Bless This Family</span>
+      <span className="text-[14px] font-semibold">Bless-A-Family</span>
     </Link>
   );
 }
@@ -52,11 +52,11 @@ export function FamilyArt({ art, photoUrl, className, children, alt = '' }: { ar
 }
 
 /** Photo with graceful gradient fallback (for Konnection photography on the landing page). */
-export function Photo({ src, alt, className, fallback = 'linear-gradient(135deg,#c9b8ff,#6c22dd)' }: { src: string; alt: string; className?: string; fallback?: string }) {
+export function Photo({ src, alt, className, position, fallback = 'linear-gradient(135deg,#c9b8ff,#6c22dd)' }: { src: string; alt: string; className?: string; /** CSS object-position, e.g. "50% 25%" to keep faces in a wide crop. */ position?: string; fallback?: string }) {
   const [broken, setBroken] = useState(false);
   return (
     <div className={cx('relative overflow-hidden', className)} style={{ background: fallback }}>
-      {!broken && <img src={src} alt={alt} onError={() => setBroken(true)} className="absolute inset-0 size-full object-cover" />}
+      {!broken && <img src={src} alt={alt} onError={() => setBroken(true)} className="absolute inset-0 size-full object-cover" style={position ? { objectPosition: position } : undefined} />}
     </div>
   );
 }

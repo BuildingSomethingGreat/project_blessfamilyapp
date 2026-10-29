@@ -15,7 +15,7 @@
 | `ADMIN_EMAILS` | comma-separated admin emails |
 | `ADMIN_PASSCODE` | a team passcode; lets admins sign in before an email provider exists |
 | `RESEND_API_KEY` | API key from resend.com. Turns on every transactional email (claims, check-ins, family updates, team alerts, sign-in links). Without it emails are only written to the log. |
-| `RESEND_EMAIL` | the sender, e.g. `bless@thekonnection.org` (shown as "Bless This Family"), or a full `Name <address>`. Its domain must be verified in Resend. |
+| `RESEND_EMAIL` | the sender, e.g. `bless@thekonnection.org` (shown as "Bless-A-Family"), or a full `Name <address>`. Its domain must be verified in Resend. |
 | `EMAIL_REPLY_TO` | optional; replies go here. Defaults to the contact email in Admin → Settings. |
 | `ANTHROPIC_API_KEY` | optional, enables the admin assistant |
 

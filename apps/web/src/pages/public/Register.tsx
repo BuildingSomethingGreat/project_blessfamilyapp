@@ -19,7 +19,7 @@ const label = 'text-[13px] font-semibold text-ink-2';
 
 function buildSteps(a: Ans, askPhoto: boolean): Step[] {
   const s: Step[] = [
-    { t: 'welcome', title: 'Tell us about your family.', help: "Bless This Family matches Konnection households with Holiday Konnectors who shop your children's wish lists. Answer a few questions and we'll take it from there." },
+    { t: 'welcome', title: 'Tell us about your family.', help: "Bless-A-Family matches Konnection households with Holiday Konnectors who shop your children's wish lists. Answer a few questions and we'll take it from there." },
     { t: 'text', key: 'guardian', kicker: 'About you', title: "What's your name?", help: 'Parent or guardian. Holiday Konnectors never see this.', ph: 'First and last name' },
     { t: 'text', key: 'phone', kicker: 'About you', title: 'Best number to reach you?', help: 'So our team can reach you about your application or gift delivery.', ph: '(313) 555-0100', type: 'tel' },
     { t: 'choice', key: 'contact', kicker: 'About you', title: 'How do you prefer we reach you?', opts: CONTACT_METHODS },

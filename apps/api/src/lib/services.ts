@@ -144,7 +144,7 @@ export class Services {
       const now = nowIso();
       const next = nextFollowUp('Claimed', settings);
       const s = await this.store.createSponsorship({
-        sponsorshipId: `SP-${settings.season}-${String(seq).padStart(3, '0')}`, familyId: f.id, sponsorId: sponsor.id, status: 'Claimed', token: newToken(), handoff: req.handoff, claimedAt: now,
+        sponsorshipId: `SP-${settings.season}-${String(seq).padStart(3, '0')}`, familyId: f.id, sponsorId: sponsor.id, status: 'Claimed', token: newToken(), handoff: 'Drop off' /* staff switch trusted Konnectors to direct delivery */, claimedAt: now,
         shoppingAt: null, purchasedAt: null, wrappedAt: null, droppedOffAt: null, deliveredAt: null, releasedAt: null, nextFollowUpAt: next ? next.toISOString() : null, lastNudgedAt: null,
         lastResponseAt: null, followUpCount: 0, flagged: false, flagReason: '', releaseReason: '', sponsorNote: req.note, adminNotes: forThisFamily.join('\n'),
       });

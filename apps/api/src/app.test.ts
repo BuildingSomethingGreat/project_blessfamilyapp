@@ -125,13 +125,18 @@ test('a duplicate claim written by another instance loses to the earlier one', a
   assert.ok(mine.every((s) => s.status === 'Released'), 'the later duplicate is released');
 });
 
-test('claim records hand-off choice and wall opt-in; the wall only shows names after hand-off', async () => {
+test('claims start as drop-off (staff can allow direct delivery) and record wall opt-in; the wall only shows names after hand-off', async () => {
   const taken = new Set((await store.listSponsorships({ status: ['Claimed'] })).map((s) => s.familyId));
   const fresh = (await store.listFamilies({ status: ['Available'] })).find((f) => !taken.has(f.id))!;
   const res = await (await post(`/api/families/${fresh.slug}/claim`, { name: 'Wanda Wall', email: 'wanda@example.com', agree: true, emailConsent: true, handoff: 'Deliver directly', wallOptIn: true, displayName: 'The Wall Family' })).json();
   assert.ok(res.token, JSON.stringify(res));
   const sp = (await store.getSponsorshipByToken(res.token))!;
-  assert.equal(sp.handoff, 'Deliver directly');
+  assert.equal(sp.handoff, 'Drop off', 'public claims are always drop-off; staff choose who may deliver directly');
+  const req = await json(await post('/api/admin/auth/request', { email: 'admin@example.com' }));
+  const verify = await post('/api/admin/auth/verify', { token: new URL(req.body.devLink).searchParams.get('token')! });
+  const admin = { cookie: verify.headers.get('set-cookie')!.split(';')[0], 'content-type': 'application/json' };
+  const switched = await json(await app.request(`/api/admin/sponsorships/${sp.id}`, { method: 'PATCH', body: JSON.stringify({ handoff: 'Deliver directly' }), headers: admin }));
+  assert.equal(switched.body.handoff, 'Deliver directly');
   const before = await (await app.request('/api/community')).json();
   assert.ok(!before.wall.some((w: any) => w.name === 'The Wall Family'), 'not on the wall before gifts are handed off');
   for (const status of ['Shopping', 'Purchased', 'Wrapped', 'Dropped Off']) assert.equal((await post(`/api/sponsor/${res.token}/status`, { status })).status, 200);

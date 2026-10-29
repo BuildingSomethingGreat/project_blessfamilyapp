@@ -12,14 +12,14 @@ type Block = string | string[];
 type Section = { id: string; title: string; body: Block[] };
 
 /**
- * Privacy Policy and Terms of Use for Bless This Family, operated by The Konnection.
+ * Privacy Policy and Terms of Use for Bless-A-Family, operated by The Konnection.
  * Written to match what the app actually does (see docs/DECISIONS.md "Legal page").
  * Keep it in sync when data handling changes: new fields, new vendors, new public surfaces.
  */
 function privacy(contact: string): Section[] {
   return [
     { id: 'p-who', title: 'Who we are', body: [
-      'Bless This Family is a holiday gift program run by The Konnection, a nonprofit organization based in Detroit, Michigan. This policy explains what information the program collects on this website, how we use it, and the choices you have. "We," "us" and "our" mean The Konnection.',
+      'Bless-A-Family is a holiday gift program run by The Konnection, a nonprofit organization based in Detroit, Michigan. This policy explains what information the program collects on this website, how we use it, and the choices you have. "We," "us" and "our" mean The Konnection.',
       `Questions about your information go to Sharnese at ${contact}.`,
     ] },
     { id: 'p-collect', title: 'What we collect', body: [
@@ -89,7 +89,7 @@ function privacy(contact: string): Section[] {
 function terms(contact: string): Section[] {
   return [
     { id: 't-agree', title: 'Using this site', body: [
-      'These terms apply when you use the Bless This Family website, run by The Konnection. By applying as a family, choosing a family, chipping in or sharing a quote, you agree to these terms and to our Privacy Policy above. If you do not agree, please do not use the site.',
+      'These terms apply when you use the Bless-A-Family website, run by The Konnection. By applying as a family, choosing a family, chipping in or sharing a quote, you agree to these terms and to our Privacy Policy above. If you do not agree, please do not use the site.',
     ] },
     { id: 't-program', title: 'How the program works', body: [
       'Families in The Konnection’s programs share their children’s holiday wishes. Volunteers we call Holiday Konnectors choose a family, buy and wrap the gifts, and hand them off through The Konnection. We work hard to match every family, but we cannot promise that every family will be chosen or that every wish will be filled.',
@@ -200,7 +200,7 @@ export default function Legal() {
     <div className={`${shell} anim-rise`}>
       <div className="mx-auto max-w-[1080px]">
         <header className="max-w-[720px]">
-          <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">The Konnection · Bless This Family</div>
+          <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">The Konnection · Bless-A-Family</div>
           <h1 className="mt-2 text-[clamp(38px,6vw,64px)] font-extrabold leading-[.98] tracking-[-.05em]">Privacy & Terms</h1>
           <p className="mt-4 text-[17px] leading-[1.55] text-ink-2">Plain-language rules for a program built on trust. Families share a lot with us, so we share as little as possible.</p>
           <div className="mt-4 text-[13px] text-ink-3">Effective {EFFECTIVE} · Questions: <a href={`mailto:${contact}`} className="font-semibold text-pri">{contact}</a></div>
@@ -209,7 +209,7 @@ export default function Legal() {
         <div className="mt-7 grid gap-3 sm:grid-cols-3">
           {[
             ['We never publish', 'Parent names, last names, addresses, phone numbers, emails or schools.'],
-            ['We never sell', 'Your information is used only to run Bless This Family.'],
+            ['We never sell', 'Your information is used only to run Bless-A-Family.'],
             ['You stay in control', 'Ask us to see, fix or delete your information anytime.'],
           ].map(([h, b]) => (
             <div key={h} className="rounded-[24px] bg-soft p-5">
@@ -231,7 +231,7 @@ export default function Legal() {
           <div className="grid min-w-0 gap-6">
             <Part id="privacy" kicker="Privacy Policy" title="How we handle your information." intro="What we collect from families, Holiday Konnectors and visitors, why we need it, and who can see it." sections={p} />
             <Part id="terms" kicker="Terms of Use" title="How we take part, together." intro="What we ask of everyone who uses this site: families, Holiday Konnectors and donors." sections={t} />
-            <p className="text-center text-[13px] text-ink-3">Back to <Link to="/" className="font-semibold text-ink">Bless This Family</Link></p>
+            <p className="text-center text-[13px] text-ink-3">Back to <Link to="/" className="font-semibold text-ink">Bless-A-Family</Link></p>
           </div>
         </div>
       </div>

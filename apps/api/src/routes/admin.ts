@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { FamilyStatusSchema, nicknameProblem, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
+import { FamilyStatusSchema, HANDOFFS, nicknameProblem, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { isAdminEmail, loginToken, sessionToken, verifyToken, SESSION_COOKIE } from '../lib/auth.ts';
@@ -128,7 +128,7 @@ export function adminRoutes(services: Services) {
     const sm = new Map(sponsors.map((s) => [s.id, s]));
     return c.json(sps.map((s) => { const f = fm.get(s.familyId); return { ...s, family: f ? { familyId: f.familyId, nickname: toPublicFamily(f).nickname, childCount: f.children.length, slug: f.slug, id: f.id } : null, sponsor: sm.get(s.sponsorId) ?? null }; }).sort((a, b) => b.claimedAt.localeCompare(a.claimedAt)));
   });
-  const SpPatch = z.object({ status: SponsorshipStatusSchema.optional(), adminNotes: z.string().max(5000).optional(), flagged: z.boolean().optional(), flagReason: z.string().max(300).optional(), reason: z.string().max(300).optional() });
+  const SpPatch = z.object({ status: SponsorshipStatusSchema.optional(), handoff: z.enum(HANDOFFS).optional(), adminNotes: z.string().max(5000).optional(), flagged: z.boolean().optional(), flagReason: z.string().max(300).optional(), reason: z.string().max(300).optional() });
   r.patch('/sponsorships/:id', async (c) => {
     const s = await store.getSponsorship(c.req.param('id'));
     if (!s) throw new HttpError(404, 'Not found');
@@ -140,6 +140,7 @@ export function adminRoutes(services: Services) {
     }
     const rest: Record<string, unknown> = {};
     if (patch.adminNotes !== undefined) rest.adminNotes = patch.adminNotes;
+    if (patch.handoff) rest.handoff = patch.handoff;
     if (patch.flagged !== undefined) { rest.flagged = patch.flagged; rest.flagReason = patch.flagged ? patch.flagReason ?? 'Flagged by admin' : ''; }
     if (Object.keys(rest).length) out = await store.updateSponsorship(s.id, rest);
     await store.logActivity({ type: 'admin_action', channel: 'system', familyId: s.familyId, sponsorshipId: s.id, subject: `${c.get('admin')} updated ${s.sponsorshipId}`, body: '', meta: { patch }, occurredAt: nowIso() });

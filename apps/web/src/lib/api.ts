@@ -64,7 +64,7 @@ export const api = {
     family: (id: string) => req<AdminFamilyDetail>(`/admin/families/${id}`),
     patchFamily: (id: string, body: Partial<{ status: FamilyStatus; adminNotes: string; storyApproved: boolean; photoApproved: boolean; photoPrivate: boolean; nickname: string; familyStory: string; goal: number }>) => patch<AdminFamily>(`/admin/families/${id}`, body),
     sponsorships: () => req<AdminSponsorship[]>('/admin/sponsorships'),
-    patchSponsorship: (id: string, body: Partial<{ status: SponsorshipStatus; adminNotes: string; flagged: boolean; flagReason: string; reason: string }>) => patch<Sponsorship>(`/admin/sponsorships/${id}`, body),
+    patchSponsorship: (id: string, body: Partial<{ status: SponsorshipStatus; handoff: 'Drop off' | 'Deliver directly'; adminNotes: string; flagged: boolean; flagReason: string; reason: string }>) => patch<Sponsorship>(`/admin/sponsorships/${id}`, body),
     nudge: (id: string, message?: string) => post<{ ok: boolean; subject?: string; text?: string; error?: string }>(`/admin/sponsorships/${id}/nudge`, { message }),
     emailFamily: (id: string, message: string) => post<{ ok: boolean; subject?: string; error?: string }>(`/admin/families/${id}/email`, { message }),
     emails: (limit = 400) => req<EmailLogRow[]>(`/admin/emails?limit=${limit}`),
@@ -86,9 +86,10 @@ export const api = {
 
 /** Konnection photography used on the landing page (from thekonnection.org). Swap for local files in /public/photos when available. */
 export const PHOTOS = {
-  hero: 'https://static.wixstatic.com/media/96402c_ceb1e7fea4fd4c98b4bfbb8975d90b5c~mv2.png/v1/fill/w_853,h_867,al_c,q_90,enc_auto/photo.png',
+  /** Landing hero band (wide crop of a portrait photo, so `position` keeps the faces in frame). */
+  hero: { src: '/photos/campaign/basketball.webp', alt: 'Two smiling kids with their new gifts at last season’s Bless-A-Family hand-out', position: '50% 24%' },
   stats: 'https://static.wixstatic.com/media/96402c_66b742f7eaa248e4b2a0c7fb5a765099~mv2.png/v1/fill/w_826,h_836,al_c,q_90,enc_auto/p.png',
-  /** Kids with their gifts at the last Bless This Family hand-out (shared by The Konnection). */
+  /** Kids with their gifts at the last Bless-A-Family hand-out (shared by The Konnection). */
   campaign: [
     { src: '/photos/campaign/gel-blaster.webp', alt: 'A smiling boy in reindeer antlers holds up his new gel blaster' },
     { src: '/photos/campaign/magnetic-tiles.webp', alt: 'A girl in green antlers shows off a box of magnetic building tiles' },

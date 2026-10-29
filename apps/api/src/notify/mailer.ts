@@ -28,10 +28,10 @@ export const parseEmails = (v: string) => [...new Set(v.split(/[,;\s]+/).map((e)
 export const alertRecipients = (s: SeasonSettings) => { const list = parseEmails(s.alertEmails ?? ''); return list.length ? list : config.adminEmails; };
 
 const REASONS: Record<Audience, string> = {
-  konnector: 'You are getting this because you chose a family through Bless This Family.',
-  family: 'You are getting this because your family applied to Bless This Family.',
-  admin: 'You are getting this because you are on the Bless This Family admin team.',
-  test: 'This is a test message from Bless This Family.',
+  konnector: 'You are getting this because you chose a family through Bless-A-Family.',
+  family: 'You are getting this because your family applied to Bless-A-Family.',
+  admin: 'You are getting this because you are on the Bless-A-Family admin team.',
+  test: 'This is a test message from Bless-A-Family.',
 };
 
 /**

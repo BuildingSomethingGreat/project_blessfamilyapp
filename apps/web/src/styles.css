@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* ---------- Bless This Family · v3 design tokens (The Konnection purple) ---------- */
+/* ---------- Bless-A-Family · v3 design tokens (The Konnection purple) ---------- */
 @theme {
   --font-display: 'Poppins', system-ui, sans-serif;
   --font-sans: 'Poppins', system-ui, -apple-system, sans-serif;

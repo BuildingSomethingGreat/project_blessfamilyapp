@@ -16,6 +16,7 @@ export default function Landing() {
   const community = useQuery({ queryKey: ['community'], queryFn: api.community, staleTime: 60_000 });
   const latest = community.data?.wall[0];
   const contact = settings.data?.contactEmail ?? 'sharnese@thekonnection.org';
+  const dropoff = settings.data?.dropoffLocation || 'Durfee Elementary-Middle School';
   const counts = catalog.data?.counts ?? { available: 0, claimed: 0, fulfilled: 0, kids: 0 };
   const blessed = counts.claimed + counts.fulfilled;
   const blessedPct = Math.round((blessed / Math.max(1, blessed + counts.available)) * 100);
@@ -26,7 +27,7 @@ export default function Landing() {
   const [faq, setFaq] = useState(0);
   const FAQ: [string, string][] = [
     ['What is a Holiday Konnector?', 'Anyone who chooses a Konnection family and shops their children’s wish lists: individuals, families, churches, teams and companies.'],
-    ['Do I pay through this site?', 'No. Holiday Konnectors shop the wish lists themselves, then deliver the gifts to the family or drop them off with us. If you’d rather give money, you can chip in toward a family or give to the general fund.'],
+    ['Do I pay through this site?', 'No. Holiday Konnectors shop the wish lists themselves and drop the wrapped gifts off with us, and we deliver them to the family. If you’d rather give money, you can chip in toward a family or give to the general fund.'],
     ['How much does it cost to sponsor a child?', 'How much you spend is entirely up to you! Sponsors typically spend $100–$250 per child. If you sponsor a family with multiple children, we ask that you purchase the same number of gifts for each child so every child feels equally celebrated.'],
     ["What if I can't follow through?", 'We understand that plans can change. If you’re unable to fulfill your sponsorship, please let us know at least 10 days before the gift deadline, whenever possible, so we have time to find another sponsor. Tap “I can no longer sponsor” on your family page to notify us and make the family available for another sponsor.'],
     ['Who are the families?', "Households already connected to The Konnection's programs. Every application is reviewed by staff before it appears here."],
@@ -66,7 +67,7 @@ export default function Landing() {
             ))}
           </h1>
           <p className="anim-fade-up pretty mx-auto mt-5 max-w-[600px] text-[clamp(16px,1.4vw,19px)] leading-[1.55] text-ink-4" style={{ ['--d' as string]: '0.75s' }}>
-            Choose a Konnection family and shop the children’s wish lists. Deliver your gifts directly to the family, or drop them off with us and we’ll handle delivery. We’ll guide you every step of the way.
+            Choose a Konnection family and shop the children’s wish lists. Drop off your wrapped and labeled gifts at {dropoff}, and we’ll deliver them to your adopted family. We’ll send friendly reminders along the way!
           </p>
           <div className="anim-fade-up mt-8 flex flex-wrap justify-center gap-2.5" style={{ ['--d' as string]: '0.9s' }}>
             <Link to="/families"><ArrowButton>Find a family</ArrowButton></Link>
@@ -83,7 +84,7 @@ export default function Landing() {
       <section className="anim-fade-up px-4 pt-[clamp(48px,6vw,72px)] sm:px-8" style={{ ['--d' as string]: '1.15s' }}>
         <div className="relative mx-auto max-w-[1180px]">
           <div className="band-in relative h-[clamp(340px,46vw,580px)] overflow-hidden rounded-[36px] bg-lav">
-            <div className="parallax-img absolute inset-0"><Photo src={PHOTOS.hero} alt="Konnection youth" className="size-full" /></div>
+            <div className="parallax-img absolute inset-0"><Photo src={PHOTOS.hero.src} alt={PHOTOS.hero.alt} position={PHOTOS.hero.position} className="size-full" /></div>
             <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(29,17,51,.35), rgba(29,17,51,0) 45%)' }} />
           </div>
           <div className="float-a pointer-events-none absolute bottom-[clamp(12px,3vw,32px)] left-[clamp(12px,3vw,32px)] w-[min(270px,44%)]">
@@ -138,7 +139,7 @@ export default function Landing() {
                 <Row label={<><b>Boots</b> · Toddler 11</>} />
               </div>
             </HowCard>
-            <HowCard n="03" title={`Hand off by ${deadlineShort}`} body={`Deliver directly to the family, or drop off at ${settings.data?.dropoffLocation ?? 'our drop-off site'} and we deliver. Friendly reminders along the way.`} dark late>
+            <HowCard n="03" title={`Hand off by ${deadlineShort}`} body={`Drop off your wrapped and labeled gifts at ${dropoff}, and we’ll deliver them to your adopted family. We’ll send friendly reminders along the way!`} dark late>
               <div className="flex h-[220px] flex-col justify-center gap-2.5 rounded-[22px] bg-white/6 p-[22px]">
                 <div className="max-w-[85%] self-start rounded-[16px_16px_16px_4px] bg-white px-3 py-2.5 text-[12px] leading-[1.45] text-ink">12 days to go! Wrap each gift and label it with the child's name. Thank you, Holiday Konnector!</div>
                 <div className="self-end rounded-[16px_16px_4px_16px] bg-lav px-3 py-2.5 text-[12px] font-semibold text-ink">Gifts handed off ✓</div>
@@ -157,11 +158,12 @@ export default function Landing() {
           <div className="reveal-late flex flex-col justify-center p-[clamp(8px,2vw,24px)]">
             <div><SectionPill>Why it matters</SectionPill></div>
             <h2 className="balance mt-4 text-[clamp(32px,4vw,52px)] leading-[1.05] tracking-[-.045em]">Every child deserves to feel seen, loved, and celebrated.</h2>
-            <p className="mt-4 max-w-[520px] text-base leading-[1.6] text-ink-4">The Konnection helps Detroit youth stay connected to school through mentoring, essential resources and unforgettable experiences. Bless This Family brings that care home for the holidays. These are a few of the kids our Holiday Konnectors blessed last season.</p>
+            <p className="mt-4 max-w-[520px] text-base leading-[1.6] text-ink-4">At The Konnection, we show up for Detroit students and their families all year long. Bless-A-Family extends that care into the holiday season—connecting families with generous people who help fulfill children’s wishes and ease the pressure on parents.</p>
+            <p className="mt-3 max-w-[520px] text-base leading-[1.6] text-ink-4">As a Holiday Konnector, you’re giving more than gifts. You’re reminding a family that their community is in their corner.</p>
             <div className="mt-8 grid grid-cols-3 gap-3">
-              <BigStat value="700+" label="youth impacted" />
-              <BigStat value="4,000+" label="resources distributed" />
-              <BigStat value={String(counts.kids)} label="kids on this year's list" pri />
+              <BigStat value="136" label="Children Celebrated" />
+              <BigStat value="1,600+" label="Gifts Distributed" />
+              <BigStat value="75+" label="Holiday Konnectors" pri />
             </div>
           </div>
         </div>
@@ -293,7 +295,7 @@ function CampaignCollage() {
         <div className={cx(tile, 'aspect-[3/4] -rotate-[1deg]')}><Photo src={d.src} alt={d.alt} className={img} /></div>
       </div>
       <figcaption className="pointer-events-none absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/70 bg-white/88 px-4 py-2 text-[12px] font-semibold text-ink shadow-soft backdrop-blur-[10px]">
-        <span className="mr-1.5 inline-block size-2 rounded-full bg-pri align-middle" />Bless This Family, last season
+        <span className="mr-1.5 inline-block size-2 rounded-full bg-pri align-middle" />Bless-A-Family, last season
       </figcaption>
     </figure>
   );
