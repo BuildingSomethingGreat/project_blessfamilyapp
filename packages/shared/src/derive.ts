@@ -76,16 +76,42 @@ const NICK_WORDS: Record<string, string> = {
   'Educational Games': 'Explorers',
 };
 
-/** Friendly, non-identifying display name derived from the kids' interests. */
-export function deriveNickname(children: Child[], seed: string): string {
+const NICK_ADJECTIVES = ['Bright', 'Merry', 'Kind', 'Curious', 'Cozy', 'Hopeful', 'Golden', 'Brave', 'Jolly', 'Joyful', 'Sunny', 'Starry'];
+type NickSource = Pick<Child, 'giftTypes' | 'hobbies'>;
+
+/**
+ * Friendly, non-identifying display name derived from the kids' interests ("The Merry Builders").
+ * `variant` 0 is the default; other values give the alternatives behind the "Shuffle" button.
+ */
+export function deriveNickname(children: NickSource[], seed: string, variant = 0): string {
   const counts = new Map<string, number>();
   for (const c of children) for (const g of c.giftTypes) counts.set(g, (counts.get(g) ?? 0) + 1);
-  const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).find(([g]) => NICK_WORDS[g]);
-  const hobby = children.map((c) => c.hobbies).find(Boolean);
-  const word = top ? NICK_WORDS[top[0]] : hobby ? `${hobby.split(/[,\s]+/)[0].replace(/^\w/, (m) => m.toUpperCase())} Family` : 'Family';
+  const words = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => NICK_WORDS[g]).filter((w): w is string => !!w);
+  const hobby = children.map((c) => c.hobbies).find(Boolean)?.split(/[,\s]+/)[0]?.replace(/[^\p{L}]/gu, '');
+  if (hobby && hobby.length >= 3) words.push(`${hobby.replace(/^\p{L}/u, (m) => m.toUpperCase())} Family`);
+  if (!words.length) words.push('Family');
   const hash = [...seed].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const adj = ['Bright', 'Merry', 'Kind', 'Curious', 'Cozy', 'Hopeful', 'Golden', 'Brave'][hash % 8];
+  const adjs = variant === 0 ? NICK_ADJECTIVES.slice(0, 8) : NICK_ADJECTIVES; // variant 0 keeps names stable for existing families
+  const adj = adjs[(hash + variant * 5) % adjs.length];
+  const word = words[variant % words.length];
   return `The ${adj} ${word}`;
+}
+
+/**
+ * Nicknames are public, so they must not identify the family. Returns a message to show, or null if
+ * the nickname is fine. Checks length, characters, the parent's name, the children's last names and
+ * long numbers (addresses, phone numbers). Children's first names are already public and are allowed.
+ */
+export function nicknameProblem(nickname: string, priv: { guardianName?: string; childNames?: string[] } = {}): string | null {
+  const n = nickname.trim();
+  if (n.length < 3 || n.length > 40) return 'Keep the nickname between 3 and 40 characters.';
+  if (!/^[\p{L}\p{N} '’&.,!-]+$/u.test(n)) return 'Use letters, numbers and spaces only.';
+  if (/\d{3,}/.test(n)) return 'Please leave out numbers like an address or phone number.';
+  const words = new Set(n.toLowerCase().split(/[^\p{L}]+/u).filter(Boolean));
+  const parent = (priv.guardianName ?? '').toLowerCase().split(/[^\p{L}]+/u).filter((w) => w.length >= 3);
+  const lastNames = (priv.childNames ?? []).flatMap((c) => c.toLowerCase().split(/[^\p{L}]+/u).filter(Boolean).slice(1)).filter((w) => w.length >= 3);
+  if ([...parent, ...lastNames].some((w) => words.has(w))) return "Please leave out last names and the parent's name. Holiday Konnectors see this nickname.";
+  return null;
 }
 
 export function toPublicChild(c: Child): PublicChild {

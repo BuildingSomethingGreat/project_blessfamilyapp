@@ -93,6 +93,7 @@
 @keyframes festiveDrift { 0% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(6px, 14px) rotate(14deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
 @keyframes festiveHover { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @keyframes festiveTwinkle { 0%, 100% { transform: scale(1); opacity: var(--tw, .5); } 50% { transform: scale(1.25); opacity: calc(var(--tw, .5) * 1.6); } }
+@keyframes dealCard { from { opacity: 0; transform: translate(calc(var(--tx) * .2), 70vh) rotate(calc(var(--rot) * -2.5)) scale(1.15); } 70% { opacity: 1; } to { opacity: 1; transform: translate(var(--tx), var(--ty)) rotate(var(--rot)); } }
 @keyframes loaderWord { from { opacity: 0; filter: blur(10px); transform: translateY(30px); } to { opacity: 1; filter: blur(0); transform: none; } }
 
 .anim-rise { animation: rise .45s var(--ease-out-expo) both; }
@@ -103,6 +104,8 @@
 .word-clip { display: inline-block; overflow: clip; overflow-clip-margin: .25em; vertical-align: top; padding: .06em .04em .14em; margin: -.06em -.04em -.14em; }
 .word-in { display: inline-block; animation: wordIn 1s var(--ease-out-expo) both; animation-delay: calc(var(--hd, 0s) + var(--d, 0s)); }
 .loader-word { display: inline-block; animation: loaderWord .9s var(--ease-out-expo) both; }
+.loader-card { transform: translate(var(--tx), var(--ty)) rotate(var(--rot)); animation: dealCard .85s var(--ease-out-expo) both; }
+@media (prefers-reduced-motion: reduce) { .loader-card { animation: none; } }
 .drift { animation: drift 18s ease-in-out infinite; }
 .pulse-dot { animation: pulseDot 1.6s ease-out infinite; }
 .blink { animation: blink 1s infinite; }

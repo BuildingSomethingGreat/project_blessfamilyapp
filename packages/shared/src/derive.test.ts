@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toPublicFamily, deriveNickname, colorToHex } from './derive.ts';
+import { toPublicFamily, deriveNickname, nicknameProblem, colorToHex } from './derive.ts';
 import { canTransition } from './status.ts';
 import { ChildInputSchema, FamilyApplicationSchema } from './schemas.ts';
 import type { Family, Child } from './types.ts';
@@ -78,4 +78,23 @@ test('application requires eligibility and valid zip', () => {
   assert.ok(FamilyApplicationSchema.safeParse(app).success);
   assert.ok(!FamilyApplicationSchema.safeParse({ ...app, zip: '4820' }).success);
   assert.ok(!FamilyApplicationSchema.safeParse({ ...app, eligibilityConfirmed: false }).success);
+});
+
+test('nickname variants give different names and variant 0 stays stable', () => {
+  const kids = [child(), { ...child(), giftTypes: ['Books'] as any, hobbies: 'soccer, drawing' }];
+  const names = new Set(Array.from({ length: 8 }, (_, i) => deriveNickname(kids, 'seed', i)));
+  assert.ok(names.size >= 5, [...names].join(' | '));
+  assert.equal(deriveNickname(kids, 'seed', 0), deriveNickname(kids, 'seed'));
+  for (const n of names) assert.equal(nicknameProblem(n, { guardianName: 'Dana Whitfield', childNames: ['Ava Whitfield'] }), null, n);
+});
+
+test('nicknames cannot identify the family', () => {
+  const priv = { guardianName: 'Dana Whitfield', childNames: ['Ava Whitfield', 'Leo'] };
+  assert.equal(nicknameProblem('The Cozy Readers', priv), null);
+  assert.equal(nicknameProblem('Team Ava & Leo', priv), null, 'kids first names are already public');
+  assert.match(nicknameProblem('The Whitfield Crew', priv)!, /last names/);
+  assert.match(nicknameProblem('Dana and the kids', priv)!, /parent/);
+  assert.match(nicknameProblem('The 4521 Elm Family', priv)!, /numbers/);
+  assert.match(nicknameProblem('Hi', priv)!, /between/);
+  assert.match(nicknameProblem('<script>', priv)!, /letters/);
 });

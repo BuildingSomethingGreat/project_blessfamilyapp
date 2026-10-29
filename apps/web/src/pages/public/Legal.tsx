@@ -43,7 +43,7 @@ function privacy(contact: string): Section[] {
       'To keep the program safe, prevent fraud and meet legal obligations.',
     ]] },
     { id: 'p-public', title: 'What is public, and what never is', body: [
-      'An approved family profile shows a made-up family nickname, your city, each child’s first name, age, sizes and wishes. Your family story and photo appear only after our team approves them, and never if you mark the photo staff-only.',
+      'An approved family profile shows a family nickname (one we suggest from your kids\u2019 interests, or one you choose, never including last names), your city, each child’s first name, age, sizes and wishes. Your family story and photo appear only after our team approves them, and never if you mark the photo staff-only.',
       'We never publish parent or guardian names, last names, home addresses, phone numbers, email addresses or school names.',
       'A Holiday Konnector’s name appears on the thank-you wall only if they opt in, only after their gifts are handed off, and only as the name they choose. Quotes appear only after our team approves them, with the credit name you gave. Our team can hide any name or quote at any time.',
     ] },
@@ -97,7 +97,7 @@ function terms(contact: string): Section[] {
     { id: 't-families', title: 'For families', body: [[
       'You must be a parent or legal guardian, 18 or older, and part of The Konnection’s programs. Every child you list must live in your household.',
       'The information you give must be true and current. Tell us if it changes.',
-      'Our team reviews every application and may ask for more information, edit a story to protect your privacy, or decline an application.',
+      'Our team reviews every application and may ask for more information, edit a story or nickname to protect your privacy, or decline an application.',
       'Gifts are given freely by volunteers. There is no cost to families, and gifts should not be resold.',
     ]] },
     { id: 't-konnectors', title: 'For Holiday Konnectors', body: [

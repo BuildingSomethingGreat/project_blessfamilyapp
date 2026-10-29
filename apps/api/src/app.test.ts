@@ -259,3 +259,27 @@ test('a signed-in sponsor claiming for another org keeps their account and the d
   assert.match(sp2.adminNotes, /On behalf of: Westside Church/);
   assert.equal((await store.findSponsorByEmail('ellie@example.com'))!.organization, 'Eastside Rotary');
 });
+
+test('families can choose their nickname; admins can change it; neither may identify the family', async () => {
+  const base = {
+    eligibilityConfirmed: true, guardianName: 'Nina Okafor', phone: '313-555-7777', email: '', address: '1 Nick St', city: 'Detroit', state: 'MI', zip: '48202', transportation: 'Yes',
+    children: [{ name: 'Zara Okafor', age: 7, gender: 'Girl', clothingCategory: 'Youth / Kids', shirtSize: '8', pantsSize: '8', shoeCategory: 'Youth / Kids', shoeSize: '1', favoriteColor: 'Pink', giftTypes: ['Books'], clothingWishlist: ['Winter Coat'] }],
+  };
+  const bad = await json(await post('/api/register', { ...base, nickname: 'The Okafor Readers' }, { 'x-forwarded-for': '10.0.2.1' }));
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.error, /last names/);
+  const ok = await json(await post('/api/register', { ...base, nickname: '  The Cozy Bookworms ' }, { 'x-forwarded-for': '10.0.2.2' }));
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  const fam = (await store.getFamilyByCode(ok.body.familyId))!;
+  assert.equal(fam.nickname, 'The Cozy Bookworms');
+  const auto = await json(await post('/api/register', base, { 'x-forwarded-for': '10.0.2.3' }));
+  assert.match((await store.getFamilyByCode(auto.body.familyId))!.nickname, /^The \w+ Readers$/, 'empty nickname gets a suggestion');
+
+  const req = await json(await post('/api/admin/auth/request', { email: 'admin@example.com' }));
+  const verify = await post('/api/admin/auth/verify', { token: new URL(req.body.devLink).searchParams.get('token')! });
+  const admin = { cookie: verify.headers.get('set-cookie')!.split(';')[0], 'content-type': 'application/json' };
+  const rename = (nickname: string) => app.request(`/api/admin/families/${fam.id}`, { method: 'PATCH', body: JSON.stringify({ nickname }), headers: admin });
+  assert.equal((await rename('Nina’s Crew')).status, 400);
+  const good = await json(await rename('The Story Seekers'));
+  assert.equal(good.body.public.nickname, 'The Story Seekers');
+});

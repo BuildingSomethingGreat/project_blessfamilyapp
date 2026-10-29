@@ -70,3 +70,12 @@ Email footers say "Questions? Email {contactName} at {contactEmail}" (Settings â
 `/legal` (also `/privacy`, `/terms`) holds the Privacy Policy and Terms of Use in plain language, written from what the app actually does: the fields we collect, what is public, the vendors (Airtable, Netlify, Resend, Zeffy, Google Fonts, Anthropic for the staff assistant), no analytics or ad trackers, IPs used only in memory for spam and rate limits, Michigan law. The contact is the season contact email (Sharnese). It is linked from the site footers, the claim and registration forms, and every email footer. The text lives in `apps/web/src/pages/public/Legal.tsx`. Update it, and the effective date, whenever data handling changes (new fields, vendors or public surfaces).
 
 Open: have counsel review before launch, especially retention (we say up to three years), tax language (no 501(c)(3) claim or EIN is stated), and whether direct-delivery Konnectors ever receive a family's address.
+
+## Family nicknames
+Every family shows publicly under a nickname. The application suggests one from the kids' gift interests and hobbies ("The Merry Builders"); the family can keep it, shuffle for another, or write their own before submitting. Admins can rename from the review queue or the family page, and the assistant can too. Because the nickname is public, `nicknameProblem` (`packages/shared/src/derive.ts`) rejects the parent's name, the children's last names, runs of 3+ digits (addresses, phone numbers) and unusual characters; the API enforces it on registration and on every rename, and the web field checks it live. Children's first names are already public, so they're allowed. An empty nickname falls back to the suggestion.
+
+## Loading screen
+The once-per-session loader deals last season's campaign photos (`PHOTOS.campaign`) onto the dark "table" like cards, with snow behind and in front, above the "Bless this family." reveal and counter. Reduced-motion users get the cards without the deal animation and no snow.
+
+## Partner logos
+The landing marquee reads `apps/web/public/partners/manifest.json` (filled by `pnpm --filter @bless/web partners:fetch`, which scrapes https://www.thekonnection.org/donate). Until it's filled it shows the combined partner strip from the homepage. Cloud sessions need `www.thekonnection.org` and `static.wixstatic.com` allowed to run the fetch.

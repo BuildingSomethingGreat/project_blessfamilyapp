@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { familyArt, colorSwatch, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
+import { familyArt, colorSwatch, nicknameProblem, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
 import { api } from '@/lib/api';
 import { Button, Chip, Dominoes, FamilyArt, Input, Kicker, Label, Select, Sheet, Skeleton, Textarea, Toggle, useToast } from '@/components/ui';
+import { NicknameField } from '@/components/NicknameField';
 import { cx, fmtDate, fmtDateTime, plural, timeAgo } from '@/lib/format';
 import { Panel, PanelTitle, RELEASE_REASONS, SpStatusChip, StatusChip, copyText } from './shared.tsx';
 
@@ -71,15 +72,17 @@ export default function FamilyDetail() {
           <div className="min-w-0">
             <Kicker>{f.familyId} · {f.city}, {f.state}</Kicker>
             {editingNick ? (
-              <form className="mt-1 flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); patchFamily.mutate({ nickname: nick.trim() }); setEditingNick(false); }}>
-                <Input value={nick} onChange={(e) => setNick(e.target.value)} className="h-11 text-xl font-bold" autoFocus maxLength={80} />
-                <Button type="submit" size="sm" variant="dark">Save</Button>
-                <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingNick(false); setNick(f.public.nickname); }}>Cancel</Button>
+              <form className="mt-1 w-[min(520px,80vw)]" onSubmit={(e) => { e.preventDefault(); if (nicknameProblem(nick, { guardianName: f.guardianName, childNames: f.children.map((k) => k.name) })) return; patchFamily.mutate({ nickname: nick.trim() }); setEditingNick(false); }}>
+                <NicknameField value={nick} onChange={setNick} kids={f.children} seed={f.familyId} priv={{ guardianName: f.guardianName, childNames: f.children.map((k) => k.name) }} size="sm" autoFocus />
+                <div className="mt-2 flex gap-2">
+                  <Button type="submit" size="sm" variant="dark" disabled={!!nicknameProblem(nick, { guardianName: f.guardianName, childNames: f.children.map((k) => k.name) })}>Save</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingNick(false); setNick(f.public.nickname); }}>Cancel</Button>
+                </div>
               </form>
             ) : (
               <button onClick={() => setEditingNick(true)} className="group mt-0.5 flex items-center gap-2 text-left" title="Rename">
                 <h1 className="text-[30px] font-extrabold tracking-[-.045em] sm:text-[36px]">{f.public.nickname}</h1>
-                <span className="text-[12px] text-ink-3 opacity-0 transition-opacity group-hover:opacity-100">edit</span>
+                <span className="rounded-full border border-line px-2.5 py-1 text-[12px] font-semibold text-ink-3 transition-colors group-hover:border-ink group-hover:text-ink">Rename</span>
               </button>
             )}
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-ink-3"><span>{plural(f.children.length, 'child', 'children')}</span><StatusChip status={f.status} /><span>submitted {fmtDate(f.createdAt)}</span></div>

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import type { FamilyStatus } from '@bless/shared';
+import { useState } from 'react';
+import { nicknameProblem, type FamilyStatus } from '@bless/shared';
+import { NicknameField } from '@/components/NicknameField';
 import { api, type AdminFamily } from '@/lib/api';
 import { Button, Chip, FamilyArt, Kicker, Skeleton, useToast } from '@/components/ui';
 import { familyArt } from '@bless/shared';
@@ -15,7 +17,7 @@ export default function Review() {
   const q = useQuery({ queryKey: ['admin', 'families'], queryFn: api.admin.families });
   const patch = useMutation({
     mutationFn: ({ id, body }: { id: string; body: Parameters<typeof api.admin.patchFamily>[1] }) => api.admin.patchFamily(id, body),
-    onSuccess: (_, v) => { if (v.body.status) toast(v.body.status === 'Available' ? 'Published to the catalog' : `Marked ${v.body.status}`, 'ok'); qc.invalidateQueries({ queryKey: ['admin'] }); },
+    onSuccess: (_, v) => { if (v.body.status) toast(v.body.status === 'Available' ? 'Published to the catalog' : `Marked ${v.body.status}`, 'ok'); else if (v.body.nickname) toast('Nickname saved', 'ok'); qc.invalidateQueries({ queryKey: ['admin'] }); },
     onError: (e: Error) => toast(e.message, 'bad'),
   });
   const rows = (q.data ?? []).filter((f) => f.status === 'Submitted' || f.status === 'Needs Info').sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -38,15 +40,28 @@ export default function Review() {
 
 function ReviewCard({ f, onPatch, pending }: { f: AdminFamily; onPatch: (body: Parameters<typeof api.admin.patchFamily>[1]) => void; pending: boolean }) {
   const art = familyArt(f.public.colors);
+  const [renaming, setRenaming] = useState(false);
+  const [nick, setNick] = useState(f.public.nickname);
+  const priv = { guardianName: f.guardianName, childNames: f.children.map((k) => k.name) };
   const needsInfo = f.status === 'Needs Info';
   const toggle = (on: boolean) => cx('h-[34px] flex-none rounded-full border px-3 text-[12px] font-semibold transition-all duration-200', on ? 'border-pri bg-pri text-white' : 'border-line bg-white text-ink hover:border-ink-3');
   const photoNote = !f.photoUrl ? 'No photo submitted.' : f.photoApproved ? 'Will show on the public card.' : 'Check: no faces of minors unless consent box was ticked.';
   return (
-    <div className="grid gap-3.5 rounded-[24px] border border-line bg-white p-[22px]">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-3.5 rounded-[24px] border border-line bg-white p-[22px]">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <Kicker>{f.familyId} · submitted {ago(f.createdAt)}</Kicker>
-          <h3 className="mt-1 text-[24px] tracking-[-.035em]"><Link to={`/admin/families/${f.id}`} className="hover:underline">{f.public.nickname}</Link></h3>
+          {renaming ? (
+            <form className="mt-1.5" onSubmit={(e) => { e.preventDefault(); if (nicknameProblem(nick, priv)) return; onPatch({ nickname: nick.trim() }); setRenaming(false); }}>
+              <NicknameField id={`nick-${f.id}`} value={nick} onChange={setNick} kids={f.children} seed={f.familyId} priv={priv} size="sm" autoFocus />
+              <div className="mt-2 flex gap-2"><Button type="submit" size="xs" variant="dark" disabled={!!nicknameProblem(nick, priv)}>Save</Button><Button type="button" size="xs" variant="ghost" onClick={() => { setRenaming(false); setNick(f.public.nickname); }}>Cancel</Button></div>
+            </form>
+          ) : (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h3 className="text-[24px] tracking-[-.035em]"><Link to={`/admin/families/${f.id}`} className="hover:underline">{f.public.nickname}</Link></h3>
+              <button onClick={() => setRenaming(true)} className="rounded-full border border-line px-2.5 py-1 text-[12px] font-semibold text-ink-3 hover:border-ink hover:text-ink">Rename</button>
+            </div>
+          )}
           <div className="mt-0.5 text-[13px] text-ink-3">{f.public.kidLine} · {f.city}</div>
         </div>
         <Chip tone={needsInfo ? 'warn' : 'soft'} className="flex-none">{f.status}</Chip>

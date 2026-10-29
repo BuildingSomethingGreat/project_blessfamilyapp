@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { FamilyStatusSchema, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
+import { FamilyStatusSchema, nicknameProblem, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { isAdminEmail, loginToken, sessionToken, verifyToken, SESSION_COOKIE } from '../lib/auth.ts';
@@ -101,6 +101,11 @@ export function adminRoutes(services: Services) {
     const f = await store.getFamily(c.req.param('id'));
     if (!f) throw new HttpError(404, 'Not found');
     const patch = FamilyPatch.parse(await c.req.json());
+    if (patch.nickname !== undefined) {
+      patch.nickname = patch.nickname.trim();
+      const issue = patch.nickname ? nicknameProblem(patch.nickname, { guardianName: f.guardianName, childNames: f.children.map((k) => k.name) }) : null;
+      if (issue) throw new HttpError(400, issue);
+    }
     const full: Record<string, unknown> = { ...patch };
     if (patch.status === 'Available' && !f.approvedAt) full.approvedAt = nowIso();
     const updated = await store.updateFamily(f.id, full);

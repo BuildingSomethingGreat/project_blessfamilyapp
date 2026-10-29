@@ -1,4 +1,4 @@
-import { ACTIVE_SPONSORSHIP_STATUSES, deriveNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type CommunityView, type FamilyApplication, type Family, type PublicFamily, type QuoteSubmit, type Sponsor, type SponsorPortalView, type WallEntry } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, deriveNickname, nicknameProblem, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type CommunityView, type FamilyApplication, type Family, type PublicFamily, type QuoteSubmit, type Sponsor, type SponsorPortalView, type WallEntry } from '@bless/shared';
 import type { Store } from '../store/types.ts';
 import { FollowUpEngine, nextFollowUp } from '../followup/engine.ts';
 import { Mailer } from '../notify/mailer.ts';
@@ -51,13 +51,17 @@ export class Services {
   async registerFamily(app: FamilyApplication): Promise<Family> {
     const settings = await this.store.getSettings();
     if (!settings.registrationOpen) throw new HttpError(403, 'Registration is closed for this season.');
+    // A nickname the family chose is public, so it must not identify them (checked before we take a family number).
+    const chosen = app.nickname.trim();
+    const nickIssue = chosen ? nicknameProblem(chosen, { guardianName: app.guardianName, childNames: app.children.map((c) => c.name) }) : null;
+    if (nickIssue) throw new HttpError(400, nickIssue);
     const seq = await this.store.nextFamilySequence(settings.season);
     const code = familyCode(settings.season, seq);
     const children = app.children.map((c, i) => ({ ...c, sortOrder: i }));
     // The photo question can be switched off in admin settings; ignore a stray photo if it is.
     const photo = settings.askFamilyPhoto ? app.photoDataUrl : '';
     const family = await this.store.createFamily({
-      familyId: code, season: settings.season, status: 'Submitted', slug: shortId(), nickname: deriveNickname(children.map((c) => ({ ...c, id: '', familyId: '' })), code),
+      familyId: code, season: settings.season, status: 'Submitted', slug: shortId(), nickname: chosen || deriveNickname(children, code),
       guardianName: app.guardianName, phone: app.phone, email: app.email, preferredContact: app.preferredContact, address: app.address, city: app.city, state: app.state.toUpperCase(),
       zip: app.zip, transportation: app.transportation, familyStory: app.familyStory, storyApproved: false, eligibilityConfirmed: true, notes: app.notes, adminNotes: '',
       photoUrl: '', photoApproved: false, photoPrivate: !!app.photoPrivate, raised: 0, goal: GOAL_PER_CHILD * children.length,

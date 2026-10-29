@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { toPublicFamily, SPONSORSHIP_STATUSES, FAMILY_STATUSES, canTransition, type SponsorshipStatus, type FamilyStatus } from '@bless/shared';
+import { toPublicFamily, nicknameProblem, SPONSORSHIP_STATUSES, FAMILY_STATUSES, canTransition, type SponsorshipStatus, type FamilyStatus } from '@bless/shared';
 import { config } from '../config.ts';
 import type { Services } from '../lib/services.ts';
 import { buildReport } from '../lib/reporting.ts';
@@ -131,7 +131,11 @@ export class AdminAgent {
         if (typeof input.storyApproved === 'boolean') patch.storyApproved = input.storyApproved;
         if (typeof input.photoApproved === 'boolean') patch.photoApproved = input.photoApproved;
         if (input.adminNotes) patch.adminNotes = (f.adminNotes ? f.adminNotes + '\n' : '') + `[${new Date().toLocaleDateString()}] ${input.adminNotes}`;
-        if (input.nickname) patch.nickname = input.nickname;
+        if (input.nickname) {
+          const issue = nicknameProblem(input.nickname, { guardianName: f.guardianName, childNames: f.children.map((k) => k.name) });
+          if (issue) return { result: `Nickname not saved: ${issue}` };
+          patch.nickname = input.nickname.trim();
+        }
         await store.updateFamily(f.id, patch);
         if (input.status === 'Available' && f.status !== 'Available') await followUp.sendToFamily('family_approved', { ...f, ...patch } as any, { actor: 'agent' }).catch(() => {});
         await log(`Agent updated ${f.familyId}: ${Object.keys(patch).join(', ')}`, { familyId: f.id, patch });
