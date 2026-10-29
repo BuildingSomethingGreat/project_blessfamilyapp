@@ -83,11 +83,12 @@ export default function Catalog() {
           <>
             <div className="relative">
               <Deck families={shown} idx={deckIdx} setIdx={setDeckIdx} saved={saved} setSaved={setSaved} open={open} showPhotos={showPhotos} />
-              {/* gifts and a lantern lean over the stage corners; purely decorative, never over the card or the skip/save zones */}
-              <Prop src={FESTIVE.gifts} motion="hover" depth={0.04} className="z-20 -bottom-5 -left-3 hidden w-[clamp(96px,11vw,176px)] sm:block lg:-left-6" />
-              <Prop src={FESTIVE.lantern} motion="hover" delay="-3s" depth={0.06} className="z-20 -bottom-3 -right-2 hidden w-[clamp(56px,6vw,104px)] sm:block lg:-right-4" />
+              {/* gifts and a lantern sit on the stage's bottom corners; decorative only, kept inside the stage so they
+                  never reach the card, the skip/save zones or the Saved row below */}
+              <Prop src={FESTIVE.gifts} motion="hover" depth={0.04} className="z-20 bottom-4 -left-3 hidden w-[clamp(96px,11vw,160px)] sm:block lg:-left-6" />
+              <Prop src={FESTIVE.lantern} motion="hover" delay="-3s" depth={0.06} className="z-20 bottom-8 -right-2 hidden w-[clamp(56px,6vw,96px)] sm:block lg:-right-4" />
             </div>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
+            <div className="relative z-30 mt-5 flex flex-wrap items-center gap-3">
               <div className="text-[15px] font-semibold">Saved <span className="font-medium text-ink-3">· {savedList.length}</span></div>
               {savedList.length === 0 && <span className="text-[13px] text-ink-3">Swipe right on a family to keep them here.</span>}
               {savedList.map((s) => (
