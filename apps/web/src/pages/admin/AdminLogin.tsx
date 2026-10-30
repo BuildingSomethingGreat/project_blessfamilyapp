@@ -58,7 +58,7 @@ export default function AdminLogin() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4 py-10">
       <div className="anim-rise w-full max-w-[440px] rounded-[32px] border border-line bg-white p-[clamp(24px,4vw,40px)]">
-        <div className="flex items-center gap-2.5"><KMark size={32} /><div><div className="text-[14px] font-bold leading-[1.1]">Bless-A-Family</div><div className="text-[10px] font-semibold tracking-[.08em] text-ink-3">ADMIN</div></div></div>
+        <div className="flex items-center gap-2.5"><KMark size={32} /><div><div className="text-[14px] font-bold leading-[1.1]">Bless-a-Family</div><div className="text-[10px] font-semibold tracking-[.08em] text-ink-3">ADMIN</div></div></div>
 
         {state === 'verifying' && (
           <div className="mt-8 flex items-center gap-3 text-ink-2"><span className="size-5 animate-spin rounded-full border-2 border-ink border-t-transparent" /> Signing you in…</div>

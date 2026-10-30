@@ -1,5 +1,5 @@
 const env = (k: string, d = ''): string => process.env[k] ?? d;
-const fromAddress = (v: string) => (v.includes('<') ? v : `Bless-A-Family <${v.trim()}>`);
+const fromAddress = (v: string) => (v.includes('<') ? v : `Bless-a-Family <${v.trim()}>`);
 
 export const config = {
   port: Number(env('PORT', '8787')),
@@ -28,7 +28,7 @@ export const config = {
     driver: (env('NOTIFY_DRIVER') || (env('RESEND_API_KEY') ? 'resend' : 'console')) as 'console' | 'resend',
     resendKey: env('RESEND_API_KEY'),
     /** RESEND_EMAIL is the verified sender, e.g. bless@thekonnection.org (a display name is added if missing). */
-    from: fromAddress(env('RESEND_EMAIL') || env('EMAIL_FROM') || 'bless@thekonnection.org'),
+    from: fromAddress(env('RESEND_EMAIL') || env('EMAIL_FROM') || 'bless@bless-a-family.thekonnection.org'),
     /** Optional fixed reply-to. Empty = the contact email from admin Settings. */
     replyTo: env('EMAIL_REPLY_TO'),
   },

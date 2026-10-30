@@ -6,9 +6,9 @@ import { cx } from '@/lib/format';
 export function Logo({ className, to = '/', light }: { className?: string; to?: string; light?: boolean }) {
   return (
     <Link to={to} className={cx('inline-flex items-center gap-2.5 no-underline', light ? 'text-white' : 'text-ink', className)}>
-      <img src="/brand/konnection-logo.png" alt="The Konnection" className="block h-[30px] w-auto" />
+      <img src="/brand/konnection-logo.png" alt="The Konnection" className="block h-[40px] w-auto" />
       <span className={cx('h-[18px] w-px', light ? 'bg-white/30' : 'bg-line')} />
-      <span className="text-[14px] font-semibold">Bless-A-Family</span>
+      <span className="text-[14px] font-semibold">Bless-a-Family</span>
     </Link>
   );
 }

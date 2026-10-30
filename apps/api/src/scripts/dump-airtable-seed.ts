@@ -1,5 +1,5 @@
 /** Prints the seed dataset as Airtable record payloads (field IDs) for bulk creation. */
-import { deriveNickname } from '@bless/shared';
+import { familyNickname } from '@bless/shared';
 import { SEED_HOUSEHOLDS, SEED_SPONSORS, SEED_SPONSORSHIPS } from '../lib/seed-data.ts';
 import { familyCode, shortId, token } from '../lib/ids.ts';
 
@@ -15,7 +15,7 @@ const families = SEED_HOUSEHOLDS.map((h, i) => {
   const code = familyCode(season, i + 1);
   const kids = h.kids.map((k, j) => ({ ...k, id: '', familyId: '', sortOrder: j }));
   return { fields: strip({
-    [F.id]: code, [F.season]: season, [F.status]: h.status, [F.slug]: shortId(), [F.nickname]: deriveNickname(kids, code), [F.guardian]: h.guardian, [F.phone]: h.phone, [F.email]: h.email,
+    [F.id]: code, [F.season]: season, [F.status]: h.status, [F.slug]: shortId(), [F.nickname]: familyNickname(code), [F.guardian]: h.guardian, [F.phone]: h.phone, [F.email]: h.email,
     [F.contact]: h.preferredContact, [F.address]: h.address, [F.city]: h.city, [F.state]: 'MI', [F.zip]: h.zip, [F.transport]: h.transportation, [F.story]: h.story, [F.storyOk]: h.storyApproved && !!h.story,
     [F.eligible]: true, [F.notes]: h.notes, [F.views]: h.views, [F.starts]: h.claimStarts, [F.approvedAt]: ['Submitted', 'Needs Info'].includes(h.status) ? undefined : daysAgo(Math.max(0, h.createdDaysAgo - 1)),
     [F.fulfilledAt]: h.status === 'Fulfilled' ? daysAgo(3) : undefined, [F.raised]: h.raised ?? 0, [F.goal]: 150 * h.kids.length,

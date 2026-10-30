@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useState } from 'react';
-import { nicknameProblem, type FamilyStatus } from '@bless/shared';
+import { familyNickname, nicknameProblem, type FamilyStatus } from '@bless/shared';
 import { NicknameField } from '@/components/NicknameField';
 import { api, type AdminFamily } from '@/lib/api';
 import { Button, Chip, FamilyArt, Kicker, Skeleton, useToast } from '@/components/ui';
@@ -53,7 +53,7 @@ function ReviewCard({ f, onPatch, pending }: { f: AdminFamily; onPatch: (body: P
           <Kicker>{f.familyId} · submitted {ago(f.createdAt)}</Kicker>
           {renaming ? (
             <form className="mt-1.5" onSubmit={(e) => { e.preventDefault(); if (nicknameProblem(nick, priv)) return; onPatch({ nickname: nick.trim() }); setRenaming(false); }}>
-              <NicknameField id={`nick-${f.id}`} value={nick} onChange={setNick} kids={f.children} seed={f.familyId} priv={priv} size="sm" autoFocus />
+              <NicknameField id={`nick-${f.id}`} value={nick} onChange={setNick} defaultName={familyNickname(f.familyId)} priv={priv} size="sm" autoFocus />
               <div className="mt-2 flex gap-2"><Button type="submit" size="xs" variant="dark" disabled={!!nicknameProblem(nick, priv)}>Save</Button><Button type="button" size="xs" variant="ghost" onClick={() => { setRenaming(false); setNick(f.public.nickname); }}>Cancel</Button></div>
             </form>
           ) : (

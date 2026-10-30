@@ -30,5 +30,5 @@ export function Kicker({ children, className, light }: { children: React.ReactNo
 
 /** The "How it works" style section pill. */
 export function SectionPill({ children }: { children: React.ReactNode }) {
-  return <div className="inline-block rounded-full bg-soft-2 px-3.5 py-1.5 text-[13px] font-semibold text-pri">{children}</div>;
+  return <div className="caps inline-block rounded-full bg-soft-2 px-3.5 py-1.5 text-[13px] font-semibold tracking-[.04em] text-pri">{children}</div>;
 }

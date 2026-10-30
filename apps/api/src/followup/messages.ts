@@ -195,7 +195,7 @@ export function template(ctx: MessageContext): ComposedMessage {
         subject: 'We received your application',
         spec: {
           preheader: `Your family number is ${f.familyId}.`,
-          eyebrow: 'Bless-A-Family',
+          eyebrow: 'Bless-a-Family',
           title: 'We got your application.',
           intro: `Thank you, ${guardian}. Our team reviews every family, usually within two days.`,
           details: [{ label: 'Family number', value: f.familyId }, { label: 'Children', value: kidList(f) }],
@@ -252,7 +252,7 @@ export function konnectorLoginEmail(link: string): ComposedMessage {
       preheader: 'Tap to open your family page. Works for 30 minutes.',
       eyebrow: 'Sign in',
       title: 'Welcome back.',
-      intro: 'Tap below to open your Bless-A-Family account. The link works for 30 minutes.',
+      intro: 'Tap below to open your Bless-a-Family account. The link works for 30 minutes.',
       cta: { label: 'Sign in', url: link },
       note: "Didn't ask for this? You can ignore it. Nobody can sign in without this link.",
     },
@@ -278,10 +278,10 @@ export function adminLoginEmail(link: string): ComposedMessage {
   return {
     subject: 'Your admin sign-in link',
     spec: {
-      preheader: 'Tap to open the Bless-A-Family admin. Works for 15 minutes.',
+      preheader: 'Tap to open the Bless-a-Family admin. Works for 15 minutes.',
       eyebrow: 'Admin',
       title: 'Sign in to admin.',
-      intro: 'Tap below to open the Bless-A-Family admin. The link works for 15 minutes.',
+      intro: 'Tap below to open the Bless-a-Family admin. The link works for 15 minutes.',
       cta: { label: 'Open admin', url: link },
       note: "Didn't ask for this? Ignore it.",
     },
@@ -393,15 +393,15 @@ export function adminAlert(a: AdminAlert): ComposedMessage {
 
 export function testEmail(by: string): ComposedMessage {
   return {
-    subject: 'Test email from Bless-A-Family',
+    subject: 'Test email from Bless-a-Family',
     spec: {
       preheader: 'If you can read this, email is working.',
       eyebrow: 'Test',
       title: 'Email is working.',
-      intro: 'This is how every Bless-A-Family email looks: one card, one headline, one clear next step.',
+      intro: 'This is how every Bless-a-Family email looks: one card, one headline, one clear next step.',
       details: [{ label: 'Sent by', value: by }, { label: 'Sent at', value: new Date().toLocaleString('en-US', { timeZone: 'America/Detroit', dateStyle: 'medium', timeStyle: 'short' }) + ' ET' }],
       list: ['Konnector confirmations, check-ins and thank-yous', 'Family updates', 'Team alerts and sign-in links'],
-      cta: { label: 'Open Bless-A-Family', url: config.webUrl },
+      cta: { label: 'Open Bless-a-Family', url: config.webUrl },
     },
   };
 }

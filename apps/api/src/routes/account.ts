@@ -45,7 +45,7 @@ export function accountRoutes(services: Services) {
       devLink = link;
     } else {
       const m = konnectorNoAccountEmail(e);
-      await mailer.send({ to: e, subject: m.subject, spec: m.spec, kind: 'konnector_no_account', audience: 'konnector', reason: 'You are getting this because someone asked to log in to Bless-A-Family with this email.' });
+      await mailer.send({ to: e, subject: m.subject, spec: m.spec, kind: 'konnector_no_account', audience: 'konnector', reason: 'You are getting this because someone asked to log in to Bless-a-Family with this email.' });
     }
     const dev = !config.isProd && config.notify.driver === 'console';
     return c.json({ ok: true, ...(dev ? { devLink } : {}) });

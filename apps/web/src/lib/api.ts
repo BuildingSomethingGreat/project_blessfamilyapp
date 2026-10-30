@@ -87,9 +87,9 @@ export const api = {
 /** Konnection photography used on the landing page (from thekonnection.org). Swap for local files in /public/photos when available. */
 export const PHOTOS = {
   /** Landing hero band (wide crop of a portrait photo, so `position` keeps the faces in frame). */
-  hero: { src: '/photos/campaign/basketball.webp', alt: 'Two smiling kids with their new gifts at last season’s Bless-A-Family hand-out', position: '50% 24%' },
+  hero: { src: '/photos/campaign/basketball.webp', alt: 'Two smiling kids with their new gifts at last season’s Bless-a-Family hand-out', position: '50% 24%' },
   stats: 'https://static.wixstatic.com/media/96402c_66b742f7eaa248e4b2a0c7fb5a765099~mv2.png/v1/fill/w_826,h_836,al_c,q_90,enc_auto/p.png',
-  /** Kids with their gifts at the last Bless-A-Family hand-out (shared by The Konnection). */
+  /** Kids with their gifts at the last Bless-a-Family hand-out (shared by The Konnection). */
   campaign: [
     { src: '/photos/campaign/gel-blaster.webp', alt: 'A smiling boy in reindeer antlers holds up his new gel blaster' },
     { src: '/photos/campaign/magnetic-tiles.webp', alt: 'A girl in green antlers shows off a box of magnetic building tiles' },

@@ -15,7 +15,7 @@
 | `ADMIN_EMAILS` | comma-separated admin emails |
 | `ADMIN_PASSCODE` | a team passcode; lets admins sign in before an email provider exists |
 | `RESEND_API_KEY` | API key from resend.com. Turns on every transactional email (claims, check-ins, family updates, team alerts, sign-in links). Without it emails are only written to the log. |
-| `RESEND_EMAIL` | the sender, e.g. `bless@thekonnection.org` (shown as "Bless-A-Family"), or a full `Name <address>`. Its domain must be verified in Resend. |
+| `RESEND_EMAIL` | the sender, e.g. `bless@bless-a-family.thekonnection.org` (shown as "Bless-a-Family"), or a full `Name <address>`. Its domain must be verified in Resend. |
 | `EMAIL_REPLY_TO` | optional; replies go here. Defaults to the contact email in Admin → Settings. |
 | `ANTHROPIC_API_KEY` | optional, enables the admin assistant |
 
@@ -80,5 +80,32 @@ pnpm --filter @bless/web partners:fetch        # downloads logos into apps/web/p
 ```
 Review the printed list, delete anything that is not a partner logo, and commit. Until the manifest has entries the marquee falls back to the combined partner strip from thekonnection.org.
 
-## Custom domain
-Point `bless.thekonnection.org` at Netlify; the API can stay on `*.fly.dev` because it is only reached through the proxy.
+## Custom domain: bless-a-family.thekonnection.org (GoDaddy)
+The Konnection's DNS is at GoDaddy. The app lives on a subdomain, so nothing on thekonnection.org (the Wix site, existing email) changes.
+
+**1. Netlify: add the domain**
+1. Netlify → the site → **Domain management** → **Add a domain** → enter `bless-a-family.thekonnection.org` → **Verify** → **Add domain**. Netlify warns the domain is managed elsewhere; that's expected.
+2. Note the site's Netlify address shown there (for example `bless-a-family.netlify.app`).
+
+**2. GoDaddy: point the subdomain at Netlify**
+1. GoDaddy → **My Products** → thekonnection.org → **DNS** → **Add New Record**.
+2. Type **CNAME**, Name `bless-a-family`, Value `<your-site>.netlify.app` (the address from step 1), TTL 1 hour. Save.
+3. Back in Netlify, the domain shows "Awaiting External DNS" until it resolves (usually minutes, up to a few hours). Then Netlify issues the HTTPS certificate automatically (**Domain management → HTTPS**; click **Verify DNS configuration** if it hasn't started).
+4. Make it the **primary domain** (Domain management → the domain's **Options** → Set as primary). The `.netlify.app` address keeps working and redirects.
+
+**3. Netlify: tell the app its address**
+Site configuration → Environment variables: set `WEB_URL=https://bless-a-family.thekonnection.org` (links in every email use it), then **Deploys → Trigger deploy → Clear cache and deploy site**. If you use the Fly API, set the same `WEB_URL` and `CORS_ORIGINS` there (`apps/api/fly.toml`).
+
+**4. Resend: send from the subdomain**
+1. resend.com → **Domains** → **Add Domain** → `bless-a-family.thekonnection.org` (region: US East). Resend lists 3–4 DNS records: an **MX** and a **TXT (SPF)** on `send.bless-a-family…`, a **TXT (DKIM)** on `resend._domainkey.bless-a-family…`, and an optional **TXT (DMARC)**.
+2. In GoDaddy → DNS → **Add New Record** for each, copying values exactly from Resend. GoDaddy adds `.thekonnection.org` itself, so enter only the part before it:
+   | Type | Name (GoDaddy) | Value |
+   |---|---|---|
+   | MX | `send.bless-a-family` | the `feedback-smtp…amazonses.com` host Resend shows, priority 10 |
+   | TXT | `send.bless-a-family` | `v=spf1 include:amazonses.com ~all` (as shown in Resend) |
+   | TXT | `resend._domainkey.bless-a-family` | the long `p=…` key from Resend |
+   | TXT (optional) | `_dmarc.bless-a-family` | `v=DMARC1; p=none;` |
+   These don't touch thekonnection.org's own MX or SPF records, so existing email keeps working.
+3. Click **Verify DNS Records** in Resend (often minutes; up to 48 hours).
+4. In Netlify set `RESEND_EMAIL=bless@bless-a-family.thekonnection.org` (any name before the @ works; it shows as "Bless-a-Family"). Keep `RESEND_API_KEY`. Redeploy.
+5. Admin → Emails → the Delivery card should say "Sending with Resend" from the new address. **Send a test email** to confirm. Replies go to the contact email in Settings (Sharnese), not the sending address.

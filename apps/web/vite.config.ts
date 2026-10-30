@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icons/favicon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'Bless-A-Family · The Konnection',
-        short_name: 'Bless-A-Family',
+        name: 'Bless-a-Family · The Konnection',
+        short_name: 'Bless-a-Family',
         description: 'Holiday giving program by The Konnection. Families share what they need; sponsors bless a whole household.',
         theme_color: '#f6f3fb',
         background_color: '#1d1133',

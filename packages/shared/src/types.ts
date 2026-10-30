@@ -177,8 +177,6 @@ export interface SeasonSettings {
   chipInsEnabled: boolean;
   chipInUrl: string;       // external checkout (Zeffy/Stripe link); empty = pledge only
   showPhotos: boolean;
-  /** Ask families for an (optional) photo on the application. Off = the photo question is not shown. */
-  askFamilyPhoto: boolean;
   /** Email the admin team about new applications, claims, releases, flags, hand-offs and quotes. */
   adminAlerts: boolean;
   /** Who gets team emails (comma-separated). Empty = everyone in ADMIN_EMAILS. Never sent to the public site. */

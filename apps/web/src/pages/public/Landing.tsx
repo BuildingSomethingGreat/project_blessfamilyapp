@@ -33,7 +33,7 @@ export default function Landing() {
     ['Who are the families?', "Households already connected to The Konnection's programs. Every application is reviewed by staff before it appears here."],
     ['Can my company or church sponsor several families?', `Yes! Email ${contact} and we'll set aside a group of families for your team.`],
   ];
-  const donate = settings.data?.orgDonateUrl ?? 'https://thekonnection.org';
+  const donate = settings.data?.orgDonateUrl || 'https://www.zeffy.com/en-US/donation-form/2026-holiday-bless-a-family';
 
   return (
     <div className="overflow-x-clip">
@@ -158,7 +158,7 @@ export default function Landing() {
           <div className="reveal-late flex flex-col justify-center p-[clamp(8px,2vw,24px)]">
             <div><SectionPill>Why it matters</SectionPill></div>
             <h2 className="balance mt-4 text-[clamp(32px,4vw,52px)] leading-[1.05] tracking-[-.045em]">Every child deserves to feel seen, loved, and celebrated.</h2>
-            <p className="mt-4 max-w-[520px] text-base leading-[1.6] text-ink-4">At The Konnection, we show up for Detroit students and their families all year long. Bless-A-Family extends that care into the holiday season—connecting families with generous people who help fulfill children’s wishes and ease the pressure on parents.</p>
+            <p className="mt-4 max-w-[520px] text-base leading-[1.6] text-ink-4">At The Konnection, we show up for Detroit students and their families all year long. Bless-a-Family extends that care into the holiday season—connecting families with generous people who help fulfill children’s wishes and ease the pressure on parents.</p>
             <p className="mt-3 max-w-[520px] text-base leading-[1.6] text-ink-4">As a Holiday Konnector, you’re giving more than gifts. You’re reminding a family that their community is in their corner.</p>
             <div className="mt-8 grid grid-cols-3 gap-3">
               <BigStat value="136" label="Children Celebrated" />
@@ -204,12 +204,12 @@ export default function Landing() {
             <p className="mt-[18px] max-w-[520px] text-[17px] leading-[1.55] text-white/72">Gifts are due {deadlineLong}. Become a Holiday Konnector today. It takes two minutes.</p>
             <div className="mt-[30px] flex flex-wrap gap-2.5">
               <Link to="/families" className="inline-flex h-[54px] items-center rounded-full bg-white px-7 text-base font-semibold text-ink transition-colors hover:bg-lav">Find a family</Link>
-              <a href={donate} target="_blank" rel="noreferrer" className="inline-flex h-[54px] items-center rounded-full border border-white/30 bg-white/6 px-6 text-base font-semibold text-white backdrop-blur-[10px]">Give to the general fund</a>
+              <a href={donate} target="_blank" rel="noreferrer" className="inline-flex h-[54px] items-center rounded-full border border-white/30 bg-white/6 px-6 text-base font-semibold text-white backdrop-blur-[10px]">Give to Bless-a-Family</a>
             </div>
           </div>
         </div>
         <div className="mx-auto mt-7 flex max-w-[1180px] flex-wrap items-center justify-between gap-4 text-[13px] text-ink-3">
-          <div className="flex items-center gap-3"><img src="/brand/konnection-logo.png" alt="The Konnection" className="h-[26px] w-auto" /><span>© {settings.data?.season ?? ''} The Konnection · Detroit, MI</span></div>
+          <div className="flex items-center gap-3"><img src="/brand/konnection-logo.png" alt="The Konnection" className="h-[34px] w-auto" /><span>© {settings.data?.season ?? ''} The Konnection · Detroit, MI</span></div>
           <span>First names and ages only. Parent names, addresses and phone numbers are never published. <Link to="/legal#privacy" className="ml-2 font-semibold text-ink-2 hover:text-ink">Privacy</Link> · <Link to="/legal#terms" className="font-semibold text-ink-2 hover:text-ink">Terms</Link> <Link to="/admin" className="ml-2 text-ink-3/70 hover:text-ink">Admin</Link></span>
         </div>
       </section>
@@ -232,7 +232,7 @@ function PartnersMarquee() {
   const row = [...logos, ...logos]; // duplicated so the -50% translate loops cleanly
   return (
     <section className="reveal pt-16 text-center">
-      <div className="px-4 text-[13px] font-medium text-ink-3">The Konnection is powered by partners who take action</div>
+      <div className="caps px-4 text-[13px] font-semibold tracking-[.06em] text-ink-3">The Konnection is powered by partners who take action</div>
       <div className="mt-[22px] overflow-hidden" style={{ maskImage: 'linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)', WebkitMaskImage: 'linear-gradient(90deg,transparent,#000 15%,#000 85%,transparent)' }}>
         <div className="marquee flex w-max items-center gap-14 bg-bg py-2 sm:gap-16" style={{ animationDuration: `${Math.max(20, row.length * 2.6)}s` }}>
           {row.map((l, i) => <img key={i} src={l.src} alt={i < logos.length ? l.alt : ''} aria-hidden={i >= logos.length || undefined} className="block h-[48px] w-auto max-w-[180px] object-contain opacity-60 mix-blend-multiply grayscale transition duration-300 hover:opacity-100 hover:grayscale-0 sm:h-[64px] sm:max-w-[210px]" loading="lazy" />)}
@@ -295,7 +295,7 @@ function CampaignCollage() {
         <div className={cx(tile, 'aspect-[3/4] -rotate-[1deg]')}><Photo src={d.src} alt={d.alt} className={img} /></div>
       </div>
       <figcaption className="pointer-events-none absolute -bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border border-white/70 bg-white/88 px-4 py-2 text-[12px] font-semibold text-ink shadow-soft backdrop-blur-[10px]">
-        <span className="mr-1.5 inline-block size-2 rounded-full bg-pri align-middle" />Bless-A-Family, last season
+        <span className="mr-1.5 inline-block size-2 rounded-full bg-pri align-middle" />Bless-a-Family, last season
       </figcaption>
     </figure>
   );
@@ -310,7 +310,7 @@ function Voices({ data }: { data?: CommunityView }) {
       <section className="px-4 pt-[clamp(80px,10vw,140px)] sm:px-8">
         <div className="reveal mx-auto flex max-w-[900px] flex-col items-center rounded-[32px] border border-dashed border-line bg-white/70 px-6 py-10 text-center backdrop-blur-[6px]">
           <SectionPill>In their words</SectionPill>
-          <h2 className="balance mt-4 text-[clamp(26px,3vw,38px)] leading-[1.1] tracking-[-.04em]">Blessed a family, or been blessed? We'd love to hear it.</h2>
+          <h2 className="balance mt-4 text-[clamp(26px,3vw,38px)] leading-[1.1] tracking-[-.04em]">Have you blessed a family—or been blessed through this program? We’d love to hear your story.</h2>
           <Link to="/share" className="mt-6 inline-flex h-[50px] items-center rounded-full bg-ink px-6 text-[15px] font-semibold text-white transition-colors hover:bg-pri">Share your story</Link>
         </div>
       </section>

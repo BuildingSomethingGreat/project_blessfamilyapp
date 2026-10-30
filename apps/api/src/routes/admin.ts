@@ -161,7 +161,7 @@ export function adminRoutes(services: Services) {
   r.get('/settings', async (c) => c.json(await store.getSettings()));
   r.patch('/settings', async (c) => {
     const body = (await c.req.json()) as Partial<SeasonSettings>;
-    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos', 'askFamilyPhoto', 'adminAlerts', 'alertEmails', 'contactName'];
+    const allowed: (keyof SeasonSettings)[] = ['season', 'dropoffDeadline', 'dropoffLocation', 'dropoffHours', 'contactEmail', 'contactPhone', 'catalogOpen', 'registrationOpen', 'perChildBudgetNote', 'orgDonateUrl', 'chipInsEnabled', 'chipInUrl', 'showPhotos', 'adminAlerts', 'alertEmails', 'contactName'];
     const patch: Partial<SeasonSettings> = {};
     for (const k of allowed) if (k in body) (patch as any)[k] = body[k];
     if (typeof patch.alertEmails === 'string') {

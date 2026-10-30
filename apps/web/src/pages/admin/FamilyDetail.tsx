@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ACTIVE_SPONSORSHIP_STATUSES, familyArt, colorSwatch, nicknameProblem, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, familyArt, familyNickname, colorSwatch, nicknameProblem, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
 import { api } from '@/lib/api';
 import { Button, Chip, Dominoes, FamilyArt, Input, Kicker, Label, Select, Sheet, Skeleton, Textarea, Toggle, useToast } from '@/components/ui';
 import { NicknameField } from '@/components/NicknameField';
@@ -73,7 +73,7 @@ export default function FamilyDetail() {
             <Kicker>{f.familyId} · {f.city}, {f.state}</Kicker>
             {editingNick ? (
               <form className="mt-1 w-[min(520px,80vw)]" onSubmit={(e) => { e.preventDefault(); if (nicknameProblem(nick, { guardianName: f.guardianName, childNames: f.children.map((k) => k.name) })) return; patchFamily.mutate({ nickname: nick.trim() }); setEditingNick(false); }}>
-                <NicknameField value={nick} onChange={setNick} kids={f.children} seed={f.familyId} priv={{ guardianName: f.guardianName, childNames: f.children.map((k) => k.name) }} size="sm" autoFocus />
+                <NicknameField value={nick} onChange={setNick} defaultName={familyNickname(f.familyId)} priv={{ guardianName: f.guardianName, childNames: f.children.map((k) => k.name) }} size="sm" autoFocus />
                 <div className="mt-2 flex gap-2">
                   <Button type="submit" size="sm" variant="dark" disabled={!!nicknameProblem(nick, { guardianName: f.guardianName, childNames: f.children.map((k) => k.name) })}>Save</Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => { setEditingNick(false); setNick(f.public.nickname); }}>Cancel</Button>

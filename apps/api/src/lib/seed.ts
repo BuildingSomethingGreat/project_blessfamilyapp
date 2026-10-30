@@ -1,5 +1,5 @@
 import type { Store } from '../store/types.ts';
-import { deriveNickname } from '@bless/shared';
+import { familyNickname } from '@bless/shared';
 import { familyCode, shortId, token, nowIso } from './ids.ts';
 import { SEED_HOUSEHOLDS, SEED_QUOTES, SEED_SPONSORS, SEED_SPONSORSHIPS } from './seed-data.ts';
 
@@ -19,7 +19,7 @@ export async function seedDemo(store: Store) {
     const kids = h.kids.map((k, i) => ({ ...k, sortOrder: i }));
     const approvedAt = ['Submitted', 'Needs Info'].includes(h.status) ? null : daysAgo(Math.max(0, h.createdDaysAgo - 1));
     const fam = await store.createFamily({
-      familyId: code, season, status: h.status, slug: shortId(), nickname: deriveNickname(kids.map((k) => ({ ...k, id: '', familyId: '' })), code),
+      familyId: code, season, status: h.status, slug: shortId(), nickname: familyNickname(code),
       guardianName: h.guardian, phone: h.phone, email: h.email, preferredContact: h.preferredContact, address: h.address, city: h.city, state: 'MI', zip: h.zip,
       transportation: h.transportation, familyStory: h.story, storyApproved: h.storyApproved && !!h.story, photoUrl: '', photoApproved: false, photoPrivate: false,
       raised: h.raised ?? 0, goal: 175 * kids.length, eligibilityConfirmed: true, notes: h.notes ?? '', adminNotes: '', views: h.views, claimStarts: h.claimStarts,

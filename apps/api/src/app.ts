@@ -25,7 +25,7 @@ export function createApp(store: Store) {
   app.use('/api/*', async (c, next) => {
     const write = c.req.method !== 'GET' && c.req.method !== 'HEAD' && c.req.method !== 'OPTIONS';
     if (write && config.isProd && store.kind !== 'airtable' && !c.req.path.startsWith('/api/admin/auth') && !c.req.path.startsWith('/api/account/logout')) {
-      return c.json({ error: 'Bless-A-Family is not connected to its database yet. Please try again soon or email us.' }, 503);
+      return c.json({ error: 'Bless-a-Family is not connected to its database yet. Please try again soon or email us.' }, 503);
     }
     await next();
   });

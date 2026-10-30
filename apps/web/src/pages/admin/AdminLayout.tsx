@@ -56,7 +56,7 @@ export function AdminLayout() {
       <aside className="sticky top-0 hidden h-dvh w-[230px] flex-none flex-col gap-1 border-r border-line bg-white px-3.5 py-5 lg:flex">
         <div className="flex items-center gap-2.5 px-2 pb-[18px] pt-1.5">
           <KMark size={32} />
-          <div><div className="text-[14px] font-bold leading-[1.1]">Bless-A-Family</div><div className="text-[10px] font-semibold tracking-[.08em] text-ink-3">ADMIN · {r?.season ?? ''}</div></div>
+          <div><div className="text-[14px] font-bold leading-[1.1]">Bless-a-Family</div><div className="text-[10px] font-semibold tracking-[.08em] text-ink-3">ADMIN · {r?.season ?? ''}</div></div>
         </div>
         {NAV.map((n) => link(n))}
         <div className="flex-1" />
@@ -70,7 +70,7 @@ export function AdminLayout() {
         {/* Mobile top bar */}
         <header className="sticky top-0 z-30 border-b border-line bg-white/95 backdrop-blur pt-safe lg:hidden">
           <div className="flex items-center justify-between px-4 py-2.5">
-            <div className="flex items-center gap-2.5"><KMark size={28} /><div className="text-[13px] font-bold">Bless-A-Family <span className="ml-1 text-[10px] font-semibold tracking-[.08em] text-ink-3">ADMIN</span></div></div>
+            <div className="flex items-center gap-2.5"><KMark size={28} /><div className="text-[13px] font-bold">Bless-a-Family <span className="ml-1 text-[10px] font-semibold tracking-[.08em] text-ink-3">ADMIN</span></div></div>
             <div className="flex items-center gap-3">{storeChip}<button onClick={signOut} className="text-[12px] font-semibold text-ink-2">Sign out</button></div>
           </div>
           <nav className="rail flex gap-1 overflow-x-auto px-3 pb-2.5">{NAV.map((n) => link(n, true))}</nav>

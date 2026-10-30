@@ -1,25 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CLOTHING_CATEGORIES, CLOTHING_OPTIONS, CLOTHING_SIZES, CONTACT_METHODS, FAVORITE_COLORS, GENDERS, GIFT_OPTIONS, OTHER_SIZE, SHOE_SIZES, TRANSPORT_OPTIONS, FamilyApplicationSchema, colorSwatch, deriveNickname, nicknameProblem, type ChildInput, type ClothingCategory } from '@bless/shared';
+import { CLOTHING_CATEGORIES, CLOTHING_OPTIONS, CLOTHING_SIZES, CONTACT_METHODS, FAVORITE_COLORS, GENDERS, GIFT_OPTIONS, OTHER_SIZE, SHOE_SIZES, TRANSPORT_OPTIONS, FamilyApplicationSchema, colorSwatch, type ChildInput, type ClothingCategory } from '@bless/shared';
 import { api, ApiError } from '@/lib/api';
 import { Checkbox, KMark, Seg, Select, UnderlineInput } from '@/components/ui';
 import { cx } from '@/lib/format';
-import { NicknameField } from '@/components/NicknameField';
 
 type Kid = { name: string; age: string; gender: string; cat: ClothingCategory; shirt: string; pants: string; shoe: string; sizeNotes: string; hobbies: string; color: string; clothing: string[]; clothingExtra: string; gifts: string[]; giftsExtra: string };
-type Ans = { guardian: string; phone: string; contact: string; email: string; city: string; address: string; zip: string; transport: string; kidCount: string; kids: Kid[]; story: string; nickname: string; nickSeed: string; photo: string; photoDataUrl: string; photoPrivate: boolean; eligible: boolean };
-type Step = { t: 'welcome' | 'text' | 'choice' | 'address' | 'who' | 'sizes' | 'interests' | 'multi' | 'story' | 'nickname' | 'photo' | 'confirm' | 'done'; key?: keyof Ans | 'clothing' | 'gifts'; i?: number; kicker?: string; title: string; help?: string; ph?: string; type?: string; opts?: readonly string[]; extraPh?: string };
+type Ans = { guardian: string; phone: string; contact: string; email: string; city: string; address: string; zip: string; transport: string; kidCount: string; kids: Kid[]; story: string; eligible: boolean };
+type Step = { t: 'welcome' | 'text' | 'choice' | 'address' | 'who' | 'sizes' | 'interests' | 'multi' | 'story' | 'confirm' | 'done'; key?: keyof Ans | 'clothing' | 'gifts'; i?: number; kicker?: string; title: string; help?: string; ph?: string; type?: string; opts?: readonly string[]; extraPh?: string };
 
 const DRAFT = 'baf-register-draft';
 const blankKid = (): Kid => ({ name: '', age: '', gender: '', cat: 'Youth / Kids', shirt: '', pants: '', shoe: '', sizeNotes: '', hobbies: '', color: '', clothing: [], clothingExtra: '', gifts: [], giftsExtra: '' });
-const fresh = (): Ans => ({ guardian: '', phone: '', contact: '', email: '', city: '', address: '', zip: '', transport: '', kidCount: '', kids: [], story: '', nickname: '', nickSeed: Math.random().toString(36).slice(2, 10), photo: '', photoDataUrl: '', photoPrivate: false, eligible: false });
+const fresh = (): Ans => ({ guardian: '', phone: '', contact: '', email: '', city: '', address: '', zip: '', transport: '', kidCount: '', kids: [], story: '', eligible: false });
 const field = 'mt-1.5 h-[50px] w-full rounded-2xl border border-line bg-bg px-4 text-base outline-none focus:border-pri focus:bg-white';
 const label = 'text-[13px] font-semibold text-ink-2';
 
-function buildSteps(a: Ans, askPhoto: boolean): Step[] {
+function buildSteps(a: Ans): Step[] {
   const s: Step[] = [
-    { t: 'welcome', title: 'Tell us about your family.', help: "Bless-A-Family matches Konnection households with Holiday Konnectors who shop your children's wish lists. Answer a few questions and we'll take it from there." },
+    { t: 'welcome', title: 'Tell us about your family.', help: "Bless-a-Family matches Konnection households with Holiday Konnectors who shop your children's wish lists. Answer a few questions and we'll take it from there." },
     { t: 'text', key: 'guardian', kicker: 'About you', title: "What's your name?", help: 'Parent or guardian. Holiday Konnectors never see this.', ph: 'First and last name' },
     { t: 'text', key: 'phone', kicker: 'About you', title: 'Best number to reach you?', help: 'So our team can reach you about your application or gift delivery.', ph: '(313) 555-0100', type: 'tel' },
     { t: 'choice', key: 'contact', kicker: 'About you', title: 'How do you prefer we reach you?', opts: CONTACT_METHODS },
@@ -46,9 +45,7 @@ function buildSteps(a: Ans, askPhoto: boolean): Step[] {
   }
   s.push(
     { t: 'story', key: 'story', kicker: 'Your story', title: 'Tell Holiday Konnectors a little about your family.', help: 'Two or three sentences. What makes your kids who they are? Optional, but families with a story are chosen sooner.' },
-    { t: 'nickname', key: 'nickname', kicker: 'Your story', title: 'Pick a nickname for your family.', help: "This is how Holiday Konnectors will know you. We made one from your kids' interests. Keep it, shuffle, or write your own." },
   );
-  if (askPhoto) s.push({ t: 'photo', key: 'photo', kicker: 'Your story', title: 'Would you like to share a family photo?', help: 'Completely optional. Our team reviews every photo, and you choose whether Holiday Konnectors see it.' });
   s.push(
     { t: 'confirm', kicker: 'Last step', title: 'Does this look right?' },
     { t: 'done', kicker: 'Submitted', title: `Thank you, ${(a.guardian || 'friend').split(' ')[0]}.` },
@@ -56,28 +53,15 @@ function buildSteps(a: Ans, askPhoto: boolean): Step[] {
   return s;
 }
 
-function toApplication(a: Ans, askPhoto: boolean) {
-  if (!askPhoto) a = { ...a, photo: '', photoDataUrl: '' };
+function toApplication(a: Ans) {
   return {
     eligibilityConfirmed: a.eligible as true, guardianName: a.guardian, phone: a.phone, email: a.email, preferredContact: (a.contact || 'Text') as 'Text' | 'Call' | 'Email',
-    nickname: a.nickname.trim(), address: a.address, city: a.city, state: 'MI', zip: a.zip, transportation: (a.transport === TRANSPORT_OPTIONS[0] || a.transport === 'I can pick up' ? 'Yes' : 'No') as 'Yes' | 'No', familyStory: a.story, photoDataUrl: a.photo === 'Share a photo' ? a.photoDataUrl : '', photoPrivate: a.photo === 'Share a photo' && a.photoPrivate, notes: '',
+    address: a.address, city: a.city, state: 'MI', zip: a.zip, transportation: (a.transport === TRANSPORT_OPTIONS[0] || a.transport === 'I can pick up' ? 'Yes' : 'No') as 'Yes' | 'No', familyStory: a.story, notes: '',
     children: a.kids.slice(0, Math.min(15, Number(a.kidCount) || 0)).map((k): ChildInput => ({
       name: k.name, age: Number(k.age), gender: (k.gender || 'Prefer not to say') as ChildInput['gender'], clothingCategory: k.cat, shirtSize: k.shirt, pantsSize: k.pants, shoeCategory: k.cat, shoeSize: k.shoe,
       sizeNotes: k.sizeNotes, favoriteColor: k.color, hobbies: k.hobbies, clothingWishlist: k.clothing as ChildInput['clothingWishlist'], otherClothing: k.clothingExtra, giftTypes: k.gifts as ChildInput['giftTypes'], specificGifts: k.giftsExtra,
     })),
   };
-}
-
-async function resizeImage(file: File): Promise<string> {
-  const url = URL.createObjectURL(file);
-  try {
-    const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
-    const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
-    const c = document.createElement('canvas');
-    c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
-    c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
-    return c.toDataURL('image/jpeg', 0.82);
-  } finally { URL.revokeObjectURL(url); }
 }
 
 export default function Register() {
@@ -90,20 +74,14 @@ export default function Register() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [more, setMore] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => { try { const raw = localStorage.getItem(DRAFT); if (raw) { const d = JSON.parse(raw); if (d?.ans?.guardian || d?.step > 0) setResume(d); } } catch { /* ignore */ } }, []);
-  useEffect(() => { if (submitted) return; try { if (step > 0) localStorage.setItem(DRAFT, JSON.stringify({ ans: { ...a, photoDataUrl: '' }, step })); } catch { /* ignore */ } }, [a, step, submitted]);
+  useEffect(() => { if (submitted) return; try { if (step > 0) localStorage.setItem(DRAFT, JSON.stringify({ ans: a, step })); } catch { /* ignore */ } }, [a, step, submitted]);
 
-  const askPhoto = !!settings.data?.askFamilyPhoto;
-  const steps = useMemo(() => buildSteps(a, askPhoto), [a, askPhoto]);
+  const steps = useMemo(() => buildSteps(a), [a]);
   const q = steps[Math.min(step, steps.length - 1)];
   const kid = a.kids[q.i ?? 0] ?? blankKid();
   const setKid = (i: number, patch: Partial<Kid>) => setA((s) => { const kids = [...s.kids]; kids[i] = { ...(kids[i] ?? blankKid()), ...patch }; return { ...s, kids }; });
   const set = (k: keyof Ans, v: Ans[keyof Ans]) => setA((s) => ({ ...s, [k]: v }));
-  const nickKids = a.kids.slice(0, Math.min(15, Number(a.kidCount) || 0)).map((k) => ({ giftTypes: k.gifts as ChildInput['giftTypes'], hobbies: k.hobbies }));
-  const nickPriv = { guardianName: a.guardian, childNames: a.kids.map((k) => k.name) };
-  // Arriving at the nickname step with nothing chosen yet: start from a suggestion.
-  useEffect(() => { if (q.t === 'nickname' && !a.nickname.trim()) set('nickname', deriveNickname(nickKids, a.nickSeed)); }, [q.t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const valid = (() => {
     switch (q.t) {
@@ -114,7 +92,6 @@ export default function Register() {
       case 'sizes': return !!kid.shirt && !!kid.pants && !!kid.shoe && !([kid.shirt, kid.pants, kid.shoe].includes(OTHER_SIZE) && !kid.sizeNotes.trim());
       case 'interests': return !!kid.hobbies.trim();
       case 'multi': return (kid[q.key as 'clothing' | 'gifts'] ?? []).length > 0;
-      case 'nickname': return !nicknameProblem(a.nickname, nickPriv);
       case 'confirm': return a.eligible;
       default: return true;
     }
@@ -123,7 +100,7 @@ export default function Register() {
   const next = async () => {
     if (!valid || busy) return;
     if (q.t === 'confirm') {
-      const parsed = FamilyApplicationSchema.safeParse(toApplication(a, askPhoto));
+      const parsed = FamilyApplicationSchema.safeParse(toApplication(a));
       if (!parsed.success) { const issue = parsed.error.issues[0]; setError(`${issue.path.join(' › ') || 'Form'}: ${issue.message}`); const idx = issue.path[0] === 'children' ? steps.findIndex((s) => s.t === 'who' && s.i === Number(issue.path[1])) : 1; if (idx >= 0) setStep(idx); return; }
       setBusy(true); setError('');
       try {
@@ -149,10 +126,10 @@ export default function Register() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[860px] px-4 pb-16 pt-6 sm:px-8">
+    <div className="caps-ui mx-auto w-full max-w-[860px] px-4 pb-16 pt-6 sm:px-8">
       <div onKeyDown={onKey} className="flex min-h-[640px] flex-col overflow-hidden rounded-[32px] border border-line bg-white">
         <div className="flex items-center justify-between px-7 pt-[22px]">
-          <div className="flex items-center gap-2.5"><KMark /><span className="text-[15px] font-bold">Bless-A-Family application</span></div>
+          <div className="flex items-center gap-2.5"><KMark /><span className="caps text-[15px] font-bold tracking-[.02em]">Bless-a-Family application</span></div>
           <Link to="/" className="text-[13px] font-semibold text-ink-2">Save & exit</Link>
         </div>
         <div className="mx-7 mt-4 h-1 overflow-hidden rounded-full bg-soft"><div className="h-full bg-pri transition-[width] duration-500 ease-[cubic-bezier(.16,1,.3,1)]" style={{ width: `${progress}%` }} /></div>
@@ -228,35 +205,10 @@ export default function Register() {
                 <div className="mt-1.5 flex justify-between text-[12px] text-ink-3"><span>Our team reads it before it goes public.</span><span>{a.story.length}/400</span></div>
               </>
             )}
-            {q.t === 'nickname' && (
-              <div className="mt-[26px]">
-                <NicknameField value={a.nickname} onChange={(v) => set('nickname', v)} kids={nickKids} seed={a.nickSeed} priv={nickPriv} autoFocus />
-                <div className="mt-5 rounded-[22px] border border-line bg-white p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[.1em] text-ink-3">How it looks to Holiday Konnectors</div>
-                  <div className="mt-2 text-[22px] font-extrabold leading-tight tracking-[-.035em]">{a.nickname.trim() || '…'}</div>
-                  <div className="mt-1 text-[13px] text-ink-3">{a.city || 'Your city'} · {nickKids.length} {nickKids.length === 1 ? 'child' : 'kids'}: {a.kids.slice(0, nickKids.length).map((k) => `${k.name.trim().split(/\s+/)[0] || 'Child'} (${k.age || '?'})`).join(', ')}</div>
-                </div>
-              </div>
-            )}
-            {q.t === 'photo' && (
-              <>
-                <div className="mt-[26px] flex gap-2">{['Share a photo', 'No photo'].map((o) => <Seg key={o} grow active={a.photo === o} onClick={() => set('photo', o)}>{o}</Seg>)}</div>
-                {a.photo === 'Share a photo' && (
-                  <>
-                    <button type="button" onClick={() => fileRef.current?.click()} className="mt-3.5 block h-[220px] w-full overflow-hidden rounded-[20px] border border-line bg-bg">
-                      {a.photoDataUrl ? <img src={a.photoDataUrl} alt="Your family photo" className="size-full object-cover" /> : <span className="grid size-full place-items-center text-[14px] font-semibold text-ink-3">Tap to add a photo</span>}
-                    </button>
-                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={async (e) => { const f = e.target.files?.[0]; if (f) set('photoDataUrl', await resizeImage(f)); }} />
-                    <div className="mt-3 rounded-2xl bg-bg px-4 py-3"><Checkbox checked={a.photoPrivate} onChange={(v) => set('photoPrivate', v)}>Keep my photo private. Only The Konnection team will see it.</Checkbox></div>
-                    <p className="mt-2.5 text-[13px] leading-[1.5] text-ink-3">Share only what you're comfortable with: a doorway, hands, a holiday table. Faces are optional, and you can ask us to remove it any time.</p>
-                  </>
-                )}
-              </>
-            )}
             {q.t === 'confirm' && (
               <>
                 <div className="mt-6 rounded-[20px] bg-bg px-[18px] py-1">
-                  {[['Guardian', a.guardian || '—'], ['Contact', `${a.contact || '—'} · ${a.phone}${a.email ? ` · ${a.email}` : ''}`], ['Children', a.kids.slice(0, Number(a.kidCount) || 0).map((k) => `${k.name}, ${k.age}`).join(' · ') || '—'], ['Nickname', a.nickname || '—'], ['Public story', a.story ? 'Yes' : 'None'], ...(askPhoto ? [['Photo', a.photo === 'Share a photo' && a.photoDataUrl ? (a.photoPrivate ? 'Staff only' : 'Shared after review') : 'None']] : []), ['Gifts', a.transport || '—']].map(([k, v], i, arr) => (
+                  {[['Guardian', a.guardian || '—'], ['Contact', `${a.contact || '—'} · ${a.phone}${a.email ? ` · ${a.email}` : ''}`], ['Children', a.kids.slice(0, Number(a.kidCount) || 0).map((k) => `${k.name}, ${k.age}`).join(' · ') || '—'], ['Public story', a.story ? 'Yes' : 'None'], ['Gifts', a.transport || '—']].map(([k, v], i, arr) => (
                     <div key={k} className={cx('flex justify-between gap-4 py-3 text-[14px]', i < arr.length - 1 && 'border-b border-line')}><span className="text-ink-3">{k}</span><b className="text-right">{v}</b></div>
                   ))}
                 </div>

@@ -1,6 +1,6 @@
 # Decisions and pushback
 
-> **October 23 update — v3 redesign.** The product now follows the "Bless-A-Family v3" prototype (purple Konnection palette, Poppins, loading page, swipe deck). Three earlier decisions changed with it: chip-ins exist (as pledges that hand off to the org's existing Zeffy checkout, see §1), families may opt in to a photo that staff approve before it shows (§2), and the dominoes have six steps (Claimed → Shopping → Purchased → Wrapped → Dropped Off → Delivered). Everything else below still holds.
+> **October 23 update — v3 redesign.** The product now follows the "Bless-a-Family v3" prototype (purple Konnection palette, Poppins, loading page, swipe deck). Three earlier decisions changed with it: chip-ins exist (as pledges that hand off to the org's existing Zeffy checkout, see §1), families may opt in to a photo that staff approve before it shows (§2), and the dominoes have six steps (Claimed → Shopping → Purchased → Wrapped → Dropped Off → Delivered). Everything else below still holds.
 
 Short record of where the build deliberately departs from the brief, and why. Each one is reversible.
 
@@ -18,7 +18,7 @@ Public cards default to "family art", a gradient generated from the kids' favori
 One question per screen is great for the household info (and it's built that way). For children it would be brutal: three kids × 15 fields = 45 screens. So each child is a short group of 5 screens (who, sizes, interests, clothing, gifts). Progress is saved to the device so a parent can stop and resume.
 
 ## 4. Family nicknames instead of "Family BF-014"
-Codes are cold and stories need a subject. Each family gets a derived, non-identifying nickname ("The Bright Builders") based on the kids' interests. Admins can override it.
+Superseded on October 30: families are listed as "Bless-a-Family #N" (see "Family names" below).
 
 ## 5. The follow-up system flags, it never auto-releases
 The dominoes engine nudges sponsors on a schedule (48h after a claim if they haven't started shopping, then every 5 days while shopping/purchased/wrapped, daily inside the last week). After two unanswered nudges it **flags** the sponsorship for a human and stops. Automatically reopening a family that someone may already be shopping for is a worse failure than a day of admin delay. Release is one click in the admin, with a reason, and it notifies the sponsor.
@@ -71,8 +71,8 @@ Email footers say "Questions? Email {contactName} at {contactEmail}" (Settings �
 
 Open: have counsel review before launch, especially retention (we say up to three years), tax language (no 501(c)(3) claim or EIN is stated), and whether direct-delivery Konnectors ever receive a family's address.
 
-## Family nicknames
-Every family shows publicly under a nickname. The application suggests one from the kids' gift interests and hobbies ("The Merry Builders"); the family can keep it, shuffle for another, or write their own before submitting. Admins can rename from the review queue or the family page, and the assistant can too. Because the nickname is public, `nicknameProblem` (`packages/shared/src/derive.ts`) rejects the parent's name, the children's last names, runs of 3+ digits (addresses, phone numbers) and unusual characters; the API enforces it on registration and on every rename, and the web field checks it live. Children's first names are already public, so they're allowed. An empty nickname falls back to the suggestion.
+## Family names: Bless-a-Family #N
+(October 30, replaces the chosen-nickname step.) Families no longer pick a nickname. Every family is listed as "Bless-a-Family #N", N being its number in the season (`familyNickname`, `packages/shared/src/derive.ts`; BF-2026-012 → #12). Staff can still rename one in admin (review queue or family page), checked by `nicknameProblem` so a rename never includes the parent's name, a last name or long numbers; clearing the name falls back to the number. The application no longer asks for a photo either (the setting is gone and the API ignores any photo sent).
 
 ## Loading screen
 The once-per-session loader deals last season's campaign photos (`PHOTOS.campaign`) onto the dark "table" like cards, with snow behind and in front, above the "Bless this family." reveal and counter. Reduced-motion users get the cards without the deal animation and no snow.
@@ -83,4 +83,11 @@ The landing marquee shows the 25 partner logos from https://www.thekonnection.or
 ## Gift hand-off: drop-off by default
 The Konnection handles delivery. Every public claim is a drop-off at the season's drop-off site (Durfee Elementary-Middle School), and the API ignores any other choice from the public form. Direct delivery is only for Konnectors the team knows and trusts: the claim form invites them to email the season contact, and staff switch that sponsorship with "Allow direct delivery (trusted only)" on the admin family page (`PATCH /api/admin/sponsorships/:id { handoff }`). Public copy everywhere reads: "Drop off your wrapped and labeled gifts at Durfee Elementary-Middle School, and we'll deliver them to your adopted family. We'll send friendly reminders along the way!"
 
-The program name is **Bless-A-Family** everywhere (site, PWA, emails, legal pages). "Bless this family" stays only as the call-to-action phrase on buttons and the loader.
+The program name is **Bless-a-Family** everywhere (site, PWA, emails, legal pages). "Bless this family" stays only as the call-to-action phrase on buttons and the loader.
+
+## October 30 updates
+- **Find a Family is grid-only.** The swipe deck and its "Saved" list are gone; the grid keeps all filters and search.
+- **Uppercase voice.** On the public site and in the application, titles, subtitles, buttons and link text are uppercase; paragraphs and descriptions keep normal case. One scoped rule (`.caps-ui` in `apps/web/src/styles.css`) does it, with exceptions for paragraphs inside cards, links inside sentences and email addresses. Emails use uppercase headlines and buttons too. Admin pages are unchanged.
+- **Donations** go to https://www.zeffy.com/en-US/donation-form/2026-holiday-bless-a-family (`orgDonateUrl` and `chipInUrl`). The landing button reads "Give to Bless-a-Family". Airtable had two `orgDonateUrl` rows pointing at thekonnection.org; both were updated.
+- **Logo** is The Konnection's full-color logo for white backgrounds (`apps/web/public/brand/konnection-logo.png`, cropped, transparent).
+- **Domain** is `bless-a-family.thekonnection.org` (GoDaddy DNS → Netlify), and email sends from that subdomain via Resend. Steps in `docs/DEPLOY.md`.

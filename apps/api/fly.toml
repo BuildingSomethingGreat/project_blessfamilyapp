@@ -1,4 +1,4 @@
-# Fly.io config for the Bless-A-Family API + follow-up agent.
+# Fly.io config for the Bless-a-Family API + follow-up agent.
 # Deploy from the repo root:  fly deploy . --config apps/api/fly.toml --dockerfile apps/api/Dockerfile
 app = "bless-a-family-api"
 primary_region = "det"   # Detroit — closest to The Konnection
@@ -11,8 +11,8 @@ primary_region = "det"   # Detroit — closest to The Konnection
   PORT = "8080"
   STORE = "airtable"
   AIRTABLE_BASE_ID = "apphUgu1q4Z7ya3Tw"
-  WEB_URL = "https://bless-a-family.netlify.app"
-  CORS_ORIGINS = "https://bless-a-family.netlify.app"
+  WEB_URL = "https://bless-a-family.thekonnection.org"
+  CORS_ORIGINS = "https://bless-a-family.thekonnection.org,https://bless-a-family.netlify.app"
   FOLLOWUP_TICK_MINUTES = "10"
   SEED_DEMO = "false"
 

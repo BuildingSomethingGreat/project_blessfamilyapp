@@ -22,7 +22,7 @@ export default function Settings() {
   if (!form) return <div className="space-y-4"><Skeleton className="h-10 w-48" /><Skeleton className="h-96" /></div>;
   const set = <K extends keyof SeasonSettings>(k: K, v: SeasonSettings[K]) => setForm({ ...form, [k]: v });
   const dirty = JSON.stringify(form) !== JSON.stringify(q.data);
-  const Row = ({ title, body, k }: { title: string; body: string; k: 'catalogOpen' | 'registrationOpen' | 'chipInsEnabled' | 'showPhotos' | 'askFamilyPhoto' | 'adminAlerts' }) => (
+  const Row = ({ title, body, k }: { title: string; body: string; k: 'catalogOpen' | 'registrationOpen' | 'chipInsEnabled' | 'showPhotos' | 'adminAlerts' }) => (
     <div className="flex items-start justify-between gap-4"><div><div className="text-[14px] font-semibold">{title}</div><div className="text-[13px] text-ink-3">{body}</div></div><Toggle checked={form[k]} onChange={(v) => set(k, v)} /></div>
   );
 
@@ -59,7 +59,6 @@ export default function Settings() {
               <Row title="Catalog open" body="Holiday Konnectors can browse and choose families." k="catalogOpen" />
               <Row title="Registration open" body="Families can submit new applications." k="registrationOpen" />
               <Row title="Chip-ins" body='Show "Chip in" on family pages for partial giving.' k="chipInsEnabled" />
-              <Row title="Ask families for a photo" body="Adds an optional photo question to the application. Families can skip it or keep the photo staff-only." k="askFamilyPhoto" />
               <Row title="Show family photos" body="Show approved, non-private photos in the catalog. Off hides every photo." k="showPhotos" />
             </div>
           </Panel>

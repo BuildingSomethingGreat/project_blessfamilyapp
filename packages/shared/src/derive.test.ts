@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toPublicFamily, deriveNickname, nicknameProblem, colorToHex } from './derive.ts';
+import { toPublicFamily, familyNickname, nicknameProblem, colorToHex } from './derive.ts';
 import { canTransition } from './status.ts';
 import { ChildInputSchema, FamilyApplicationSchema } from './schemas.ts';
 import type { Family, Child } from './types.ts';
@@ -46,9 +46,9 @@ test('age and need tags are plain-language', () => {
   assert.ok(!p.tags.includes('Needs a winter coat'));
 });
 
-test('nickname is deterministic and interest based', () => {
-  assert.equal(deriveNickname([child()], 'BF-2026-001'), deriveNickname([child()], 'BF-2026-001'));
-  assert.match(deriveNickname([child()], 'x'), /Artists$/);
+test('families are listed by number', () => {
+  assert.equal(familyNickname('BF-2026-001'), 'Bless-a-Family #1');
+  assert.equal(familyNickname('BF-2026-112'), 'Bless-a-Family #112');
 });
 
 test('color lookup', () => {
@@ -78,14 +78,6 @@ test('application requires eligibility and valid zip', () => {
   assert.ok(FamilyApplicationSchema.safeParse(app).success);
   assert.ok(!FamilyApplicationSchema.safeParse({ ...app, zip: '4820' }).success);
   assert.ok(!FamilyApplicationSchema.safeParse({ ...app, eligibilityConfirmed: false }).success);
-});
-
-test('nickname variants give different names and variant 0 stays stable', () => {
-  const kids = [child(), { ...child(), giftTypes: ['Books'] as any, hobbies: 'soccer, drawing' }];
-  const names = new Set(Array.from({ length: 8 }, (_, i) => deriveNickname(kids, 'seed', i)));
-  assert.ok(names.size >= 5, [...names].join(' | '));
-  assert.equal(deriveNickname(kids, 'seed', 0), deriveNickname(kids, 'seed'));
-  for (const n of names) assert.equal(nicknameProblem(n, { guardianName: 'Dana Whitfield', childNames: ['Ava Whitfield'] }), null, n);
 });
 
 test('nicknames cannot identify the family', () => {

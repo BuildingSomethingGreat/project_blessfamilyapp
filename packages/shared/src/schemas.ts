@@ -47,12 +47,6 @@ export const FamilyApplicationSchema = z.object({
   zip: z.string().trim().regex(/^\d{5}(?:-\d{4})?$/, 'Enter a valid ZIP code'),
   transportation: z.enum(['Yes', 'No']),
   familyStory: trimmed(600).default(''),
-  /** Public display name. Empty = we pick one from the kids' interests. Checked with nicknameProblem on the server. */
-  nickname: trimmed(40).default(''),
-  /** Optional family photo as a data URL (client resizes to <= 1200px, <= 1.5MB). */
-  photoDataUrl: z.union([z.literal(''), z.string().regex(/^data:image\/(jpeg|png|webp);base64,/, 'Unsupported image').max(2_000_000, 'Photo is too large')]).default(''),
-  /** The family wants the photo kept from sponsors (staff only). */
-  photoPrivate: z.boolean().default(false),
   notes: trimmed(1000).default(''),
   children: z.array(ChildInputSchema).min(1, 'Add at least one child').max(15, 'Please contact program staff for households with more than 15 children'),
 });

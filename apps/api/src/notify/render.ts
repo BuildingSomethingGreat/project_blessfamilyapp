@@ -50,7 +50,7 @@ export function renderEmail(spec: EmailSpec, footer: Footer): { html: string; te
 
   const parts: string[] = [];
   if (spec.eyebrow) parts.push(`<p style="margin:0 0 10px;font-family:${FONT};font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:${P.pri}">${esc(spec.eyebrow)}</p>`);
-  parts.push(`<h1 style="margin:0 0 16px;font-family:${FONT};font-size:30px;line-height:1.08;font-weight:800;letter-spacing:-.04em;color:${P.ink}">${esc(spec.title)}</h1>`);
+  parts.push(`<h1 style="margin:0 0 16px;font-family:${FONT};font-size:28px;line-height:1.1;font-weight:800;letter-spacing:-.02em;text-transform:uppercase;color:${P.ink}">${esc(spec.title)}</h1>`);
   if (spec.intro) parts.push(p(spec.intro, 17, P.ink2, 18));
   for (const para of spec.paragraphs ?? []) parts.push(p(para));
   if (spec.quote) {
@@ -71,7 +71,7 @@ export function renderEmail(spec: EmailSpec, footer: Footer): { html: string; te
   }
   if (spec.cta) {
     parts.push(`<table role="presentation" cellpadding="0" cellspacing="0" style="margin:10px 0 6px"><tr><td style="border-radius:999px;background:${P.pri}" bgcolor="${P.pri}">
-      <a href="${esc(spec.cta.url)}" style="display:inline-block;padding:15px 30px;font-family:${FONT};font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:999px">${esc(spec.cta.label)} &rarr;</a>
+      <a href="${esc(spec.cta.url)}" style="display:inline-block;padding:15px 30px;font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#ffffff;text-decoration:none;border-radius:999px">${esc(spec.cta.label)} &rarr;</a>
     </td></tr></table>`);
   }
 
@@ -88,7 +88,7 @@ export function renderEmail(spec: EmailSpec, footer: Footer): { html: string; te
     <tr><td style="padding:0 6px 18px">
       <table role="presentation" cellpadding="0" cellspacing="0"><tr>
         <td style="width:32px;height:32px;border-radius:10px;background:${P.pri};text-align:center;vertical-align:middle;font-family:${FONT};font-size:17px;font-weight:800;color:#fff">K</td>
-        <td style="padding-left:10px;font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:-.01em;color:${P.ink}">Bless-A-Family <span style="font-weight:400;color:${P.ink3}">&middot; The Konnection</span></td>
+        <td style="padding-left:10px;font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:-.01em;color:${P.ink}">Bless-a-Family <span style="font-weight:400;color:${P.ink3}">&middot; The Konnection</span></td>
       </tr></table>
     </td></tr>
     <tr><td class="card" style="background:#ffffff;border-radius:28px;padding:38px 36px;border:1px solid ${P.line}">${parts.join('\n')}</td></tr>

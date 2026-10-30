@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* ---------- Bless-A-Family · v3 design tokens (The Konnection purple) ---------- */
+/* ---------- Bless-a-Family · v3 design tokens (The Konnection purple) ---------- */
 @theme {
   --font-display: 'Poppins', system-ui, sans-serif;
   --font-sans: 'Poppins', system-ui, -apple-system, sans-serif;
@@ -57,6 +57,12 @@
   body { @apply bg-bg text-ink font-sans antialiased; overscroll-behavior-y: none; }
   h1, h2, h3, .display { font-family: var(--font-display); letter-spacing: -0.03em; font-weight: 700; }
   input, textarea, select, button { font: inherit; color: inherit; }
+  /* Public site voice: titles, subtitles, buttons and link text are uppercase; descriptions and
+     paragraphs keep normal case. Scoped to .caps-ui (public layout + application), so admin data
+     rows are untouched. A `normal-case` utility still wins where something must stay as typed. */
+  .caps-ui :is(h1, h2, h3, h4, h5, h6, button, a, .caps) { text-transform: uppercase; }
+  .caps-ui :is(h1, h2, h3) { letter-spacing: -0.02em !important; } /* tight display tracking makes capitals collide */
+  .caps-ui :is(button, a, h1, h2, h3, h4) :is(p, blockquote), .caps-ui :is(p, blockquote, label) a, .caps-ui a[href^="mailto:"] { text-transform: none; }
   input::placeholder, textarea::placeholder { color: var(--color-muted-lav); }
   :focus-visible { outline: 2px solid var(--color-pri); outline-offset: 3px; border-radius: 6px; }
   button, [role='button'] { touch-action: manipulation; }

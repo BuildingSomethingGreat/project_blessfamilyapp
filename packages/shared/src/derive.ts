@@ -70,35 +70,19 @@ export function deriveTags(children: Child[]): string[] {
   return [...tags];
 }
 
-const NICK_WORDS: Record<string, string> = {
-  'Building Sets / LEGO': 'Builders', 'Art Supplies': 'Artists', Books: 'Readers', 'Sports Equipment': 'Athletes', 'Board Games': 'Game Night Crew',
-  'Music Items': 'Music Makers', Puzzles: 'Puzzlers', 'Craft Kits': 'Makers', 'Video Games': 'Gamers', 'Toys / Dolls': 'Playmakers',
-  'Educational Games': 'Explorers',
-};
-
-const NICK_ADJECTIVES = ['Bright', 'Merry', 'Kind', 'Curious', 'Cozy', 'Hopeful', 'Golden', 'Brave', 'Jolly', 'Joyful', 'Sunny', 'Starry'];
-type NickSource = Pick<Child, 'giftTypes' | 'hobbies'>;
+export const PROGRAM_NAME = 'Bless-a-Family';
 
 /**
- * Friendly, non-identifying display name derived from the kids' interests ("The Merry Builders").
- * `variant` 0 is the default; other values give the alternatives behind the "Shuffle" button.
+ * Every family is listed as "Bless-a-Family #N", where N is its number in the season
+ * (BF-2026-012 → "Bless-a-Family #12"). Staff can still rename a family in admin.
  */
-export function deriveNickname(children: NickSource[], seed: string, variant = 0): string {
-  const counts = new Map<string, number>();
-  for (const c of children) for (const g of c.giftTypes) counts.set(g, (counts.get(g) ?? 0) + 1);
-  const words = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([g]) => NICK_WORDS[g]).filter((w): w is string => !!w);
-  const hobby = children.map((c) => c.hobbies).find(Boolean)?.split(/[,\s]+/)[0]?.replace(/[^\p{L}]/gu, '');
-  if (hobby && hobby.length >= 3) words.push(`${hobby.replace(/^\p{L}/u, (m) => m.toUpperCase())} Family`);
-  if (!words.length) words.push('Family');
-  const hash = [...seed].reduce((a, ch) => (a * 31 + ch.charCodeAt(0)) >>> 0, 7);
-  const adjs = variant === 0 ? NICK_ADJECTIVES.slice(0, 8) : NICK_ADJECTIVES; // variant 0 keeps names stable for existing families
-  const adj = adjs[(hash + variant * 5) % adjs.length];
-  const word = words[variant % words.length];
-  return `The ${adj} ${word}`;
+export function familyNickname(familyId: string): string {
+  const n = Number(familyId.match(/(\d+)\s*$/)?.[1] ?? NaN);
+  return Number.isFinite(n) ? `${PROGRAM_NAME} #${n}` : PROGRAM_NAME;
 }
 
 /**
- * Nicknames are public, so they must not identify the family. Returns a message to show, or null if
+ * Nicknames are public, so a staff rename must not identify the family. Returns a message to show, or null if
  * the nickname is fine. Checks length, characters, the parent's name, the children's last names and
  * long numbers (addresses, phone numbers). Children's first names are already public and are allowed.
  */
@@ -132,7 +116,7 @@ export function toPublicFamily(f: Family, now = new Date()): PublicFamily {
   return {
     familyId: f.familyId,
     slug: f.slug,
-    nickname: f.nickname || deriveNickname(kids, f.familyId),
+    nickname: f.nickname || familyNickname(f.familyId),
     city: f.city,
     status: f.status,
     story: f.storyApproved ? f.familyStory : '',
