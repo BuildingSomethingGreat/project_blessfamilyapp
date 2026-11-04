@@ -25,4 +25,4 @@ Privacy rules the API enforces: a family photo is public only when Photo Approve
 Useful Airtable views to create by hand: *Families · Available* (Status = Available, sort by Approved At), *Sponsorships · Needs attention* (Flagged = ✓ or Last Response At older than 3 days), *Activity · Messages* (Type = message_sent).
 
 ## Test data
-The base is prefilled with 16 fictional households (30 children), 5 sponsors and 5 sponsorships at different dominoes steps, matching `apps/api/src/lib/seed-data.ts`. Guardian names, addresses and 555 phone numbers are invented. To wipe them before the real season, delete the rows in Families, Children, Sponsors, Sponsorships and Activity (Settings stay). The same data loads automatically in local dev (memory store).
+The live base was cleared of all test data on November 4, 2026 (families, children, sponsors, sponsorships and their activity); Settings were kept. The first real application becomes BF-2026-001 ("Bless-a-Family #1"). The fictional demo households in `apps/api/src/lib/seed-data.ts` still load automatically in local dev (memory store) and are never written to Airtable.
