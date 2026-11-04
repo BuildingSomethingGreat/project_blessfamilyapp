@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
-    "partners:fetch": "node scripts/fetch-partners.mjs"
+    "partners:fetch": "node scripts/fetch-partners.mjs",
+    "og:make": "node scripts/make-og.mjs"
   },
   "dependencies": {
     "@bless/shared": "workspace:*",

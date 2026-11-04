@@ -91,3 +91,6 @@ The program name is **Bless-a-Family** everywhere (site, PWA, emails, legal page
 - **Donations** go to https://www.zeffy.com/en-US/donation-form/2026-holiday-bless-a-family (`orgDonateUrl` and `chipInUrl`). The landing button reads "Give to Bless-a-Family". Airtable had two `orgDonateUrl` rows pointing at thekonnection.org; both were updated.
 - **Logo** is The Konnection's full-color logo for white backgrounds (`apps/web/public/brand/konnection-logo.png`, cropped, transparent).
 - **Domain** is `bless-a-family.thekonnection.org` (GoDaddy DNS → Netlify), and email sends from that subdomain via Resend. Steps in `docs/DEPLOY.md`.
+
+## Social preview image
+`apps/web/public/og-image.jpg` (1200×630) is the link preview for Facebook, iMessage, LinkedIn, X and Slack, wired up with Open Graph and Twitter tags in `apps/web/index.html`. It's built from the landing page's own pieces (logo, the "Give a family the holiday they've been hoping for." headline, last season's campaign photos, the festive branch) rather than a raw screenshot, so it never shows live counts. Tags use the canonical domain `https://bless-a-family.thekonnection.org`, so previews appear once that domain is live. Each season, regenerate it with `pnpm --filter @bless/web og:make -- --season 2027` (dev server running), then re-scrape in the Facebook Sharing Debugger.
