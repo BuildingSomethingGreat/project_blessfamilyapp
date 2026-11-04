@@ -4,12 +4,13 @@ import { toPublicFamily, familyNickname, nicknameProblem, colorToHex } from './d
 import { canTransition } from './status.ts';
 import { ChildInputSchema, FamilyApplicationSchema } from './schemas.ts';
 import type { Family, Child } from './types.ts';
-import { GOAL_PER_CHILD } from './sizes.ts';
+import { GIFT_OPTIONS, GOAL_PER_CHILD } from './sizes.ts';
+import { cleanGiftDetails, giftDetailLines, giftDetailsFromText, giftDetailsToText, GIFT_QUESTIONS } from './gifts.ts';
 
 const child = (over: Partial<Child> = {}): Child => ({
   id: 'c1', familyId: 'f1', name: 'Jordan Smith', age: 8, gender: 'Boy', clothingCategory: 'Youth / Kids', shirtSize: '12', pantsSize: '12',
   shoeCategory: 'Youth / Kids', shoeSize: '3', sizeNotes: '', favoriteColor: 'Purple', hobbies: 'Drawing', clothingWishlist: ['Winter Coat'],
-  otherClothing: '', giftTypes: ['Art Supplies'], specificGifts: '', sortOrder: 0, ...over,
+  otherClothing: '', giftTypes: ['Art Supplies'], giftDetails: {}, specificGifts: '', sortOrder: 0, ...over,
 });
 
 const family: Family = {
@@ -89,4 +90,20 @@ test('nicknames cannot identify the family', () => {
   assert.match(nicknameProblem('The 4521 Elm Family', priv)!, /numbers/);
   assert.match(nicknameProblem('Hi', priv)!, /between/);
   assert.match(nicknameProblem('<script>', priv)!, /letters/);
+});
+
+test('gift follow-ups: required answers, cleaning, and the Airtable text round trip', () => {
+  const kid = { name: 'Maya', age: 9, gender: 'Girl', clothingCategory: 'Youth / Kids', shirtSize: '10', pantsSize: '10', shoeCategory: 'Youth / Kids', shoeSize: '3', giftTypes: ['Video Games', 'Gift Card to a Store'], giftDetails: {} };
+  const missing = ChildInputSchema.safeParse(kid);
+  assert.equal(missing.success, false);
+  assert.deepEqual(missing.error!.issues.map((i) => i.path.join('.')).sort(), ['giftDetails.gc_store', 'giftDetails.vg_system']);
+  const ok = ChildInputSchema.safeParse({ ...kid, giftDetails: { vg_system: 'Nintendo Switch, PC', gc_store: 'Target', books_level: 'Teen' } });
+  assert.ok(ok.success);
+  const details = cleanGiftDetails(kid.giftTypes, ok.data!.giftDetails);
+  assert.deepEqual(details, { vg_system: 'Nintendo Switch, PC', gc_store: 'Target' }, 'answers for unselected gifts are dropped');
+  const text = giftDetailsToText(details);
+  assert.equal(text, 'Video Games · System: Nintendo Switch, PC\nGift Card to a Store · Store: Target');
+  assert.deepEqual(giftDetailsFromText(text), details);
+  assert.deepEqual(giftDetailLines(kid.giftTypes, details), [{ gift: 'Video Games', parts: ['Nintendo Switch, PC'] }, { gift: 'Gift Card to a Store', parts: ['Target'] }]);
+  assert.ok(GIFT_QUESTIONS.every((q) => (GIFT_OPTIONS as readonly string[]).includes(q.gift)), 'every follow-up belongs to a real gift option');
 });

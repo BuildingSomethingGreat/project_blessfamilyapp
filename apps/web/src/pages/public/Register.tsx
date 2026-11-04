@@ -1,17 +1,18 @@
 import { useQuery } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { CLOTHING_CATEGORIES, CLOTHING_OPTIONS, CLOTHING_SIZES, CONTACT_METHODS, FAVORITE_COLORS, GENDERS, GIFT_OPTIONS, OTHER_SIZE, SHOE_SIZES, TRANSPORT_OPTIONS, FamilyApplicationSchema, colorSwatch, type ChildInput, type ClothingCategory } from '@bless/shared';
+import { CLOTHING_CATEGORIES, CLOTHING_OPTIONS, CLOTHING_SIZES, CONTACT_METHODS, FAVORITE_COLORS, GENDERS, GIFT_OPTIONS, OTHER_SIZE, SHOE_SIZES, TRANSPORT_OPTIONS, FamilyApplicationSchema, cleanGiftDetails, colorSwatch, giftQuestionsFor, missingGiftDetails, type ChildInput, type ClothingCategory } from '@bless/shared';
 import { api, ApiError } from '@/lib/api';
 import { Checkbox, KMark, Seg, Select, UnderlineInput } from '@/components/ui';
 import { cx } from '@/lib/format';
+import { GiftFollowUps } from '@/components/GiftFollowUps';
 
-type Kid = { name: string; age: string; gender: string; cat: ClothingCategory; shirt: string; pants: string; shoe: string; sizeNotes: string; hobbies: string; color: string; clothing: string[]; clothingExtra: string; gifts: string[]; giftsExtra: string };
+type Kid = { name: string; age: string; gender: string; cat: ClothingCategory; shirt: string; pants: string; shoe: string; sizeNotes: string; hobbies: string; color: string; clothing: string[]; clothingExtra: string; gifts: string[]; giftsExtra: string; giftDetails?: Record<string, string> };
 type Ans = { guardian: string; phone: string; contact: string; email: string; city: string; address: string; zip: string; transport: string; kidCount: string; kids: Kid[]; story: string; eligible: boolean };
-type Step = { t: 'welcome' | 'text' | 'choice' | 'address' | 'who' | 'sizes' | 'interests' | 'multi' | 'story' | 'confirm' | 'done'; key?: keyof Ans | 'clothing' | 'gifts'; i?: number; kicker?: string; title: string; help?: string; ph?: string; type?: string; opts?: readonly string[]; extraPh?: string };
+type Step = { t: 'welcome' | 'text' | 'choice' | 'address' | 'who' | 'sizes' | 'interests' | 'multi' | 'giftq' | 'story' | 'confirm' | 'done'; key?: keyof Ans | 'clothing' | 'gifts'; i?: number; kicker?: string; title: string; help?: string; ph?: string; type?: string; opts?: readonly string[]; extraPh?: string };
 
 const DRAFT = 'baf-register-draft';
-const blankKid = (): Kid => ({ name: '', age: '', gender: '', cat: 'Youth / Kids', shirt: '', pants: '', shoe: '', sizeNotes: '', hobbies: '', color: '', clothing: [], clothingExtra: '', gifts: [], giftsExtra: '' });
+const blankKid = (): Kid => ({ name: '', age: '', gender: '', cat: 'Youth / Kids', shirt: '', pants: '', shoe: '', sizeNotes: '', hobbies: '', color: '', clothing: [], clothingExtra: '', gifts: [], giftsExtra: '', giftDetails: {} });
 const fresh = (): Ans => ({ guardian: '', phone: '', contact: '', email: '', city: '', address: '', zip: '', transport: '', kidCount: '', kids: [], story: '', eligible: false });
 const field = 'mt-1.5 h-[50px] w-full rounded-2xl border border-line bg-bg px-4 text-base outline-none focus:border-pri focus:bg-white';
 const label = 'text-[13px] font-semibold text-ink-2';
@@ -42,6 +43,8 @@ function buildSteps(a: Ans): Step[] {
       { t: 'multi', i, key: 'clothing', kicker: `Child ${i + 1} · ${nm}`, title: `Clothing ${nm} needs`, opts: CLOTHING_OPTIONS, extraPh: 'Anything else? (optional)' },
       { t: 'multi', i, key: 'gifts', kicker: `Child ${i + 1} · ${nm}`, title: `Fun gifts for ${nm}`, help: 'Pick a few kinds. Holiday Konnectors choose within them.', opts: GIFT_OPTIONS, extraPh: 'A specific wish, e.g. a sketchbook and markers' },
     );
+    // Short follow-ups for the gifts just picked (game system, which store…), only when there are any.
+    if (giftQuestionsFor(a.kids[i]?.gifts ?? []).length) s.push({ t: 'giftq', i, kicker: `Child ${i + 1} · ${nm}`, title: `A few gift details for ${nm}`, help: 'So Holiday Konnectors buy the right thing.' });
   }
   s.push(
     { t: 'story', key: 'story', kicker: 'Your story', title: 'Tell Holiday Konnectors a little about your family.', help: 'Two or three sentences. What makes your kids who they are? Optional, but families with a story are chosen sooner.' },
@@ -59,7 +62,7 @@ function toApplication(a: Ans) {
     address: a.address, city: a.city, state: 'MI', zip: a.zip, transportation: (a.transport === TRANSPORT_OPTIONS[0] || a.transport === 'I can pick up' ? 'Yes' : 'No') as 'Yes' | 'No', familyStory: a.story, notes: '',
     children: a.kids.slice(0, Math.min(15, Number(a.kidCount) || 0)).map((k): ChildInput => ({
       name: k.name, age: Number(k.age), gender: (k.gender || 'Prefer not to say') as ChildInput['gender'], clothingCategory: k.cat, shirtSize: k.shirt, pantsSize: k.pants, shoeCategory: k.cat, shoeSize: k.shoe,
-      sizeNotes: k.sizeNotes, favoriteColor: k.color, hobbies: k.hobbies, clothingWishlist: k.clothing as ChildInput['clothingWishlist'], otherClothing: k.clothingExtra, giftTypes: k.gifts as ChildInput['giftTypes'], specificGifts: k.giftsExtra,
+      sizeNotes: k.sizeNotes, favoriteColor: k.color, hobbies: k.hobbies, clothingWishlist: k.clothing as ChildInput['clothingWishlist'], otherClothing: k.clothingExtra, giftTypes: k.gifts as ChildInput['giftTypes'], giftDetails: cleanGiftDetails(k.gifts, k.giftDetails), specificGifts: k.giftsExtra,
     })),
   };
 }
@@ -92,6 +95,7 @@ export default function Register() {
       case 'sizes': return !!kid.shirt && !!kid.pants && !!kid.shoe && !([kid.shirt, kid.pants, kid.shoe].includes(OTHER_SIZE) && !kid.sizeNotes.trim());
       case 'interests': return !!kid.hobbies.trim();
       case 'multi': return (kid[q.key as 'clothing' | 'gifts'] ?? []).length > 0;
+      case 'giftq': return missingGiftDetails(kid.gifts, kid.giftDetails).length === 0;
       case 'confirm': return a.eligible;
       default: return true;
     }
@@ -198,6 +202,11 @@ export default function Register() {
                 <div className="mt-[26px] flex flex-wrap gap-2">{q.opts!.map((o) => { const list = kid[q.key as 'clothing' | 'gifts']; const on = list.includes(o); return <Seg key={o} active={on} onClick={() => setKid(q.i!, { [q.key as 'clothing' | 'gifts']: on ? list.filter((x) => x !== o) : [...list, o] })} className="h-[42px] px-3.5">{o}</Seg>; })}</div>
                 <input value={q.key === 'clothing' ? kid.clothingExtra : kid.giftsExtra} onChange={(e) => setKid(q.i!, q.key === 'clothing' ? { clothingExtra: e.target.value.slice(0, 500) } : { giftsExtra: e.target.value.slice(0, 500) })} placeholder={q.extraPh} className="mt-3.5 h-12 w-full rounded-[14px] border border-line bg-bg px-3.5 text-[14px] outline-none focus:border-pri" />
               </>
+            )}
+            {q.t === 'giftq' && (
+              <div className="mt-[26px]">
+                <GiftFollowUps giftTypes={kid.gifts} value={kid.giftDetails ?? {}} onChange={(d) => setKid(q.i!, { giftDetails: d })} />
+              </div>
             )}
             {q.t === 'story' && (
               <>

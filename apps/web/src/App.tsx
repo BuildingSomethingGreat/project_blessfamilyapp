@@ -25,6 +25,7 @@ const Dashboard = lazy(() => import('./pages/admin/Dashboard.tsx'));
 const Review = lazy(() => import('./pages/admin/Review.tsx'));
 const AdminFamilies = lazy(() => import('./pages/admin/Families.tsx'));
 const AdminFamily = lazy(() => import('./pages/admin/FamilyDetail.tsx'));
+const AdminFamilyEdit = lazy(() => import('./pages/admin/FamilyEdit.tsx'));
 const Sponsors = lazy(() => import('./pages/admin/Sponsors.tsx'));
 const Assistant = lazy(() => import('./pages/admin/Assistant.tsx'));
 const Settings = lazy(() => import('./pages/admin/Settings.tsx'));
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="review" element={<Review />} />
               <Route path="families" element={<AdminFamilies />} />
               <Route path="families/:id" element={<AdminFamily />} />
+              <Route path="families/:id/edit" element={<AdminFamilyEdit />} />
               <Route path="sponsors" element={<Sponsors />} />
               <Route path="follow-ups" element={<Navigate to="/admin/sponsors" replace />} />
               <Route path="emails" element={<Emails />} />

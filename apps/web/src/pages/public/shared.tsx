@@ -1,5 +1,5 @@
 import type { PublicFamily, PublicChild } from '@bless/shared';
-import { AGE_GROUPS, NEED_FILTERS, colorSwatch, familyArt, type AgeGroupKey, type NeedKey } from '@bless/shared';
+import { AGE_GROUPS, NEED_FILTERS, colorSwatch, familyArt, giftDetailLines, type AgeGroupKey, type NeedKey } from '@bless/shared';
 import { Link } from 'react-router-dom';
 import { cx } from '@/lib/format';
 
@@ -76,7 +76,19 @@ export function WishlistCard({ k, n }: { k: PublicChild; n: number }) {
       <div className="mt-1.5 flex flex-wrap gap-1.5">{[...k.clothingWishlist, ...(k.otherClothing ? [k.otherClothing] : [])].map((c) => <span key={c} className="rounded-full bg-soft px-2.5 py-[5px] text-[12px] font-semibold text-pri-dark">{c}</span>)}</div>
       <div className="mt-3 text-[12px] font-semibold text-ink-2">Fun gifts</div>
       <div className="mt-1.5 flex flex-wrap gap-1.5">{[...k.giftTypes, ...(k.specificGifts ? [k.specificGifts] : [])].map((g) => <span key={g} className="rounded-full border border-line bg-bg px-2.5 py-[5px] text-[12px] font-semibold text-ink">{g}</span>)}</div>
+      <GiftDetailList k={k} />
     </div>
+  );
+}
+
+/** The gift follow-up answers ("Video Games: Nintendo Switch · Mario Kart"), when the parent gave any. */
+export function GiftDetailList({ k, compact }: { k: Pick<PublicChild, 'giftTypes' | 'giftDetails'>; compact?: boolean }) {
+  const lines = giftDetailLines(k.giftTypes, k.giftDetails);
+  if (!lines.length) return null;
+  return (
+    <ul className={cx('grid gap-1 rounded-[12px] bg-bg', compact ? 'mt-2 px-2.5 py-2 text-[12px]' : 'mt-2.5 px-3 py-2.5 text-[13px]')}>
+      {lines.map((l) => <li key={l.gift} className="leading-[1.45] text-ink-2"><b className="font-semibold text-ink">{l.gift}:</b> {l.parts.join(' · ')}</li>)}
+    </ul>
   );
 }
 
@@ -89,6 +101,7 @@ export function KidMini({ k }: { k: PublicChild }) {
         {k.clothingWishlist.map((c) => <span key={c} className="rounded-full bg-soft px-[9px] py-1 text-[12px] font-semibold text-pri-dark">{c}</span>)}
         {k.giftTypes.map((g) => <span key={g} className="rounded-full border border-line bg-bg px-[9px] py-1 text-[12px] font-semibold">{g}</span>)}
       </div>
+      <GiftDetailList k={k} compact />
     </div>
   );
 }

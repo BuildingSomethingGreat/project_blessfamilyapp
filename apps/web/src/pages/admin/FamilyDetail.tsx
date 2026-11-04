@@ -6,6 +6,7 @@ import { api } from '@/lib/api';
 import { Button, Chip, Dominoes, FamilyArt, Input, Kicker, Label, Select, Sheet, Skeleton, Textarea, Toggle, useToast } from '@/components/ui';
 import { NicknameField } from '@/components/NicknameField';
 import { cx, fmtDate, fmtDateTime, plural, timeAgo } from '@/lib/format';
+import { GiftDetailList } from '../public/shared.tsx';
 import { Panel, PanelTitle, RELEASE_REASONS, SpStatusChip, StatusChip, copyText } from './shared.tsx';
 
 type Sp = Sponsorship & { sponsor: Sponsor | null; family?: { nickname: string } | null };
@@ -89,6 +90,7 @@ export default function FamilyDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link to={`/admin/families/${f.id}/edit`} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-ink px-4 text-[13px] font-semibold text-white transition-colors hover:bg-pri">✎ Edit details</Link>
           {FAMILY_ACTIONS[f.status].map((a) => (
             <Button key={a.to} size="sm" variant={a.variant} onClick={() => { if (a.to === 'Declined' || a.to === 'Withdrawn' ? window.confirm(`${a.label} ${f.familyId}? Holiday Konnectors will no longer see this family.`) : true) patchFamily.mutate({ status: a.to }); }} loading={patchFamily.isPending && patchFamily.variables?.status === a.to}>{a.label}</Button>
           ))}
@@ -144,7 +146,7 @@ export default function FamilyDetail() {
           </div>
 
           <div className="space-y-3.5">
-            <h2 className="text-[20px]">Children</h2>
+            <div className="flex items-end justify-between gap-3"><h2 className="text-[20px]">Children</h2><Link to={`/admin/families/${f.id}/edit`} className="text-[13px] font-semibold text-pri hover:text-pri-dark">Edit children</Link></div>
             {f.children.map((c, i) => (
               <Panel key={c.id}>
                 <div className="flex items-center justify-between gap-3">
@@ -161,6 +163,7 @@ export default function FamilyDetail() {
                 <div className="mt-1.5 flex flex-wrap gap-1.5">{c.clothingWishlist.map((x) => <Chip key={x} tone="soft">{x}</Chip>)}{c.otherClothing && <Chip tone="outline">{c.otherClothing}</Chip>}{!c.clothingWishlist.length && !c.otherClothing && <span className="text-[13px] text-ink-3">—</span>}</div>
                 <div className="mt-3 text-[12px] font-semibold text-ink-2">Fun gifts</div>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">{c.giftTypes.map((x) => <Chip key={x} tone="outline">{x}</Chip>)}{c.specificGifts && <Chip tone="outline">{c.specificGifts}</Chip>}{!c.giftTypes.length && !c.specificGifts && <span className="text-[13px] text-ink-3">—</span>}</div>
+                <GiftDetailList k={c} />
               </Panel>
             ))}
           </div>

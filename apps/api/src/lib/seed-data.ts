@@ -1,3 +1,4 @@
+import { cleanGiftDetails } from '@bless/shared';
 import type { NewChild } from '../store/types.ts';
 
 /**
@@ -29,9 +30,16 @@ export interface SeedHousehold {
   kids: NewChild[];
 }
 
+/** Sample follow-up answers so demo families show what Holiday Konnectors see (local dev only). */
+const DEMO_GIFT_DETAILS: Record<string, string> = {
+  vg_system: 'Nintendo Switch', vg_games: 'Mario Kart, Minecraft', gc_store: 'Target', sport: 'Basketball', music_item: 'Headphones', books_level: 'Chapter books',
+  lego_theme: 'City, Minecraft', art_kind: 'Drawing, Painting', toys_kind: 'Dolls, plush', other_gift: 'Science kit', puzzle_size: '100–300 pieces',
+};
+const demoDetails = (giftTypes: readonly string[] = []) => cleanGiftDetails(giftTypes, DEMO_GIFT_DETAILS);
+
 const kid = (o: Partial<NewChild> & { name: string; age: number }): NewChild => ({
   gender: 'Girl', clothingCategory: 'Youth / Kids', shirtSize: '10', pantsSize: '10', shoeCategory: 'Youth / Kids', shoeSize: '3', sizeNotes: '',
-  favoriteColor: 'Blue', hobbies: '', clothingWishlist: [], otherClothing: '', giftTypes: [], specificGifts: '', sortOrder: 0, ...o,
+  favoriteColor: 'Blue', hobbies: '', clothingWishlist: [], otherClothing: '', giftTypes: [], specificGifts: '', sortOrder: 0, ...o, giftDetails: o.giftDetails ?? demoDetails(o.giftTypes),
 });
 
 export const SEED_HOUSEHOLDS: SeedHousehold[] = [

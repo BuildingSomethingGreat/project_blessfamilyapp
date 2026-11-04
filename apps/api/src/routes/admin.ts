@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { FamilyStatusSchema, HANDOFFS, nicknameProblem, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
+import { cleanGiftDetails, FamilyDetailsSchema, FamilyStatusSchema, giftDetailsToText, HANDOFFS, nicknameProblem, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { isAdminEmail, loginToken, sessionToken, verifyToken, SESSION_COOKIE } from '../lib/auth.ts';
@@ -111,6 +111,20 @@ export function adminRoutes(services: Services) {
     const updated = await store.updateFamily(f.id, full);
     await store.logActivity({ type: 'admin_action', channel: 'system', familyId: f.id, sponsorshipId: null, subject: `${c.get('admin')} updated ${f.familyId}`, body: '', meta: { patch, from: f.status }, occurredAt: nowIso() });
     if (patch.status === 'Available' && f.status !== 'Available') await followUp.sendToFamily('family_approved', updated, { actor: 'admin' }).catch(() => {});
+    return c.json({ ...updated, public: toPublicFamily(updated) });
+  });
+  // Full edit of household details and children, at any status (also after approval).
+  r.put('/families/:id/details', async (c) => {
+    const f = await store.getFamily(c.req.param('id'));
+    if (!f) throw new HttpError(404, 'Not found');
+    const parsed = FamilyDetailsSchema.safeParse(await c.req.json());
+    if (!parsed.success) return c.json({ error: parsed.error.issues[0]?.message ?? 'Check the form', issues: parsed.error.flatten() }, 400);
+    const { children, ...household } = parsed.data;
+    const before = { household: Object.fromEntries(Object.keys(household).map((k) => [k, (f as any)[k]])), kids: f.children.length };
+    await store.updateFamily(f.id, { ...household, state: household.state.toUpperCase() });
+    const updated = await store.saveChildren(f.id, children.map((k, i) => ({ ...k, giftDetails: cleanGiftDetails(k.giftTypes, k.giftDetails), sortOrder: i })));
+    const changed = Object.keys(household).filter((k) => String((before.household as any)[k] ?? '') !== String((household as any)[k] ?? ''));
+    await store.logActivity({ type: 'admin_action', channel: 'system', familyId: f.id, sponsorshipId: null, subject: `${c.get('admin')} edited ${f.familyId} details`, body: [changed.length ? `Household: ${changed.join(', ')}` : '', `Children: ${before.kids} → ${updated.children.length}`].filter(Boolean).join('\n'), meta: { changed, kidsBefore: before.kids, kidsAfter: updated.children.length }, occurredAt: nowIso() });
     return c.json({ ...updated, public: toPublicFamily(updated) });
   });
   r.post('/families/:id/email', async (c) => {
@@ -268,11 +282,11 @@ export function adminRoutes(services: Services) {
     const fams = await store.listFamilies({ season: settings.season });
     const sps = await store.listSponsorships();
     const sponsors = new Map((await store.listSponsors()).map((s) => [s.id, s]));
-    const rows = [['Family ID', 'Nickname', 'Status', 'Guardian', 'Phone', 'Email', 'Address', 'City', 'State', 'ZIP', 'Transportation', 'Child', 'Age', 'Gender', 'Clothing Category', 'Shirt', 'Pants', 'Shoe Category', 'Shoe', 'Size Notes', 'Favorite Color', 'Hobbies', 'Clothing Wishlist', 'Other Clothing', 'Gift Types', 'Specific Gifts', 'Holiday Konnector', 'Konnector Email', 'Konnector Phone', 'Hand-off', 'Sponsorship Status']];
+    const rows = [['Family ID', 'Nickname', 'Status', 'Guardian', 'Phone', 'Email', 'Address', 'City', 'State', 'ZIP', 'Transportation', 'Child', 'Age', 'Gender', 'Clothing Category', 'Shirt', 'Pants', 'Shoe Category', 'Shoe', 'Size Notes', 'Favorite Color', 'Hobbies', 'Clothing Wishlist', 'Other Clothing', 'Gift Types', 'Gift Details', 'Specific Gifts', 'Holiday Konnector', 'Konnector Email', 'Konnector Phone', 'Hand-off', 'Sponsorship Status']];
     for (const f of fams) {
       const s = sps.filter((x) => x.familyId === f.id && x.status !== 'Released').sort((a, b) => b.claimedAt.localeCompare(a.claimedAt))[0];
       const sp = s ? sponsors.get(s.sponsorId) : null;
-      for (const k of f.children) rows.push([f.familyId, toPublicFamily(f).nickname, f.status, f.guardianName, f.phone, f.email, f.address, f.city, f.state, f.zip, f.transportation, k.name, String(k.age), k.gender, k.clothingCategory, k.shirtSize, k.pantsSize, k.shoeCategory, k.shoeSize, k.sizeNotes, k.favoriteColor, k.hobbies, k.clothingWishlist.join('; '), k.otherClothing, k.giftTypes.join('; '), k.specificGifts, sp?.name ?? '', sp?.email ?? '', sp?.phone ?? '', s?.handoff ?? '', s?.status ?? '']);
+      for (const k of f.children) rows.push([f.familyId, toPublicFamily(f).nickname, f.status, f.guardianName, f.phone, f.email, f.address, f.city, f.state, f.zip, f.transportation, k.name, String(k.age), k.gender, k.clothingCategory, k.shirtSize, k.pantsSize, k.shoeCategory, k.shoeSize, k.sizeNotes, k.favoriteColor, k.hobbies, k.clothingWishlist.join('; '), k.otherClothing, k.giftTypes.join('; '), giftDetailsToText(k.giftDetails).replace(/\n/g, '; '), k.specificGifts, sp?.name ?? '', sp?.email ?? '', sp?.phone ?? '', s?.handoff ?? '', s?.status ?? '']);
     }
     const csv = toCsv(rows);
     return c.body(csv, 200, { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="bless-a-family-${settings.season}.csv"` });

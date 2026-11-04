@@ -1,5 +1,5 @@
-import type { Activity, Family, FamilyStatus, Quote, QuoteStatus, SeasonSettings, Sponsor, Sponsorship, SponsorshipStatus, Child } from '@bless/shared';
-import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewFamily, type NewQuote, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
+import { giftDetailsFromText, giftDetailsToText, type Activity, type Family, type FamilyStatus, type Quote, type QuoteStatus, type SeasonSettings, type Sponsor, type Sponsorship, type SponsorshipStatus, type Child } from '@bless/shared';
+import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewChild, type NewFamily, type NewQuote, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
 import { uuid } from '../lib/ids.ts';
 
 /**
@@ -86,6 +86,10 @@ export class AirtableStore implements Store {
     this.bust();
     return out;
   }
+  private async del(table: string, ids: string[]) {
+    for (let i = 0; i < ids.length; i += 10) await this.req('DELETE', table, '', undefined, { 'records[]': ids.slice(i, i + 10) });
+    this.bust();
+  }
   private async patch(table: string, id: string, fields: Record<string, unknown>): Promise<Rec> {
     const r = await this.req<Rec>('PATCH', table, `/${id}`, { fields, typecast: true });
     this.bust();
@@ -100,14 +104,15 @@ export class AirtableStore implements Store {
       clothingCategory: f['Clothing Category'] ?? 'Youth / Kids', shirtSize: f['Shirt Size'] ?? '', pantsSize: f['Pants Size'] ?? '',
       shoeCategory: f['Shoe Category'] ?? 'Youth / Kids', shoeSize: f['Shoe Size'] ?? '', sizeNotes: f['Size Notes'] ?? '', favoriteColor: f['Favorite Color'] ?? '',
       hobbies: f['Hobbies'] ?? '', clothingWishlist: f['Clothing Wishlist'] ?? [], otherClothing: f['Other Clothing'] ?? '', giftTypes: f['Gift Types'] ?? [],
-      specificGifts: f['Specific Gifts'] ?? '', sortOrder: Number(f['Sort Order'] ?? 0),
+      giftDetails: giftDetailsFromText(f['Gift Details']), specificGifts: f['Specific Gifts'] ?? '', sortOrder: Number(f['Sort Order'] ?? 0),
     };
   }
   private childTo(c: Partial<Child>, familyRecId: string) {
     return {
       Name: c.name, Age: c.age, Gender: c.gender, 'Clothing Category': c.clothingCategory, 'Shirt Size': c.shirtSize, 'Pants Size': c.pantsSize,
       'Shoe Category': c.shoeCategory, 'Shoe Size': c.shoeSize, 'Size Notes': c.sizeNotes, 'Favorite Color': c.favoriteColor, Hobbies: c.hobbies,
-      'Clothing Wishlist': c.clothingWishlist, 'Other Clothing': c.otherClothing, 'Gift Types': c.giftTypes, 'Specific Gifts': c.specificGifts,
+      'Clothing Wishlist': c.clothingWishlist, 'Other Clothing': c.otherClothing, 'Gift Types': c.giftTypes,
+      'Gift Details': c.giftDetails === undefined ? undefined : giftDetailsToText(c.giftDetails), 'Specific Gifts': c.specificGifts,
       'Sort Order': c.sortOrder, Family: [familyRecId],
     };
   }
@@ -213,6 +218,21 @@ export class AirtableStore implements Store {
     const f = await this.getFamily(id);
     if (!f) throw new Error('family not found');
     return f;
+  }
+  async saveChildren(familyId: string, children: (NewChild & { id?: string })[]) {
+    const f = await this.getFamily(familyId);
+    if (!f) throw new Error('family not found');
+    const keep = new Set(children.map((c) => c.id).filter(Boolean));
+    const gone = f.children.filter((c) => !keep.has(c.id)).map((c) => c.id);
+    for (const [i, c] of children.entries()) {
+      const fields = this.childTo({ ...c, sortOrder: i }, familyId);
+      if (c.id && f.children.some((k) => k.id === c.id)) await this.patch(T.children, c.id, fields);
+      else await this.create(T.children, fields);
+    }
+    if (gone.length) await this.del(T.children, gone);
+    const out = await this.getFamily(familyId);
+    if (!out) throw new Error('family not found');
+    return out;
   }
   /** Uploads a data URL to the Photo attachment field via Airtable's content API. */
   async storeFamilyPhoto(id: string, dataUrl: string) {

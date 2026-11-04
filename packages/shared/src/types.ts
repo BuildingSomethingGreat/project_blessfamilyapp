@@ -20,6 +20,8 @@ export interface Child {
   clothingWishlist: string[];
   otherClothing: string;
   giftTypes: string[];
+  /** Answers to the gift follow-up questions, keyed by question id (see gifts.ts). */
+  giftDetails: Record<string, string>;
   specificGifts: string;
   sortOrder: number;
 }
@@ -75,6 +77,8 @@ export interface PublicChild {
   clothingWishlist: string[];
   otherClothing: string;
   giftTypes: string[];
+  /** Gift follow-up answers (system, store, sport…), only for the gifts selected. */
+  giftDetails: Record<string, string>;
   specificGifts: string;
 }
 

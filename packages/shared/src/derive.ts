@@ -1,3 +1,4 @@
+import { cleanGiftDetails } from './gifts.ts';
 import type { Child, Family, PublicFamily, PublicChild } from './types.ts';
 import { GOAL_PER_CHILD } from './sizes.ts';
 
@@ -102,7 +103,7 @@ export function toPublicChild(c: Child): PublicChild {
   return {
     name: firstName(c.name), age: c.age, gender: c.gender, clothingCategory: c.clothingCategory, shirtSize: c.shirtSize,
     pantsSize: c.pantsSize, shoeCategory: c.shoeCategory, shoeSize: c.shoeSize, sizeNotes: c.sizeNotes, favoriteColor: c.favoriteColor,
-    hobbies: c.hobbies, clothingWishlist: c.clothingWishlist, otherClothing: c.otherClothing, giftTypes: c.giftTypes, specificGifts: c.specificGifts,
+    hobbies: c.hobbies, clothingWishlist: c.clothingWishlist, otherClothing: c.otherClothing, giftTypes: c.giftTypes, giftDetails: cleanGiftDetails(c.giftTypes, c.giftDetails), specificGifts: c.specificGifts,
   };
 }
 

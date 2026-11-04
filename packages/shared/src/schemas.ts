@@ -2,11 +2,12 @@ import { z } from 'zod';
 import { CLOTHING_CATEGORIES, CLOTHING_OPTIONS, CONTACT_METHODS, GENDERS, GIFT_OPTIONS, OTHER_SIZE, CLOTHING_SIZES, SHOE_SIZES } from './sizes.ts';
 import { FAMILY_STATUSES, SPONSORSHIP_STATUSES } from './status.ts';
 import { HANDOFFS, QUOTE_ROLES } from './types.ts';
+import { missingGiftDetails } from './gifts.ts';
 
 const trimmed = (max = 200) => z.string().trim().max(max);
 
-export const ChildInputSchema = z
-  .object({
+/** A child's fields without the size-list checks (admins editing older records use this). */
+export const ChildBaseSchema = z.object({
     name: trimmed(80).min(1, 'Please add a first name'),
     age: z.coerce.number().int().min(0).max(17),
     gender: z.enum(GENDERS),
@@ -21,8 +22,11 @@ export const ChildInputSchema = z
     clothingWishlist: z.array(z.enum(CLOTHING_OPTIONS)).default([]),
     otherClothing: trimmed(500).default(''),
     giftTypes: z.array(z.enum(GIFT_OPTIONS)).default([]),
+    giftDetails: z.record(z.string().max(40), trimmed(200)).default({}),
     specificGifts: trimmed(500).default(''),
-  })
+});
+
+export const ChildInputSchema = ChildBaseSchema
   .superRefine((c, ctx) => {
     const sizes = [...CLOTHING_SIZES[c.clothingCategory], OTHER_SIZE];
     if (!sizes.includes(c.shirtSize)) ctx.addIssue({ code: 'custom', path: ['shirtSize'], message: 'Pick a size from the list' });
@@ -32,6 +36,7 @@ export const ChildInputSchema = z
     if ([c.shirtSize, c.pantsSize, c.shoeSize].includes(OTHER_SIZE) && !c.sizeNotes.trim()) {
       ctx.addIssue({ code: 'custom', path: ['sizeNotes'], message: 'Tell us a little more about sizing so a sponsor can shop confidently' });
     }
+    for (const q of missingGiftDetails(c.giftTypes, c.giftDetails)) ctx.addIssue({ code: 'custom', path: ['giftDetails', q.id], message: `${q.gift}: ${q.label}` });
   });
 export type ChildInput = z.infer<typeof ChildInputSchema>;
 
@@ -51,6 +56,27 @@ export const FamilyApplicationSchema = z.object({
   children: z.array(ChildInputSchema).min(1, 'Add at least one child').max(15, 'Please contact program staff for households with more than 15 children'),
 });
 export type FamilyApplication = z.infer<typeof FamilyApplicationSchema>;
+
+/**
+ * Admin edit of a family's details and children, any time (also after approval). Same fields as the
+ * application, but children skip the size-list check so older records with legacy sizes stay editable.
+ * A child with an `id` is updated; without one it is added; children left out are removed.
+ */
+export const FamilyDetailsSchema = z.object({
+  guardianName: trimmed(120).min(2, 'Guardian name is required'),
+  phone: z.string().trim().regex(/^[+()\-.\s\d]{10,20}$/, 'Enter a valid phone number'),
+  email: z.union([z.literal(''), z.string().trim().email('Enter a valid email')]).default(''),
+  preferredContact: z.enum(CONTACT_METHODS),
+  address: trimmed(200).min(3, 'Address is required'),
+  city: trimmed(80).min(2, 'City is required'),
+  state: trimmed(2).length(2, 'Use the 2-letter state code'),
+  zip: z.string().trim().regex(/^\d{5}(?:-\d{4})?$/, 'Enter a valid ZIP code'),
+  transportation: z.enum(['Yes', 'No']),
+  familyStory: trimmed(600).default(''),
+  notes: trimmed(1000).default(''),
+  children: z.array(ChildBaseSchema.extend({ id: z.string().max(40).optional() })).min(1, 'A family needs at least one child').max(15),
+});
+export type FamilyDetails = z.infer<typeof FamilyDetailsSchema>;
 
 export const ClaimRequestSchema = z.object({
   name: trimmed(120).min(2, 'Please enter your name'),

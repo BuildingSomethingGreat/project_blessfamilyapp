@@ -1,4 +1,4 @@
-import type { AdminReport, ChipIn, ClaimRequest, CommunityView, FamilyApplication, PublicFamily, Quote, QuoteRole, QuoteStatus, QuoteSubmit, SeasonSettings, SponsorPortalView, Family, Sponsorship, Sponsor, Activity, SponsorshipStatus, FamilyStatus } from '@bless/shared';
+import type { AdminReport, ChipIn, ClaimRequest, FamilyDetails, CommunityView, FamilyApplication, PublicFamily, Quote, QuoteRole, QuoteStatus, QuoteSubmit, SeasonSettings, SponsorPortalView, Family, Sponsorship, Sponsor, Activity, SponsorshipStatus, FamilyStatus } from '@bless/shared';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public issues?: unknown) {
@@ -66,6 +66,7 @@ export const api = {
     sponsorships: () => req<AdminSponsorship[]>('/admin/sponsorships'),
     patchSponsorship: (id: string, body: Partial<{ status: SponsorshipStatus; handoff: 'Drop off' | 'Deliver directly'; adminNotes: string; flagged: boolean; flagReason: string; reason: string }>) => patch<Sponsorship>(`/admin/sponsorships/${id}`, body),
     nudge: (id: string, message?: string) => post<{ ok: boolean; subject?: string; text?: string; error?: string }>(`/admin/sponsorships/${id}/nudge`, { message }),
+    saveFamilyDetails: (id: string, body: FamilyDetails) => req<AdminFamilyDetail>(`/admin/families/${id}/details`, { method: 'PUT', body: JSON.stringify(body) }),
     emailFamily: (id: string, message: string) => post<{ ok: boolean; subject?: string; error?: string }>(`/admin/families/${id}/email`, { message }),
     emails: (limit = 400) => req<EmailLogRow[]>(`/admin/emails?limit=${limit}`),
     testEmail: (to: string) => post<{ ok: boolean; error?: string; id?: string; provider: string }>('/admin/emails/test', { to }),

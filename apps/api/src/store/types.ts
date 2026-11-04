@@ -25,6 +25,8 @@ export interface Store {
   getFamilyByCode(familyId: string): Promise<Family | null>;
   createFamily(input: NewFamily): Promise<Family>;
   updateFamily(id: string, patch: Partial<Omit<Family, 'id' | 'children'>>): Promise<Family>;
+  /** Replaces a family's children: entries with a known id are updated, others added, and missing ones removed. Order is kept. */
+  saveChildren(familyId: string, children: (NewChild & { id?: string })[]): Promise<Family>;
   /** Stores a family photo (data URL) and returns the URL to persist. */
   storeFamilyPhoto(id: string, dataUrl: string): Promise<string>;
   incrementFamilyCounter(id: string, field: 'views' | 'claimStarts'): Promise<void>;

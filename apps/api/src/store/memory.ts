@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Activity, Family, FamilyStatus, Quote, QuoteStatus, SeasonSettings, Sponsor, Sponsorship, SponsorshipStatus } from '@bless/shared';
-import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewFamily, type NewQuote, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
+import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewChild, type NewFamily, type NewQuote, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
 import { nowIso, uuid } from '../lib/ids.ts';
 
 interface Snapshot {
@@ -99,6 +99,14 @@ export class MemoryStore implements Store {
     const f = this.data.families.find((x) => x.id === id);
     if (!f) throw new Error('family not found');
     Object.assign(f, patch, { id: f.id, children: f.children });
+    this.persist();
+    return this.clone(f);
+  }
+  async saveChildren(familyId: string, children: (NewChild & { id?: string })[]) {
+    const f = this.data.families.find((x) => x.id === familyId);
+    if (!f) throw new Error('family not found');
+    const known = new Set(f.children.map((c) => c.id));
+    f.children = children.map((c, i) => ({ ...c, id: c.id && known.has(c.id) ? c.id : uuid(), familyId, sortOrder: i }));
     this.persist();
     return this.clone(f);
   }

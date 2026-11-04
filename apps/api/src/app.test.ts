@@ -287,3 +287,53 @@ test('families are listed as Bless-a-Family #N; admins can rename but not with i
   const reset = await json(await rename(''));
   assert.equal(reset.body.public.nickname, `Bless-a-Family #${n}`, 'an empty name falls back to the number');
 });
+
+test('gift follow-ups are required on the application and shown to Konnectors', async () => {
+  const base = {
+    eligibilityConfirmed: true, guardianName: 'Gia Follow', phone: '313-555-6161', email: '', address: '2 Gift St', city: 'Detroit', state: 'MI', zip: '48202', transportation: 'Yes',
+  };
+  const kid = { name: 'Ty', age: 11, gender: 'Boy', clothingCategory: 'Youth / Kids', shirtSize: '12', pantsSize: '12', shoeCategory: 'Youth / Kids', shoeSize: '5', favoriteColor: 'Red', giftTypes: ['Video Games', 'Books'], clothingWishlist: ['Hoodies'] };
+  const missing = await json(await post('/api/register', { ...base, children: [kid] }, { 'x-forwarded-for': '10.0.3.1' }));
+  assert.equal(missing.status, 400, 'game system is required when Video Games is picked');
+  const ok = await json(await post('/api/register', { ...base, children: [{ ...kid, giftDetails: { vg_system: 'Nintendo Switch', vg_games: 'Mario Kart', books_level: 'Middle grade', sport: 'Soccer' } }] }, { 'x-forwarded-for': '10.0.3.2' }));
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  const fam = (await store.getFamilyByCode(ok.body.familyId))!;
+  assert.deepEqual(fam.children[0].giftDetails, { vg_system: 'Nintendo Switch', vg_games: 'Mario Kart', books_level: 'Middle grade' }, 'answers for gifts not picked are dropped');
+  await store.updateFamily(fam.id, { status: 'Available' });
+  const pub = await json(await app.request(`/api/families/${fam.slug}`));
+  assert.equal(pub.body.children[0].giftDetails.vg_system, 'Nintendo Switch');
+});
+
+test('admins can edit household details and children after approval', async () => {
+  const req = await json(await post('/api/admin/auth/request', { email: 'admin@example.com' }));
+  const verify = await post('/api/admin/auth/verify', { token: new URL(req.body.devLink).searchParams.get('token')! });
+  const admin = { cookie: verify.headers.get('set-cookie')!.split(';')[0], 'content-type': 'application/json' };
+  const fam = (await store.listFamilies({ status: ['Available'] })).find((f) => f.children.length >= 2)!;
+  const [first, second] = fam.children;
+  const body = {
+    guardianName: 'Updated Guardian', phone: '(313) 555-0000', email: 'new@example.com', preferredContact: 'Email', address: '99 New Ave', city: 'Detroit', state: 'mi', zip: '48201', transportation: 'No',
+    familyStory: 'Updated story', notes: '',
+    children: [
+      { ...first, shirtSize: 'Legacy XL', giftTypes: ['Gift Card to a Store'], giftDetails: { gc_store: 'Target' } },
+      { name: 'New Baby', age: 0, gender: 'Prefer not to say', clothingCategory: 'Baby / Infant', shirtSize: '6-9M', pantsSize: '6-9M', shoeCategory: 'Baby / Infant', shoeSize: '2', clothingWishlist: [], giftTypes: [] },
+    ],
+  };
+  const save = (b: unknown) => app.request(`/api/admin/families/${fam.id}/details`, { method: 'PUT', body: JSON.stringify(b), headers: admin });
+  assert.equal((await app.request(`/api/admin/families/${fam.id}/details`, { method: 'PUT', body: JSON.stringify(body), headers: { 'content-type': 'application/json' } })).status, 401);
+  assert.equal((await save({ ...body, children: [] })).status, 400, 'a family keeps at least one child');
+  const res = await json(await save(body));
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  const after = (await store.getFamily(fam.id))!;
+  assert.equal(after.guardianName, 'Updated Guardian');
+  assert.equal(after.state, 'MI');
+  assert.equal(after.status, 'Available', 'status is untouched by a details edit');
+  assert.equal(after.children.length, 2);
+  assert.equal(after.children[0].id, first.id, 'existing child is updated in place');
+  assert.equal(after.children[0].shirtSize, 'Legacy XL', 'admins can keep a size outside the current lists');
+  assert.deepEqual(after.children[0].giftDetails, { gc_store: 'Target' });
+  assert.equal(after.children[1].name, 'New Baby');
+  assert.ok(!after.children.some((k) => k.id === second.id), 'a child left out is removed');
+  const pub = await json(await app.request(`/api/families/${fam.slug}`));
+  assert.equal(pub.body.children.length, 2);
+  assert.ok(!JSON.stringify(pub.body).includes('Updated Guardian') && !JSON.stringify(pub.body).includes('99 New Ave'), 'private fields stay private');
+});

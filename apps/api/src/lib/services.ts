@@ -1,4 +1,4 @@
-import { ACTIVE_SPONSORSHIP_STATUSES, familyNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type CommunityView, type FamilyApplication, type Family, type PublicFamily, type QuoteSubmit, type Sponsor, type SponsorPortalView, type WallEntry } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, cleanGiftDetails, familyNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type CommunityView, type FamilyApplication, type Family, type PublicFamily, type QuoteSubmit, type Sponsor, type SponsorPortalView, type WallEntry } from '@bless/shared';
 import type { Store } from '../store/types.ts';
 import { FollowUpEngine, nextFollowUp } from '../followup/engine.ts';
 import { Mailer } from '../notify/mailer.ts';
@@ -53,7 +53,7 @@ export class Services {
     if (!settings.registrationOpen) throw new HttpError(403, 'Registration is closed for this season.');
     const seq = await this.store.nextFamilySequence(settings.season);
     const code = familyCode(settings.season, seq);
-    const children = app.children.map((c, i) => ({ ...c, sortOrder: i }));
+    const children = app.children.map((c, i) => ({ ...c, giftDetails: cleanGiftDetails(c.giftTypes, c.giftDetails), sortOrder: i }));
     const family = await this.store.createFamily({
       familyId: code, season: settings.season, status: 'Submitted', slug: shortId(), nickname: familyNickname(code), // "Bless-a-Family #12"
       guardianName: app.guardianName, phone: app.phone, email: app.email, preferredContact: app.preferredContact, address: app.address, city: app.city, state: app.state.toUpperCase(),
