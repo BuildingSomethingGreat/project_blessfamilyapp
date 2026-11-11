@@ -1,4 +1,4 @@
-import { ACTIVE_SPONSORSHIP_STATUSES, SHOPPING_STATUSES, familyStatusFor, toPublicFamily, type Family, type SeasonSettings, type Sponsorship, type SponsorshipStatus, type Sponsor } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, SHOPPING_STATUSES, familyStatusFor, teamOf, toPublicFamily, type Family, type SeasonSettings, type Sponsorship, type SponsorshipStatus, type Sponsor } from '@bless/shared';
 import { config } from '../config.ts';
 import type { Mailer } from '../notify/mailer.ts';
 import type { Store } from '../store/types.ts';
@@ -74,13 +74,23 @@ export class FollowUpEngine {
   }
 
   /** Email a Holiday Konnector. A custom body (from staff or the assistant) goes out as a "note" email. */
+  /**
+   * Email a Holiday Konnector about their family. Joined co-sponsor teammates get their own copy
+   * (greeted by name); pending invitees get nothing. Returns the result for the Konnector who chose the family.
+   */
   async send(kind: MessageKind, s: Sponsorship, opts: { custom?: string; reason?: string; actor?: 'system' | 'admin' | 'agent' } = {}) {
-    const [family, sponsor] = await Promise.all([this.store.getFamily(s.familyId), this.store.getSponsor(s.sponsorId)]);
+    const [family, everyone] = await Promise.all([this.store.getFamily(s.familyId), this.store.listSponsors()]);
+    const sponsor = everyone.find((p) => p.id === s.sponsorId);
     if (!family || !sponsor) return { ok: false, error: 'missing family or sponsor', subject: '', text: '' };
     const k: MessageKind = opts.custom ? 'staff_note' : kind;
-    const ctx = await this.context(k, s, family, sponsor, { custom: opts.custom, reason: opts.reason });
-    const msg = template(ctx);
-    return this.mailer.send({ to: sponsor.email, subject: msg.subject, spec: msg.spec, kind: k, audience: 'konnector', familyId: family.id, sponsorshipId: s.id, actor: opts.actor ?? 'system' });
+    const mates = teamOf(sponsor, everyone).joined.filter((p) => p.id !== sponsor.id && p.email.toLowerCase() !== sponsor.email.toLowerCase());
+    const one = async (to: Sponsor, teammate: boolean) => {
+      const ctx = await this.context(k, s, family, to, { custom: opts.custom, reason: opts.reason });
+      const msg = template(ctx);
+      return this.mailer.send({ to: to.email, subject: msg.subject, spec: msg.spec, kind: k, audience: 'konnector', familyId: family.id, sponsorshipId: s.id, actor: opts.actor ?? 'system', ...(teammate ? { reason: `You are getting this because you're on a Holiday Konnector team with ${sponsor.name}.` } : {}) });
+    };
+    const [first] = await Promise.all([one(sponsor, false), ...mates.map((m) => one(m, true))]);
+    return first!;
   }
 
   /** Email the family (received, approved, matched, or a custom note). Families without an email are skipped. */

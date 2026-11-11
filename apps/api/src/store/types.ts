@@ -2,7 +2,10 @@ import type { Activity, Child, Family, FamilyStatus, Quote, QuoteStatus, SeasonS
 
 export type NewChild = Omit<Child, 'id' | 'familyId'>;
 export type NewFamily = Omit<Family, 'id' | 'children' | 'createdAt'> & { children: NewChild[] };
-export type NewSponsor = Omit<Sponsor, 'id' | 'createdAt'>;
+type TeamKeys = 'teamId' | 'teamInvite' | 'invitedBy' | 'invitedAt' | 'joinedTeamAt';
+/** Team fields default to "on their own". */
+export type NewSponsor = Omit<Sponsor, 'id' | 'createdAt' | TeamKeys> & Partial<Pick<Sponsor, TeamKeys>>;
+export const NO_TEAM = { teamId: '', teamInvite: '', invitedBy: '', invitedAt: null, joinedTeamAt: null } satisfies Pick<Sponsor, TeamKeys>;
 export type NewSponsorship = Omit<Sponsorship, 'id' | 'createdAt'>;
 export type NewActivity = Omit<Activity, 'id'>;
 export type NewQuote = Omit<Quote, 'id'>;

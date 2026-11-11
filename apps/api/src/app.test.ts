@@ -337,3 +337,100 @@ test('admins can edit household details and children after approval', async () =
   assert.equal(pub.body.children.length, 2);
   assert.ok(!JSON.stringify(pub.body).includes('Updated Guardian') && !JSON.stringify(pub.body).includes('99 New Ave'), 'private fields stay private');
 });
+
+test('co-sponsor teams: invite on claim, join by link, same access and emails, up to 6 people, leave', async () => {
+  const { konnectorInviteToken } = await import('./lib/auth.ts');
+  let n = 0;
+  const freshFamily = async () => {
+    const { id: _id, createdAt: _c, children, ...rest } = (await store.listFamilies())[0]!;
+    n++;
+    return store.createFamily({ ...rest, familyId: `BF-TEAM-${n}`, slug: `team-${n}-${Date.now()}`, status: 'Available', children: children.map(({ id: _i, familyId: _f, ...c }) => c) });
+  };
+  const cookieOf = (res: Response) => res.headers.get('set-cookie')!.split(';')[0]!;
+  const get = (path: string, cookie?: string) => app.request(path, { headers: cookie ? { cookie } : {} });
+  const call = (method: string, path: string, body: unknown, cookie?: string) => app.request(path, { method, body: body === undefined ? undefined : JSON.stringify(body), headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) } });
+
+  // Claim with two teammates (and a mistaken self-invite).
+  const f1 = await freshFamily();
+  const claimRes = await post(`/api/families/${f1.slug}/claim`, { name: 'Owen Owner', email: 'owen@example.com', agree: true, emailConsent: true, team: [{ name: 'Tia Team', email: 'Tia@Example.com' }, { name: 'Max Mate', email: 'max@example.com' }, { name: 'Owen', email: 'owen@example.com' }] }, { 'x-forwarded-for': '10.0.2.1' });
+  const claim = await claimRes.json();
+  assert.equal(claimRes.status, 200, JSON.stringify(claim));
+  assert.deepEqual(claim.team.invited.map((m: any) => m.email).sort(), ['max@example.com', 'tia@example.com']);
+  assert.equal(claim.team.skipped.length, 1);
+  const owen = cookieOf(claimRes);
+  const invites = (await store.listActivity({ types: ['message_sent'], limit: 50 })).filter((a) => (a.meta as any).kind === 'team_invite');
+  assert.deepEqual(invites.map((a) => (a.meta as any).to).sort(), ['max@example.com', 'tia@example.com']);
+  assert.ok(invites.every((a) => !a.body.includes('token=')), 'join links stay out of the email log');
+  const owner = (await store.findSponsorByEmail('owen@example.com'))!;
+  assert.ok(owner.teamId);
+  const sp = (await store.getSponsorshipByToken(claim.token))!;
+
+  // A pending invitee sees nothing yet and gets no family emails.
+  const tiaLogin = await json(await post('/api/account/login', { email: 'tia@example.com' }, { 'x-forwarded-for': '10.0.2.2' }));
+  const tiaPending = cookieOf(await post('/api/account/verify', { token: new URL(tiaLogin.body.devLink).searchParams.get('token')! }));
+  const pending = await json(await get('/api/account/me', tiaPending));
+  assert.equal(pending.body.families.length, 0);
+  assert.equal(pending.body.invite.from, 'Owen Owner');
+  await services.followUp.send('confirm_nudge', sp);
+  let nudges = (await store.listActivity({ types: ['message_sent'], limit: 50 })).filter((a) => a.sponsorshipId === sp.id && (a.meta as any).kind === 'confirm_nudge').map((a) => (a.meta as any).to);
+  assert.deepEqual(nudges, ['owen@example.com']);
+
+  // Tia joins from her invite link: same families, same emails.
+  const join = await post('/api/account/verify', { token: konnectorInviteToken('tia@example.com', owner.teamId) });
+  assert.equal((await join.clone().json()).team.joined, true);
+  const tia = cookieOf(join);
+  const tiaMe = await json(await get('/api/account/me', tia));
+  assert.deepEqual(tiaMe.body.families.map((f: any) => f.token), [claim.token]);
+  assert.equal(tiaMe.body.families[0].claimedBy, 'Owen Owner');
+  assert.deepEqual(tiaMe.body.team.map((m: any) => `${m.name}:${m.status}`), ['Owen Owner:Joined', 'Tia Team:Joined', 'Max Mate:Invited']);
+  await services.followUp.send('confirm_nudge', sp);
+  nudges = (await store.listActivity({ types: ['message_sent'], limit: 50 })).filter((a) => a.sponsorshipId === sp.id && (a.meta as any).kind === 'confirm_nudge').map((a) => (a.meta as any).to);
+  assert.deepEqual(nudges.slice(0, 2).sort(), ['owen@example.com', 'tia@example.com'], 'joined teammates get their own copy; pending invitees do not');
+
+  // On the family page she is herself, and can update progress like Owen.
+  const view = await json(await get(`/api/sponsor/${claim.token}`, tia));
+  assert.equal(view.body.viewer.name, 'Tia Team');
+  assert.equal(view.body.viewer.claimedThis, false);
+  const bubbles = view.body.timeline.filter((m: any) => m.type === 'message_sent');
+  const keys = bubbles.map((m: any) => `${m.subject}|${m.occurredAt.slice(0, 16)}`);
+  assert.equal(new Set(keys).size, keys.length, 'each email shows once on the family page, not once per teammate');
+  assert.ok(bubbles.some((m: any) => m.body.includes('Hi Tia')), "the viewer sees their own copy");
+  assert.equal((await call('POST', `/api/sponsor/${claim.token}/status`, { status: 'Shopping' }, tia)).status, 200);
+
+  // Up to 6 people counting invites: Owen, Tia, Max (invited) + 3 more; the 4th is turned away.
+  const more = await json(await call('POST', `/api/sponsor/${claim.token}/team`, { invites: ['a', 'b', 'c', 'd'].map((x) => ({ name: `Pal ${x.toUpperCase()}`, email: `pal-${x}@example.com` })) }, tia));
+  assert.equal(more.status, 200, JSON.stringify(more.body));
+  assert.equal(more.body.invited.length, 3);
+  assert.equal(more.body.skipped[0].email, 'pal-d@example.com');
+  assert.equal(more.body.view.team.length, 6);
+  assert.ok(more.body.view.team.filter((m: any) => m.name.startsWith('Pal')).every((m: any) => m.invitedBy === 'Tia Team'));
+
+  // Anyone can cancel an invite; joined teammates can't remove each other.
+  assert.equal((await call('DELETE', `/api/account/team/${owner.id}`, undefined, tia)).status, 403);
+  const max = (await store.findSponsorByEmail('max@example.com'))!;
+  assert.equal((await call('DELETE', `/api/account/team/${max.id}`, undefined, tia)).status, 200);
+  const late = await (await post('/api/account/verify', { token: konnectorInviteToken('max@example.com', owner.teamId) })).json();
+  assert.equal(late.team.joined, false, 'a cancelled invite only signs them in');
+  assert.equal((await store.findSponsorByEmail('max@example.com'))!.teamId, '');
+
+  // A family Tia chooses shows up for Owen too; admins see the team.
+  const f2 = await freshFamily();
+  const tiaClaim = await (await post(`/api/families/${f2.slug}/claim`, { name: 'Tia Team', email: 'tia@example.com', agree: true, emailConsent: true }, { 'x-forwarded-for': '10.0.2.3' })).json();
+  const owenMe = await json(await get('/api/account/me', owen));
+  assert.deepEqual(owenMe.body.families.map((f: any) => f.token).sort(), [claim.token, tiaClaim.token].sort());
+  const req = await json(await post('/api/admin/auth/request', { email: 'admin@example.com' }));
+  const admin = cookieOf(await post('/api/admin/auth/verify', { token: new URL(req.body.devLink).searchParams.get('token')! }));
+  const board = await json(await get('/api/admin/sponsorships', admin));
+  const row = board.body.find((s: any) => s.id === sp.id);
+  assert.ok(row.team.some((m: any) => m.email === 'tia@example.com' && m.status === 'Joined'));
+  const csv = await (await get('/api/admin/sponsors.csv', admin)).text();
+  assert.ok(csv.split('\n')[0]!.includes('Team') && csv.includes('Tia Team <tia@example.com>'));
+  assert.ok(!JSON.stringify(await (await app.request(`/api/families/${f1.slug}`)).json()).includes('tia@example.com'), 'teams never reach the public family page');
+
+  // Tia leaves: she keeps her own family, Owen stops seeing it, and she stops getting Owen's emails.
+  assert.equal((await call('DELETE', `/api/account/team/${tiaMe.body.sponsor.id}`, undefined, tia)).status, 200);
+  assert.deepEqual((await json(await get('/api/account/me', owen))).body.families.map((f: any) => f.token), [claim.token]);
+  assert.deepEqual((await json(await get('/api/account/me', tia))).body.families.map((f: any) => f.token), [tiaClaim.token]);
+  const solo = await json(await get(`/api/sponsor/${claim.token}`, tia));
+  assert.equal(solo.body.viewer, null);
+});

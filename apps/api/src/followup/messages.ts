@@ -259,6 +259,25 @@ export function konnectorLoginEmail(link: string): ComposedMessage {
   };
 }
 
+/** Invite to a co-sponsor team. Sent once per invite; the button signs them in and joins the team. */
+export function teamInviteEmail(o: { inviter: Pick<Sponsor, 'name' | 'organization'>; invitee: string; link: string; families: string[]; settings: SeasonSettings }): ComposedMessage {
+  const who = o.inviter.name.trim() || 'A Holiday Konnector';
+  const fams = o.families.length === 0 ? '' : o.families.length === 1 ? o.families[0]! : `${o.families.length} families`;
+  return {
+    subject: `${firstName(who)} invited you to bless a family together`,
+    spec: {
+      preheader: `Join ${firstName(who)}'s Holiday Konnector team on Bless-a-Family.`,
+      eyebrow: 'Holiday Konnector team',
+      title: `${who} wants to bless kids with you.`,
+      intro: `Hi ${firstName(o.invitee)}. ${who}${o.inviter.organization ? ` (${o.inviter.organization})` : ''} invited you to their team on Bless-a-Family, The Konnection's holiday gift drive${fams ? `. They're blessing ${fams}` : ''}.`,
+      paragraphs: ['On the team, everyone sees the same family pages, sizes and wish lists, gets the reminders, and can mark progress as gifts are bought, wrapped and dropped off.'],
+      cta: { label: 'Join the team', url: o.link },
+      details: [{ label: 'Gifts due', value: `${shortDue(o.settings)} at ${o.settings.dropoffLocation}` }],
+      note: "Not for you? Ignore this email and you won't hear from us again. The link works for 14 days.",
+    },
+  };
+}
+
 export function konnectorNoAccountEmail(email: string): ComposedMessage {
   return {
     subject: "You're not a sponsor yet",

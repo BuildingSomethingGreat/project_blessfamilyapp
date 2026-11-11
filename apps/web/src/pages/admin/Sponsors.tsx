@@ -15,6 +15,13 @@ const FILTERS: { key: Filter; label: string }[] = [
 const isAttention = (s: AdminSponsorship) => ACTIVE_SPONSORSHIP_STATUSES.includes(s.status) && (s.flagged || s.followUpCount >= 1 || (s.lastResponseAt == null && daysSilent(null, s.claimedAt) >= 2));
 const matches = (s: AdminSponsorship, f: Filter) =>
   f === 'all' ? true : f === 'attention' ? isAttention(s) : f === 'active' ? ACTIVE_SPONSORSHIP_STATUSES.includes(s.status) : f === 'dropped' ? s.status === 'Dropped Off' : f === 'delivered' ? s.status === 'Delivered' : s.status === 'Released';
+/** "+2 teammates" (joined) and "1 invited", with names on hover. */
+const mates = (s: AdminSponsorship) => (s.team ?? []).filter((m) => m.id !== s.sponsorId);
+const teamLine = (s: AdminSponsorship) => {
+  const j = mates(s).filter((m) => m.status === 'Joined').length, i = mates(s).length - j;
+  return [j ? `+${j} teammate${j === 1 ? '' : 's'}` : '', i ? `${i} invited` : ''].filter(Boolean).join(', ');
+};
+const teamTitle = (s: AdminSponsorship) => mates(s).map((m) => `${m.name} <${m.email}>${m.status === 'Invited' ? ' (invited)' : ''}`).join('\n');
 const COLS = 'grid-cols-[1.2fr_1.2fr_150px_110px_90px_120px_200px]';
 
 /** Sponsors: every Holiday Konnector and where their family is in the dominoes, plus the sponsor export. */
@@ -68,7 +75,7 @@ export default function Sponsors() {
         {!sps.isPending && rows.length === 0 && <div className="py-8 text-center text-[13px] text-ink-3">{filter === 'attention' ? 'Nothing is stalled. Every active Holiday Konnector has responded since their last nudge.' : 'Nothing here.'}</div>}
         {rows.map((s) => (
           <div key={s.id} className={cx('grid min-w-[960px] items-center gap-3 border-b border-soft py-3.5 text-[13px]', COLS)} style={{ background: s.flagged ? '#fdf3f3' : 'transparent' }}>
-            <div className="min-w-0"><b className="block truncate">{s.sponsor?.name ?? 'Unknown Konnector'}</b><div className="truncate text-[11px] text-ink-3" title={s.sponsor?.email}>{s.sponsorshipId}</div></div>
+            <div className="min-w-0"><b className="block truncate">{s.sponsor?.name ?? 'Unknown Konnector'}</b><div className="truncate text-[11px] text-ink-3" title={s.sponsor?.email}>{s.sponsorshipId}</div>{teamLine(s) && <div className="truncate text-[11px] font-semibold text-pri-dark" title={teamTitle(s)}>Team: {teamLine(s)}</div>}</div>
             <div className="min-w-0">{s.family ? <Link to={`/admin/families/${s.family.id}`} className="block truncate font-bold hover:underline">{s.family.nickname}</Link> : <b>—</b>}<div className="text-[11px] text-ink-3">{s.family ? (s.family.childCount === 1 ? '1 child' : `${s.family.childCount} kids`) : ''}</div></div>
             <div><Dominoes status={s.status} compact /><div className="mt-1 text-[11px] text-ink-3">{STATUS_LABEL[s.status]}</div></div>
             <span className={s.lastResponseAt ? '' : 'text-bad'}>{lastLabel(s)}</span>

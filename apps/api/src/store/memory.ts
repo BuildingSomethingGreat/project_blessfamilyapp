@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { Activity, Family, FamilyStatus, Quote, QuoteStatus, SeasonSettings, Sponsor, Sponsorship, SponsorshipStatus } from '@bless/shared';
-import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewChild, type NewFamily, type NewQuote, type NewSponsor, type NewSponsorship, type Store } from './types.ts';
+import { DEFAULT_SETTINGS, type ActivityFilter, type NewActivity, type NewChild, type NewFamily, type NewQuote, type NewSponsor, type NewSponsorship, type Store, NO_TEAM } from './types.ts';
 import { nowIso, uuid } from '../lib/ids.ts';
 
 interface Snapshot {
@@ -33,7 +33,7 @@ export class MemoryStore implements Store {
     try {
       const raw = await readFile(this.file, 'utf8');
       const loaded = JSON.parse(raw) as Partial<Snapshot>;
-      this.data = { ...this.data, ...loaded, quotes: loaded.quotes ?? [], settings: { ...DEFAULT_SETTINGS, ...(loaded.settings ?? {}) } };
+      this.data = { ...this.data, ...loaded, sponsors: (loaded.sponsors ?? []).map((p) => ({ ...NO_TEAM, ...p })), quotes: loaded.quotes ?? [], settings: { ...DEFAULT_SETTINGS, ...(loaded.settings ?? {}) } };
     } catch {
       /* fresh */
     }
@@ -140,7 +140,7 @@ export class MemoryStore implements Store {
     return this.clone(this.data.sponsors.find((s) => s.email.toLowerCase() === e) ?? null);
   }
   async createSponsor(input: NewSponsor) {
-    const s: Sponsor = { ...input, id: uuid(), createdAt: nowIso() };
+    const s: Sponsor = { ...NO_TEAM, ...input, id: uuid(), createdAt: nowIso() };
     this.data.sponsors.push(s);
     this.persist();
     return this.clone(s);

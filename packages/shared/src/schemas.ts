@@ -3,6 +3,7 @@ import { CLOTHING_CATEGORIES, CLOTHING_OPTIONS, CONTACT_METHODS, GENDERS, GIFT_O
 import { FAMILY_STATUSES, SPONSORSHIP_STATUSES } from './status.ts';
 import { HANDOFFS, QUOTE_ROLES } from './types.ts';
 import { missingGiftDetails } from './gifts.ts';
+import { TEAM_MAX } from './team.ts';
 
 const trimmed = (max = 200) => z.string().trim().max(max);
 
@@ -78,6 +79,14 @@ export const FamilyDetailsSchema = z.object({
 });
 export type FamilyDetails = z.infer<typeof FamilyDetailsSchema>;
 
+/** One person invited to a co-sponsor team. */
+export const TeamInviteSchema = z.object({
+  name: trimmed(120).min(2, 'Add their name'),
+  email: z.string().trim().toLowerCase().email('Enter a valid email'),
+});
+export type TeamInvite = z.infer<typeof TeamInviteSchema>;
+export const TeamInvitesSchema = z.object({ invites: z.array(TeamInviteSchema).min(1).max(TEAM_MAX - 1) });
+
 export const ClaimRequestSchema = z.object({
   name: trimmed(120).min(2, 'Please enter your name'),
   email: z.string().trim().email('Enter a valid email'),
@@ -92,6 +101,8 @@ export const ClaimRequestSchema = z.object({
   /** Add my name to the Wall of Holiday Konnectors once gifts are in. */
   wallOptIn: z.boolean().default(false),
   displayName: trimmed(80).default(''),
+  /** People to invite to shop together (optional, up to 5). */
+  team: z.array(TeamInviteSchema).max(TEAM_MAX - 1).default([]),
   agree: z.literal(true, { errorMap: () => ({ message: 'Please confirm you can support every child in this family' }) }),
 });
 export type ClaimRequest = z.infer<typeof ClaimRequestSchema>;

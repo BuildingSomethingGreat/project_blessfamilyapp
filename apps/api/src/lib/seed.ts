@@ -11,6 +11,13 @@ export async function seedDemo(store: Store) {
   const season = (await store.getSettings()).season || '2026';
   const sponsors = [];
   for (const s of SEED_SPONSORS) sponsors.push(await store.createSponsor(s));
+  // A co-sponsor team: Rocket Mortgage Team 4B with one teammate who joined and one still invited.
+  const lead = sponsors[3]!;
+  const team = 'T-demo4b';
+  await store.updateSponsor(lead.id, { teamId: team, joinedTeamAt: daysAgo(5) });
+  const mate = { phone: '', organization: 'Rocket Mortgage', preferredContact: 'Email' as const, notes: '', displayName: '', wallOptIn: false, wallHidden: false, invitedBy: lead.email };
+  await store.createSponsor({ ...mate, name: 'Kendra Brooks', email: 'kendra@example.com', teamId: team, invitedAt: daysAgo(5), joinedTeamAt: daysAgo(4) });
+  await store.createSponsor({ ...mate, name: 'Andre Wells', email: 'andre@example.com', teamInvite: team, invitedAt: daysAgo(1) });
 
   const families = [];
   let seq = 1;

@@ -1,14 +1,12 @@
-import { ACTIVE_SPONSORSHIP_STATUSES, cleanGiftDetails, familyNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type ChipIn, type ClaimRequest, type CommunityView, type FamilyApplication, type Family, type PublicFamily, type QuoteSubmit, type Sponsor, type SponsorPortalView, type WallEntry } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, cleanGiftDetails, teamMembers, familyNickname, toPublicFamily, GOAL_PER_CHILD, CARD_FEE, type Activity, type ChipIn, type ClaimRequest, type CommunityView, type FamilyApplication, type Family, type PublicFamily, type QuoteSubmit, type Sponsor, type SponsorPortalView, type WallEntry } from '@bless/shared';
 import type { Store } from '../store/types.ts';
 import { FollowUpEngine, nextFollowUp } from '../followup/engine.ts';
 import { Mailer } from '../notify/mailer.ts';
 import { familyCode, nowIso, shortId, token as newToken } from './ids.ts';
+import { HttpError } from './errors.ts';
+import { Teams, type InviteResult } from './team.ts';
 
-export class HttpError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
+export { HttpError };
 
 /** Public credit line for a Holiday Konnector: their chosen display name, else "First L." (never a full surname). */
 export function wallName(s: Pick<Sponsor, 'displayName' | 'name'>): string {
@@ -40,12 +38,29 @@ async function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
 /** Waits for side-effect emails without letting one failure break the request (serverless can't finish work after responding). */
 const settle = (...ps: Promise<unknown>[]) => Promise.allSettled(ps).then((rs) => rs.forEach((r) => r.status === 'rejected' && console.error('[email] failed', r.reason)));
 
+/**
+ * Teammates each get their own copy of a family email, so the log has one row per person. The family
+ * page shows each email once: the viewer's own copy when there is one (it greets them by name).
+ */
+function dedupeTeamCopies(rows: Activity[], me: string): Activity[] {
+  const key = (a: Activity) => `${(a.meta as { kind?: string }).kind ?? a.subject}|${a.occurredAt.slice(0, 16)}`;
+  const pick = new Map<string, Activity>();
+  for (const a of rows) {
+    if (a.type !== 'message_sent') continue;
+    const k = key(a), cur = pick.get(k);
+    if (!cur || String((a.meta as { to?: string }).to ?? '').toLowerCase() === me) pick.set(k, a);
+  }
+  return rows.filter((a) => a.type !== 'message_sent' || pick.get(key(a)) === a);
+}
+
 export class Services {
   readonly followUp: FollowUpEngine;
   readonly mailer: Mailer;
+  readonly teams: Teams;
   constructor(public store: Store) {
     this.mailer = new Mailer(store);
     this.followUp = new FollowUpEngine(store, this.mailer);
+    this.teams = new Teams(store, this.mailer);
   }
 
   async registerFamily(app: FamilyApplication): Promise<Family> {
@@ -100,7 +115,7 @@ export class Services {
     await this.store.logActivity({ type: 'claim_start', channel: 'web', familyId: f.id, sponsorshipId: null, subject: 'Started claim', body: '', meta: {}, occurredAt: nowIso() });
   }
 
-  async claim(slug: string, req: ClaimRequest): Promise<{ sponsorEmail: string; token: string; sponsorshipId: string; family: PublicFamily }> {
+  async claim(slug: string, req: ClaimRequest): Promise<{ sponsorEmail: string; token: string; sponsorshipId: string; family: PublicFamily; team: Pick<InviteResult, 'invited' | 'skipped'> }> {
     return withLock(`claim:${slug}`, async () => {
       const settings = await this.store.getSettings();
       if (!settings.catalogOpen) throw new HttpError(403, 'Sponsorships are closed for this season.');
@@ -149,7 +164,13 @@ export class Services {
         this.followUp.sendToFamily('family_matched', claimed),
         this.followUp.alert({ kind: 'admin_family_claimed', family: claimed, pub: toPublicFamily(claimed), sponsor: sponsor!, sponsorship: s }, { familyId: f.id, sponsorshipId: s.id }),
       );
-      return { sponsorEmail: sponsor!.email, token: s.token, sponsorshipId: s.sponsorshipId, family: toPublicFamily({ ...f, status: 'Claimed' }) };
+      // Teammates named on the claim form. The family is already theirs; an invite problem never undoes the claim.
+      let team: Pick<InviteResult, 'invited' | 'skipped'> = { invited: [], skipped: [] };
+      if (req.team.length) {
+        try { team = await this.teams.invite(sponsor!, req.team); }
+        catch (e) { team = { invited: [], skipped: req.team.map((t) => ({ email: t.email, reason: e instanceof Error ? e.message : 'Could not send the invite' })) }; }
+      }
+      return { sponsorEmail: sponsor!.email, token: s.token, sponsorshipId: s.sponsorshipId, family: toPublicFamily({ ...f, status: 'Claimed' }), team };
     });
   }
 
@@ -166,19 +187,29 @@ export class Services {
     return { checkoutUrl: url, total, family: toPublicFamily(updated) };
   }
 
-  async sponsorPortal(tok: string): Promise<SponsorPortalView> {
+  /**
+   * A family page. `viewerEmail` is the signed-in Konnector, if any: a teammate sees the page as
+   * themselves. The link itself is the key, as before, so it works from any emailed copy.
+   */
+  async sponsorPortal(tok: string, viewerEmail?: string | null): Promise<SponsorPortalView> {
     const s = await this.store.getSponsorshipByToken(tok);
     if (!s) throw new HttpError(404, 'This link is not valid.');
-    const [family, sponsor, settings, timeline] = await Promise.all([this.store.getFamily(s.familyId), this.store.getSponsor(s.sponsorId), this.store.getSettings(), this.store.listActivity({ sponsorshipId: s.id, limit: 30 })]);
+    const [family, everyone, settings, timeline] = await Promise.all([this.store.getFamily(s.familyId), this.store.listSponsors(), this.store.getSettings(), this.store.listActivity({ sponsorshipId: s.id, limit: 30 })]);
+    const sponsor = everyone.find((p) => p.id === s.sponsorId);
     if (!family || !sponsor) throw new HttpError(404, 'This link is not valid.');
+    const team = teamMembers(sponsor, everyone);
+    const v = viewerEmail ? everyone.find((p) => p.email.toLowerCase() === viewerEmail.toLowerCase()) : undefined;
+    const viewer = v && team.some((m) => m.id === v.id && m.status === 'Joined') ? { id: v.id, name: v.name, email: v.email, claimedThis: v.id === sponsor.id } : null;
     return {
+      team,
+      viewer,
       sponsorship: { sponsorshipId: s.sponsorshipId, status: s.status, handoff: s.handoff ?? 'Drop off', claimedAt: s.claimedAt, shoppingAt: s.shoppingAt, purchasedAt: s.purchasedAt, wrappedAt: s.wrappedAt, droppedOffAt: s.droppedOffAt, deliveredAt: s.deliveredAt, releasedAt: s.releasedAt, sponsorNote: s.sponsorNote, nextFollowUpAt: s.nextFollowUpAt, followUpCount: s.followUpCount, flagged: s.flagged },
       sponsor: { name: sponsor.name, email: sponsor.email, preferredContact: sponsor.preferredContact, displayName: sponsor.displayName, wallOptIn: sponsor.wallOptIn },
       family: toPublicFamily(family),
       settings,
       // Only what the Konnector should see: emails sent to them, and their own updates. Team alerts,
       // family emails and staff actions share the sponsorship id but stay out of this view.
-      timeline: timeline.filter((a) => a.type === 'sponsor_response' || a.type === 'status_change' || (a.type === 'message_sent' && ((a.meta as { audience?: string })?.audience ?? 'konnector') === 'konnector' && !String((a.meta as { kind?: string })?.kind ?? '').endsWith('_login'))).map((a) => ({ type: a.type, subject: a.subject, body: a.type === 'message_sent' ? a.body : '', occurredAt: a.occurredAt, channel: a.channel })),
+      timeline: dedupeTeamCopies(timeline.filter((a) => a.type === 'sponsor_response' || a.type === 'status_change' || (a.type === 'message_sent' && ((a.meta as { audience?: string })?.audience ?? 'konnector') === 'konnector' && !String((a.meta as { kind?: string })?.kind ?? '').endsWith('_login'))), (viewer?.email ?? sponsor.email).toLowerCase()).map((a) => ({ type: a.type, subject: a.subject, body: a.type === 'message_sent' ? a.body : '', occurredAt: a.occurredAt, channel: a.channel })),
     };
   }
 

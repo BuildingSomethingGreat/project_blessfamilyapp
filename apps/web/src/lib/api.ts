@@ -1,4 +1,4 @@
-import type { AdminReport, ChipIn, ClaimRequest, FamilyDetails, CommunityView, FamilyApplication, PublicFamily, Quote, QuoteRole, QuoteStatus, QuoteSubmit, SeasonSettings, SponsorPortalView, Family, Sponsorship, Sponsor, Activity, SponsorshipStatus, FamilyStatus } from '@bless/shared';
+import type { TeamInvite, TeamMember, AdminReport, ChipIn, ClaimRequest, FamilyDetails, CommunityView, FamilyApplication, PublicFamily, Quote, QuoteRole, QuoteStatus, QuoteSubmit, SeasonSettings, SponsorPortalView, Family, Sponsorship, Sponsor, Activity, SponsorshipStatus, FamilyStatus } from '@bless/shared';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public issues?: unknown) {
@@ -18,11 +18,19 @@ const patch = <T,>(path: string, body: unknown) => req<T>(path, { method: 'PATCH
 
 export type Catalog = { families: PublicFamily[]; counts: { available: number; claimed: number; fulfilled: number; kids: number } };
 export type AdminFamily = Family & { public: PublicFamily; sponsorship: (Sponsorship & { sponsor: Sponsor | null }) | null };
-export type AdminFamilyDetail = Family & { public: PublicFamily; sponsorships: (Sponsorship & { sponsor: Sponsor | null })[]; activity: Activity[] };
-export type AdminSponsorship = Sponsorship & { family: { familyId: string; nickname: string; childCount: number; slug: string; id: string } | null; sponsor: Sponsor | null };
+export type AdminFamilyDetail = Family & { public: PublicFamily; sponsorships: (Sponsorship & { sponsor: Sponsor | null; team: TeamMember[] })[]; activity: Activity[] };
+export type AdminSponsorship = Sponsorship & { family: { familyId: string; nickname: string; childCount: number; slug: string; id: string } | null; sponsor: Sponsor | null; team: TeamMember[] };
 export type WallAdminRow = { id: string; name: string; email: string; organization: string; displayName: string; publicName: string; wallOptIn: boolean; wallHidden: boolean; active: number; done: number; showing: boolean };
-export type AccountFamily = { token: string; sponsorshipId: string; status: SponsorshipStatus; handoff: string; claimedAt: string; nickname: string; kidLine: string; kidNames: string; colors: string[] };
-export type AccountMe = { sponsor: { name: string; email: string; phone: string; organization: string; displayName: string; wallOptIn: boolean }; families: AccountFamily[] };
+/** `claimedBy` is the teammate who chose the family ('' when it was you). */
+export type AccountFamily = { token: string; sponsorshipId: string; status: SponsorshipStatus; handoff: string; claimedAt: string; nickname: string; kidLine: string; kidNames: string; colors: string[]; claimedBy: string };
+export type AccountMe = {
+  sponsor: { id: string; name: string; email: string; phone: string; organization: string; displayName: string; wallOptIn: boolean };
+  team: TeamMember[];
+  /** A team this person was invited to and hasn't answered yet. */
+  invite: { from: string; members: string[]; invitedAt: string | null } | null;
+  families: AccountFamily[];
+};
+export type InviteResult = { invited: TeamMember[]; skipped: { email: string; reason: string }[]; team: TeamMember[] };
 export type EmailLogRow = { id: string; at: string; subject: string; body: string; kind: string; to: string; ok: boolean; error: string | null; provider: string; actor: string; audience: 'konnector' | 'family' | 'admin' | 'test'; family: { id: string; familyId: string; nickname: string } | null; sponsorshipId: string | null };
 export type AgentTurn = { conversationId: string; reply: string; actions: { tool: string; summary: string }[] };
 
@@ -36,15 +44,19 @@ export const api = {
   catalog: () => req<Catalog>('/families'),
   family: (slug: string) => req<PublicFamily>(`/families/${slug}`),
   claimStart: (slug: string) => post<{ ok: true }>(`/families/${slug}/claim-start`),
-  claim: (slug: string, body: ClaimRequest) => post<{ token: string; sponsorshipId: string; family: PublicFamily }>(`/families/${slug}/claim`, body),
+  claim: (slug: string, body: ClaimRequest) => post<{ token: string; sponsorshipId: string; family: PublicFamily; team: Pick<InviteResult, 'invited' | 'skipped'> }>(`/families/${slug}/claim`, body),
   chipIn: (slug: string, body: ChipIn) => post<{ checkoutUrl: string; total: number; family: PublicFamily }>(`/families/${slug}/chip-in`, body),
   register: (body: FamilyApplication) => post<{ familyId: string }>('/register', body),
   community: () => req<CommunityView>('/community'),
   submitQuote: (body: QuoteSubmit) => post<{ ok: true }>('/quotes', body),
   account: {
     login: (email: string) => post<{ ok: true; devLink?: string }>('/account/login', { email }),
-    verify: (token: string) => post<{ ok: true }>('/account/verify', { token }),
+    verify: (token: string) => post<{ ok: true; team?: { joined: boolean; message?: string } }>('/account/verify', { token }),
     me: () => req<AccountMe>('/account/me'),
+    invite: (invites: TeamInvite[]) => post<InviteResult & { me: AccountMe }>('/account/team', { invites }),
+    removeMember: (id: string) => req<AccountMe>(`/account/team/${id}`, { method: 'DELETE' }),
+    acceptInvite: () => post<AccountMe>('/account/team/accept'),
+    declineInvite: () => post<AccountMe>('/account/team/decline'),
     logout: () => post<{ ok: true }>('/account/logout'),
   },
   sponsor: {
@@ -52,6 +64,8 @@ export const api = {
     status: (token: string, status: SponsorshipStatus, note = '', reason = '') => post<SponsorPortalView>(`/sponsor/${token}/status`, { status, note, reason }),
     note: (token: string, note: string) => post<SponsorPortalView>(`/sponsor/${token}/note`, { note }),
     wall: (token: string, optIn: boolean, displayName: string) => post<SponsorPortalView>(`/sponsor/${token}/wall`, { optIn, displayName }),
+    invite: (token: string, invites: TeamInvite[]) => post<InviteResult & { view: SponsorPortalView }>(`/sponsor/${token}/team`, { invites }),
+    removeMember: (token: string, id: string) => req<SponsorPortalView>(`/sponsor/${token}/team/${id}`, { method: 'DELETE' }),
   },
   admin: {
     requestLink: (email: string) => post<{ ok: true; devLink?: string; passcodeEnabled?: boolean; emailConfigured?: boolean }>('/admin/auth/request', { email }),
@@ -79,6 +93,7 @@ export const api = {
     addQuote: (body: { quote: string; name: string; role: QuoteRole; organization?: string; featured?: boolean }) => post<Quote>('/admin/quotes', body),
     patchQuote: (id: string, body: Partial<{ status: QuoteStatus; featured: boolean; quote: string; name: string; organization: string; role: QuoteRole }>) => patch<Quote>(`/admin/quotes/${id}`, body),
     wall: () => req<WallAdminRow[]>('/admin/wall'),
+    removeFromTeam: (id: string) => post<Sponsor>(`/admin/sponsors/${id}/remove-from-team`),
     patchSponsor: (id: string, body: Partial<{ wallHidden: boolean; wallOptIn: boolean; displayName: string }>) => patch<Sponsor>(`/admin/sponsors/${id}`, body),
     exportUrl: '/api/admin/export.csv',
     sponsorsCsvUrl: '/api/admin/sponsors.csv',

@@ -143,13 +143,17 @@ export class AirtableStore implements Store {
     const f = r.fields;
     return {
       id: r.id, name: f['Name'] ?? '', email: f['Email'] ?? '', phone: f['Phone'] ?? '', organization: f['Organization'] ?? '', preferredContact: f['Preferred Contact'] ?? 'Email', notes: f['Notes'] ?? '',
-      displayName: f['Display Name'] ?? '', wallOptIn: !!f['Wall Opt In'], wallHidden: !!f['Wall Hidden'], createdAt: f['Created At'] ?? r.createdTime,
+      displayName: f['Display Name'] ?? '', wallOptIn: !!f['Wall Opt In'], wallHidden: !!f['Wall Hidden'],
+      teamId: f['Team'] ?? '', teamInvite: f['Team Invite'] ?? '', invitedBy: f['Invited By'] ?? '', invitedAt: f['Invited At'] ?? null, joinedTeamAt: f['Joined Team At'] ?? null,
+      createdAt: f['Created At'] ?? r.createdTime,
     };
   }
   private sponsorTo(p: Partial<Sponsor>) {
     return strip({
       Name: p.name, Email: p.email, Phone: p.phone || undefined, Organization: p.organization, 'Preferred Contact': p.preferredContact, Notes: p.notes,
       'Display Name': p.displayName, 'Wall Opt In': p.wallOptIn, 'Wall Hidden': p.wallHidden,
+      // Team fields: '' / null clear the cell (Airtable treats null as empty).
+      Team: p.teamId, 'Team Invite': p.teamInvite, 'Invited By': p.invitedBy, 'Invited At': p.invitedAt, 'Joined Team At': p.joinedTeamAt,
     });
   }
   private sponsorshipFrom(r: Rec): Sponsorship {
@@ -270,7 +274,7 @@ export class AirtableStore implements Store {
     return (await this.listSponsors()).find((s) => s.email.toLowerCase() === e) ?? null;
   }
   async createSponsor(input: NewSponsor) {
-    const r = await this.create(T.sponsors, this.sponsorTo(input));
+    const r = await this.create(T.sponsors, this.sponsorTo(input) /* team fields are left blank unless set */);
     return this.sponsorFrom(r);
   }
   async updateSponsor(id: string, patch: Partial<Sponsor>) {

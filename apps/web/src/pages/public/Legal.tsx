@@ -5,7 +5,7 @@ import { api } from '@/lib/api';
 import { shell } from './shared.tsx';
 
 /** Bump when either policy changes in a meaningful way (and email active participants about it). */
-const EFFECTIVE = 'October 30, 2026';
+const EFFECTIVE = 'November 11, 2026';
 const FALLBACK_CONTACT = 'sharnese@thekonnection.org';
 
 type Block = string | string[];
@@ -28,6 +28,7 @@ function privacy(contact: string): Section[] {
         'Families (from a parent or guardian): your name, phone, email (optional unless you choose email), home address, city and ZIP, how you prefer to be contacted, whether you prefer to pick up gifts or have them delivered, and confirmation that you are part of The Konnection’s programs.',
         'About each child: first name, age, gender (or "prefer not to say"), clothing and shoe sizes, favorite color, interests and a wish list. A short family story is optional. We do not ask families for photos.',
         'Holiday Konnectors: your name, email, optional phone and organization, how you will hand off gifts, the name you want on our thank-you wall, notes you send us, and the progress you mark on your family page.',
+        'Holiday Konnector teams: if a Konnector invites you to shop with them, we receive the name and email they enter for you. We use it to send you one invite. If you don’t join, we don’t email you again.',
         'Quotes and shout-outs: your words, the name you want to be credited as, and an optional email.',
         'Chip-ins: the amount you pledge and an optional email. Payments are handled by Zeffy. We never see or store your card details.',
         'Staff: the work email used to sign in to the admin tools.',
@@ -51,6 +52,7 @@ function privacy(contact: string): Section[] {
       'We do not sell, rent or trade personal information. We share it only as follows:',
       [
         'With the Holiday Konnector who chooses your family: the information on your family profile. If gifts are delivered directly, our team arranges the hand-off and shares only what is needed to complete it.',
+        'Within a Holiday Konnector team: everyone who has joined the team sees each other’s names and emails and the family pages of every family any of them sponsors, and gets the reminders for those families. Invited people see nothing until they join. Leaving a team ends that sharing.',
         'With service providers that run the program for us, under their privacy and security terms: Airtable (program database), Netlify (website hosting), Resend (email delivery), Zeffy (chip-in donations) and Google Fonts (typefaces). When enabled, our staff use an AI assistant from Anthropic to help manage program records. Anthropic’s commercial terms limit how it can use that data.',
         'When required by law, or to protect the safety of a child, a family, a volunteer or the public.',
       ],
@@ -110,6 +112,7 @@ function terms(contact: string): Section[] {
         'Answer our check-ins. If you cannot finish, release the family from your family page as soon as you can so another Konnector can step in. If we cannot reach you, our team may reopen the family.',
       ],
       'You must be 18 or older, or take part with a parent, guardian or organization that agrees to these terms. If you sign up for a group, you confirm you may act for it.',
+      'You can invite up to five people to your Holiday Konnector team. Only invite people who know you and expect to hear from us. Everyone on a team has the same access, follows these terms, and shares responsibility for the families the team chooses.',
     ] },
     { id: 't-respect', title: 'Respecting families', body: [[
       'Use family information only to shop for and deliver their gifts. Do not share it, post it online or use it for anything else.',

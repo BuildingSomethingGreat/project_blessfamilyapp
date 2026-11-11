@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ACTIVE_SPONSORSHIP_STATUSES, familyArt, familyNickname, colorSwatch, nicknameProblem, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus } from '@bless/shared';
+import { ACTIVE_SPONSORSHIP_STATUSES, familyArt, familyNickname, colorSwatch, nicknameProblem, STATUS_LABEL, type Activity, type FamilyStatus, type Sponsor, type Sponsorship, type SponsorshipStatus, type TeamMember } from '@bless/shared';
 import { api } from '@/lib/api';
 import { Button, Chip, Dominoes, FamilyArt, Input, Kicker, Label, Select, Sheet, Skeleton, Textarea, Toggle, useToast } from '@/components/ui';
 import { NicknameField } from '@/components/NicknameField';
@@ -9,7 +9,7 @@ import { cx, fmtDate, fmtDateTime, plural, timeAgo } from '@/lib/format';
 import { GiftDetailList } from '../public/shared.tsx';
 import { Panel, PanelTitle, RELEASE_REASONS, SpStatusChip, StatusChip, copyText } from './shared.tsx';
 
-type Sp = Sponsorship & { sponsor: Sponsor | null; family?: { nickname: string } | null };
+type Sp = Sponsorship & { sponsor: Sponsor | null; family?: { nickname: string } | null; team?: TeamMember[] };
 type Variant = 'primary' | 'secondary' | 'danger' | 'ghost';
 
 const FAMILY_ACTIONS: Record<FamilyStatus, { label: string; to: FamilyStatus; variant: Variant }[]> = {
@@ -37,6 +37,11 @@ export default function FamilyDetail() {
   const [releaseOpen, setReleaseOpen] = useState<Sp | null>(null);
   const [showOld, setShowOld] = useState(false);
   const [emailOpen, setEmailOpen] = useState(false);
+  const removeMember = useMutation({
+    mutationFn: (sponsorId: string) => api.admin.removeFromTeam(sponsorId),
+    onSuccess: () => { toast('Team updated', 'ok'); invalidate(); },
+    onError: (e: Error) => toast(e.message, 'bad'),
+  });
 
   useEffect(() => { if (q.data) { setNick(q.data.public.nickname); setNotes(q.data.adminNotes); setGoal(String(q.data.public.goal)); } }, [q.data]);
 
@@ -203,6 +208,22 @@ export default function FamilyDetail() {
                     {active.sponsor && <div className="text-ink-3">Wall: {active.sponsor.wallOptIn ? (active.sponsor.wallHidden ? 'opted in, hidden by staff' : 'opted in') : 'not opted in'}</div>}
                   </div>
                   {active.sponsorNote && <p className="mt-2 rounded-[14px] bg-bg px-3 py-2 text-[13px] italic">“{active.sponsorNote}”</p>}
+                  {(active.team?.length ?? 0) > 1 && (
+                    <div className="mt-3 rounded-2xl border border-line px-3.5 py-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[.08em] text-ink-3">Co-sponsor team · same access, emails go to everyone joined</div>
+                      <ul className="mt-2 space-y-1.5 text-[13px]">
+                        {active.team!.filter((m) => m.id !== active.sponsorId).map((m) => (
+                          <li key={m.id} className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1"><b>{m.name}</b>{m.status === 'Invited' && <span className="ml-1.5 rounded-full bg-soft px-2 py-0.5 text-[11px] font-semibold text-pri-dark">Invited</span>} <a className="text-pri hover:underline" href={`mailto:${m.email}`}>{m.email}</a>{m.invitedBy && <span className="text-ink-3"> · invited by {m.invitedBy}</span>}</div>
+                            <button className="text-[12px] font-semibold text-ink-3 hover:text-bad" disabled={removeMember.isPending}
+                              onClick={() => { if (window.confirm(m.status === 'Invited' ? `Cancel ${m.name}'s invite?` : `Remove ${m.name} from this team? They stop seeing the team's families and getting its emails. Families they chose stay with them.`)) removeMember.mutate(m.id); }}>
+                              {m.status === 'Invited' ? 'Cancel invite' : 'Remove'}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
                 <Dominoes status={active.status} dates={{ Claimed: active.claimedAt, Shopping: active.shoppingAt, Purchased: active.purchasedAt, Wrapped: active.wrappedAt, 'Dropped Off': active.droppedOffAt, Delivered: active.deliveredAt }} />
                 <dl className="grid grid-cols-2 gap-2 text-[13px]">

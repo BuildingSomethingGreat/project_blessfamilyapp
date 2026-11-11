@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
-import { cleanGiftDetails, FamilyDetailsSchema, FamilyStatusSchema, giftDetailsToText, HANDOFFS, nicknameProblem, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, toPublicFamily, type SeasonSettings } from '@bless/shared';
+import { cleanGiftDetails, FamilyDetailsSchema, FamilyStatusSchema, giftDetailsToText, HANDOFFS, nicknameProblem, QUOTE_ROLES, QUOTE_STATUSES, SponsorshipStatusSchema, canTransition, teamMembers, toPublicFamily, type SeasonSettings } from '@bless/shared';
 import { z } from 'zod';
 import { config } from '../config.ts';
 import { isAdminEmail, loginToken, sessionToken, verifyToken, SESSION_COOKIE } from '../lib/auth.ts';
@@ -91,8 +91,8 @@ export function adminRoutes(services: Services) {
   r.get('/families/:id', async (c) => {
     const f = await store.getFamily(c.req.param('id'));
     if (!f) throw new HttpError(404, 'Not found');
-    const sps = await store.listSponsorships({ familyId: f.id });
-    const withSponsor = await Promise.all(sps.map(async (s) => ({ ...s, sponsor: await store.getSponsor(s.sponsorId) })));
+    const [sps, everyone] = await Promise.all([store.listSponsorships({ familyId: f.id }), store.listSponsors()]);
+    const withSponsor = sps.map((s) => { const sponsor = everyone.find((p) => p.id === s.sponsorId) ?? null; return { ...s, sponsor, team: sponsor ? teamMembers(sponsor, everyone) : [] }; });
     const activity = await store.listActivity({ familyId: f.id, limit: 50 });
     return c.json({ ...f, public: toPublicFamily(f), sponsorships: withSponsor, activity });
   });
@@ -140,7 +140,7 @@ export function adminRoutes(services: Services) {
     const [fams, sponsors] = await Promise.all([store.listFamilies(), store.listSponsors()]);
     const fm = new Map(fams.map((f) => [f.id, f]));
     const sm = new Map(sponsors.map((s) => [s.id, s]));
-    return c.json(sps.map((s) => { const f = fm.get(s.familyId); return { ...s, family: f ? { familyId: f.familyId, nickname: toPublicFamily(f).nickname, childCount: f.children.length, slug: f.slug, id: f.id } : null, sponsor: sm.get(s.sponsorId) ?? null }; }).sort((a, b) => b.claimedAt.localeCompare(a.claimedAt)));
+    return c.json(sps.map((s) => { const f = fm.get(s.familyId); return { ...s, family: f ? { familyId: f.familyId, nickname: toPublicFamily(f).nickname, childCount: f.children.length, slug: f.slug, id: f.id } : null, sponsor: sm.get(s.sponsorId) ?? null, team: sm.has(s.sponsorId) ? teamMembers(sm.get(s.sponsorId)!, sponsors) : [] }; }).sort((a, b) => b.claimedAt.localeCompare(a.claimedAt)));
   });
   const SpPatch = z.object({ status: SponsorshipStatusSchema.optional(), handoff: z.enum(HANDOFFS).optional(), adminNotes: z.string().max(5000).optional(), flagged: z.boolean().optional(), flagReason: z.string().max(300).optional(), reason: z.string().max(300).optional() });
   r.patch('/sponsorships/:id', async (c) => {
@@ -219,6 +219,8 @@ export function adminRoutes(services: Services) {
     );
   });
   const SponsorPatch = z.object({ wallHidden: z.boolean().optional(), wallOptIn: z.boolean().optional(), displayName: z.string().trim().max(80).optional() });
+  /** Take a Konnector off their co-sponsor team (or cancel their pending invite). Their own families stay with them. */
+  r.post('/sponsors/:id/remove-from-team', async (c) => c.json(await services.teams.staffRemove(c.req.param('id'), c.get('admin'))));
   r.patch('/sponsors/:id', async (c) => {
     const patch = SponsorPatch.parse(await c.req.json());
     const p = await store.updateSponsor(c.req.param('id'), patch);
@@ -263,15 +265,17 @@ export function adminRoutes(services: Services) {
     const settings = await store.getSettings();
     const [sponsors, sps, fams] = await Promise.all([store.listSponsors(), store.listSponsorships(), store.listFamilies({ season: settings.season })]);
     const fm = new Map(fams.map((f) => [f.id, f]));
-    const rows = [['Sponsor', 'Email', 'Phone', 'Organization', 'Public name', 'On the wall', 'Sponsorship ID', 'Family ID', 'Family', 'Kids', 'Status', 'Hand-off', 'Claimed', 'Shopping', 'Purchased', 'Wrapped', 'Handed off', 'Delivered', 'Released', 'Release reason', 'Follow-ups unanswered', 'Flagged', 'Sponsor note', 'Admin notes']];
+    const rows = [['Sponsor', 'Email', 'Phone', 'Organization', 'Public name', 'On the wall', 'Sponsorship ID', 'Family ID', 'Family', 'Kids', 'Status', 'Hand-off', 'Claimed', 'Shopping', 'Purchased', 'Wrapped', 'Handed off', 'Delivered', 'Released', 'Release reason', 'Follow-ups unanswered', 'Flagged', 'Sponsor note', 'Admin notes', 'Team']];
     for (const p of sponsors) {
+      const team = teamMembers(p, sponsors).filter((m) => m.id !== p.id).map((m) => `${m.name} <${m.email}>${m.status === 'Invited' ? ' (invited)' : ''}`).join('; ');
+      const pending = p.teamInvite && !p.teamId ? 'Invited, not joined yet' : '';
       const mine = sps.filter((s) => s.sponsorId === p.id && fm.has(s.familyId)).sort((a, b) => a.claimedAt.localeCompare(b.claimedAt));
       const base = [p.name, p.email, p.phone, p.organization, wallName(p), p.wallOptIn && !p.wallHidden ? 'Yes' : 'No'];
-      if (!mine.length) { rows.push([...base, ...Array(18).fill('')]); continue; }
+      if (!mine.length) { rows.push([...base, ...Array(18).fill(''), team || pending]); continue; }
       for (const s of mine) {
         const f = fm.get(s.familyId)!;
         const d = (x: string | null) => (x ? x.slice(0, 10) : '');
-        rows.push([...base, s.sponsorshipId, f.familyId, toPublicFamily(f).nickname, String(f.children.length), s.status, s.handoff, d(s.claimedAt), d(s.shoppingAt), d(s.purchasedAt), d(s.wrappedAt), d(s.droppedOffAt), d(s.deliveredAt), d(s.releasedAt), s.releaseReason, String(s.followUpCount), s.flagged ? 'Yes' : 'No', s.sponsorNote, s.adminNotes]);
+        rows.push([...base, s.sponsorshipId, f.familyId, toPublicFamily(f).nickname, String(f.children.length), s.status, s.handoff, d(s.claimedAt), d(s.shoppingAt), d(s.purchasedAt), d(s.wrappedAt), d(s.droppedOffAt), d(s.deliveredAt), d(s.releasedAt), s.releaseReason, String(s.followUpCount), s.flagged ? 'Yes' : 'No', s.sponsorNote, s.adminNotes, team]);
       }
     }
     const csv = toCsv(rows);

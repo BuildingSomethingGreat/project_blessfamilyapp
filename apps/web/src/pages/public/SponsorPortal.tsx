@@ -9,6 +9,7 @@ import { GIFT_RULES, KidMini, shell, wrap } from './shared.tsx';
 import { SignedInAs } from './MyFamily.tsx';
 import { useAccount } from '@/lib/account';
 import { ShareForm } from './Share.tsx';
+import { TeamCard } from '@/components/Team';
 
 const REASONS = ["Can't afford it right now", 'Travel or timing', 'Other'];
 
@@ -49,8 +50,13 @@ export default function SponsorPortal() {
   const v = q.data;
   if (!v) return <div className={shell}><div className={wrap}><Skeleton className="mt-6 h-14 w-2/3" /><div className="mt-7 grid gap-5 md:grid-cols-2"><Skeleton className="h-[420px]" /><Skeleton className="h-[420px]" /></div></div></div>;
 
-  const { sponsorship: sp, family: f, settings: s, sponsor } = v;
-  const first = sponsor.name.split(' ')[0];
+  const { sponsorship: sp, family: f, settings: s, sponsor, team, viewer } = v;
+  // A signed-in teammate sees the page as themselves; the link alone means the Konnector who chose the family.
+  const first = (viewer?.name ?? sponsor.name).split(' ')[0];
+  const chosenBy = viewer && !viewer.claimedThis ? sponsor.name.split(' ')[0] : null;
+  const onTeam = team.filter((m) => m.status === 'Joined').length > 1;
+  const invite = async (invites: Parameters<typeof api.sponsor.invite>[1]) => { const r = await api.sponsor.invite(token, invites); qc.setQueryData(['portal', token], r.view); qc.invalidateQueries({ queryKey: ['account'] }); return r; };
+  const removeMember = async (m: { id: string }) => { const r = await api.sponsor.removeMember(token, m.id); qc.setQueryData(['portal', token], r); qc.invalidateQueries({ queryKey: ['account'] }); };
   const deadline = fmtDate(s.dropoffDeadline, { weekday: 'short', month: 'short', day: 'numeric' });
   const daysLeft = Math.max(0, Math.round((new Date(s.dropoffDeadline + 'T00:00:00').getTime() - new Date(new Date().toDateString()).getTime()) / 86_400_000));
   const direct = sp.handoff === 'Deliver directly';
@@ -76,8 +82,8 @@ export default function SponsorPortal() {
     <div className={`${shell} anim-rise`}>
       <div className={wrap}>
         <div className="text-[12px] font-semibold uppercase tracking-[.1em] text-pri">Holiday Konnector · your family page · {sp.sponsorshipId}</div>
-        <h1 className="mt-2 max-w-[900px] text-[clamp(34px,5vw,60px)] font-extrabold leading-none tracking-[-.045em]">Hi {first}, you're blessing <span className="text-pri">{f.nickname}</span>.</h1>
-        <div className="mt-2.5 text-[15px] text-ink-2">{f.kidLine}: {f.kidNames} · {f.city}</div>
+        <h1 className="mt-2 max-w-[900px] text-[clamp(34px,5vw,60px)] font-extrabold leading-none tracking-[-.045em]">Hi {first}, {onTeam ? 'your team is' : "you're"} blessing <span className="text-pri">{f.nickname}</span>.</h1>
+        <div className="mt-2.5 text-[15px] text-ink-2">{f.kidLine}: {f.kidNames} · {f.city}{chosenBy && <> · chosen by your teammate {chosenBy}</>}</div>
         <div className="mt-7 grid items-start gap-5 md:grid-cols-2">
           <div className="grid gap-3.5">
             <div className="rounded-xl3 border border-line bg-white p-6">
@@ -95,13 +101,14 @@ export default function SponsorPortal() {
               {sp.status === 'Released' && <Link to="/families" className="mt-[18px] inline-flex h-12 items-center rounded-full bg-pri px-5 text-[15px] font-semibold text-white">Find a family</Link>}
             </div>
             {canRelease && <div className="text-center text-[13px] text-ink-3">Something changed? <button onClick={() => setReleaseOpen(true)} className="font-semibold text-ink">I can no longer sponsor</button></div>}
+            <TeamCard team={team} meId={viewer?.id} canLeave={!!viewer} onInvite={invite} onRemove={removeMember} />
             <div className="rounded-xl3 border border-line bg-white p-5">
               <h3 className="text-[15px]">Wall of Holiday Konnectors</h3>
               <p className="mt-1 text-[13px] leading-[1.5] text-ink-3">We thank Konnectors by name on the home page once their gifts are handed off.</p>
-              <div className="mt-3"><Checkbox checked={sponsor.wallOptIn} onChange={(v) => wall.mutate({ optIn: v, displayName: wallName ?? sponsor.displayName })}>Show my name on the wall</Checkbox></div>
+              <div className="mt-3"><Checkbox checked={sponsor.wallOptIn} onChange={(v) => wall.mutate({ optIn: v, displayName: wallName ?? sponsor.displayName })}>{onTeam ? 'Show our name on the wall' : 'Show my name on the wall'}</Checkbox></div>
               {sponsor.wallOptIn && (
                 <div className="mt-2.5 flex gap-2">
-                  <input value={wallName ?? sponsor.displayName} onChange={(e) => setWallName(e.target.value.slice(0, 80))} placeholder={`${first} ${sponsor.name.split(' ').at(-1)?.[0] ?? ''}.`} aria-label="Name to show on the wall" className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-bg px-3 text-[14px] outline-none focus:border-pri focus:bg-white" />
+                  <input value={wallName ?? sponsor.displayName} onChange={(e) => setWallName(e.target.value.slice(0, 80))} placeholder={onTeam ? 'e.g. The Carter Family & Friends' : `${first} ${sponsor.name.split(' ').at(-1)?.[0] ?? ''}.`} aria-label="Name to show on the wall" className="h-10 min-w-0 flex-1 rounded-xl border border-line bg-bg px-3 text-[14px] outline-none focus:border-pri focus:bg-white" />
                   <button onClick={() => wall.mutate({ optIn: true, displayName: wallName ?? sponsor.displayName })} disabled={wall.isPending || wallName === null || wallName === sponsor.displayName} className="h-10 rounded-full border border-line bg-white px-3.5 text-[13px] font-semibold disabled:opacity-50">Save</button>
                 </div>
               )}
@@ -113,11 +120,11 @@ export default function SponsorPortal() {
               <div className="mt-3.5 grid gap-2.5">
                 {thread.length === 0 && <div className="text-[13px] text-ink-3">Your first check-in lands shortly after claiming.</div>}
                 {thread.map((m, i) => {
-                  const mine = m.type === 'sponsor_response';
+                  const mine = m.type === 'sponsor_response'; // from this family's Konnector team
                   return (
                     <div key={i} className={cx('anim-bubble flex flex-col', mine ? 'items-end' : 'items-start')}>
                       <div className={cx('max-w-[92%] px-3.5 py-3 text-[14px] leading-[1.5] whitespace-pre-line', mine ? 'rounded-[18px_18px_4px_18px] bg-lav text-ink' : 'rounded-[18px_18px_18px_4px] bg-bg text-ink')}>{mine ? m.subject.replace(/^(Sponsor|Konnector) marked: /, '') + (m.body ? ` — ${m.body}` : '') : m.body || m.subject}</div>
-                      <div className="mt-1 text-[11px] text-ink-3">{fmtDateTime(m.occurredAt)} · {m.channel} · {mine ? 'you' : 'automated'}</div>
+                      <div className="mt-1 text-[11px] text-ink-3">{fmtDateTime(m.occurredAt)} · {m.channel} · {mine ? (onTeam ? 'your team' : 'you') : 'automated'}</div>
                     </div>
                   );
                 })}

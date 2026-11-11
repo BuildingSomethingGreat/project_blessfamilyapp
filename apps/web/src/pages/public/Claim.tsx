@@ -1,9 +1,10 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ClaimRequestSchema } from '@bless/shared';
+import { ClaimRequestSchema, TEAM_MAX } from '@bless/shared';
 import { api, ApiError, setSponsorToken } from '@/lib/api';
-import { Checkbox } from '@/components/ui';
+import { Checkbox, useToast } from '@/components/ui';
+import { InviteRows, blankRow, checkRows, type InviteRow } from '@/components/Team';
 import { fmtDate } from '@/lib/format';
 import { useAccount } from '@/lib/account';
 import { BackButton, shell } from './shared.tsx';
@@ -21,6 +22,11 @@ export default function Claim() {
   const [busy, setBusy] = useState(false);
   const [gone, setGone] = useState<string | null>(null);
   const set = (k: keyof typeof form, v: string | boolean) => setForm((f) => ({ ...f, [k]: v }));
+  const toast = useToast();
+  // Optional co-sponsors: everyone invited gets the same access to this family once they join.
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [team, setTeam] = useState<InviteRow[]>([blankRow()]);
+  const [teamErrors, setTeamErrors] = useState<Record<number, string>>({});
   // Signed-in sponsors start from their account details. They can still change anything, e.g. to
   // sponsor on behalf of another group or pick a different hand-off.
   const { me } = useAccount();
@@ -39,14 +45,23 @@ export default function Claim() {
   const s = settings.data;
   const f = fam.data;
 
+  const myTeam = me?.team ?? [];
+  const teamSlots = Math.max(0, TEAM_MAX - Math.max(1, myTeam.length));
+  const teammates = myTeam.filter((m) => m.status === 'Joined' && m.id !== me?.sponsor.id);
+
   const submit = async () => {
-    const parsed = ClaimRequestSchema.safeParse(form);
+    const rows = teamOpen ? checkRows(team) : { invites: [], errors: {} };
+    setTeamErrors(rows.errors);
+    if (Object.keys(rows.errors).length) return;
+    const parsed = ClaimRequestSchema.safeParse({ ...form, team: rows.invites.slice(0, teamSlots) });
     if (!parsed.success) { const e: Record<string, string> = {}; for (const i of parsed.error.issues) e[String(i.path[0])] = i.message; setErrors(e); return; }
     setBusy(true); setErrors({});
     try {
       const res = await api.claim(slug, parsed.data);
       setSponsorToken(res.token);
       qc.invalidateQueries({ queryKey: ['account'] });
+      if (res.team.invited.length) toast(`Invite sent to ${res.team.invited.map((m) => m.name.split(' ')[0]).join(', ')}.`, 'ok');
+      if (res.team.skipped.length) toast(`Not invited: ${res.team.skipped.map((x) => `${x.email} (${x.reason.replace(/\.$/, '')})`).join('; ')}`, 'bad');
       nav(`/s/${res.token}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) setGone(err.message);
@@ -88,6 +103,25 @@ export default function Claim() {
             </div>
             <p className="mt-2 px-1 text-[12px] leading-[1.5] text-ink-3">Already know this family personally? Email {s?.contactName || 'our team'} at <a href={`mailto:${s?.contactEmail ?? 'sharnese@thekonnection.org'}`} className="font-semibold text-ink-2">{s?.contactEmail ?? 'sharnese@thekonnection.org'}</a> after choosing them and we can arrange for you to deliver.</p>
             <div className="mt-4 rounded-2xl border border-line px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-[14px] font-semibold text-ink">Bless together <span className="font-normal text-ink-3">(optional)</span></div>
+                  <p className="mt-0.5 text-[13px] leading-[1.5] text-ink-3">
+                    {teammates.length
+                      ? `${teammates.map((m) => m.name.split(' ')[0]).join(', ')} ${teammates.length === 1 ? 'is' : 'are'} on your team and will see this family too.${teamSlots ? ` You can invite ${teamSlots} more.` : ''}`
+                      : `Shopping with family, friends or coworkers? Invite up to ${teamSlots} people. They'll see this family's page, get the reminders and can mark progress, just like you.`}
+                  </p>
+                </div>
+                {teamSlots > 0 && !teamOpen && <button type="button" onClick={() => setTeamOpen(true)} className="h-9 flex-none rounded-full border border-line bg-white px-3.5 text-[13px] font-semibold text-ink hover:border-pri">+ Invite</button>}
+              </div>
+              {teamOpen && (
+                <div className="mt-3">
+                  <InviteRows rows={team} onChange={setTeam} max={teamSlots} errors={teamErrors} />
+                  <p className="mt-2 text-[12px] leading-[1.5] text-ink-3">We'll email each person one invite. They only get reminders once they join. <button type="button" onClick={() => { setTeamOpen(false); setTeam([blankRow()]); setTeamErrors({}); }} className="font-semibold text-ink-2 hover:text-ink">Skip</button></p>
+                </div>
+              )}
+            </div>
+            <div className="mt-3 rounded-2xl border border-line px-4 py-3.5">
               <Checkbox checked={form.wallOptIn} onChange={(v) => set('wallOptIn', v)}>Thank me on the Wall of Holiday Konnectors once my gifts are in.</Checkbox>
               {form.wallOptIn && <input value={form.displayName} onChange={(e) => set('displayName', e.target.value.slice(0, 80))} placeholder={`Show my name as… (e.g. ${form.organization || 'The Carter Family'})`} aria-label="Name to show on the wall" className="mt-2.5 h-11 w-full rounded-xl border border-line bg-bg px-3.5 text-[14px] outline-none focus:border-pri focus:bg-white" />}
               <div className="mt-1.5 text-[12px] text-ink-3">Leave it blank and we'll use your first name and last initial. You can change this anytime.</div>

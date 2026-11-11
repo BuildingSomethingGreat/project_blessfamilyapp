@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '@/lib/api';
-import { Button, Input, Label } from '@/components/ui';
+import { Button, Input, Label, useToast } from '@/components/ui';
 import { shell } from './shared.tsx';
 
 /**
@@ -14,6 +14,7 @@ export default function Login() {
   const token = params.get('token');
   const nav = useNavigate();
   const qc = useQueryClient();
+  const toast = useToast();
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'sent' | 'verifying' | 'error'>(token ? 'verifying' : 'idle');
   const [error, setError] = useState('');
@@ -23,10 +24,15 @@ export default function Login() {
     if (!token) return;
     let alive = true;
     api.account.verify(token)
-      .then(async () => { await qc.invalidateQueries({ queryKey: ['account'] }); if (alive) nav('/my-family', { replace: true }); })
+      .then(async (r) => {
+        // Team invite links also join the team. If the invite was cancelled they're still signed in.
+        if (r.team) toast(r.team.joined ? "You're on the team. Welcome!" : r.team.message ?? 'Could not join the team.', r.team.joined ? 'ok' : 'bad');
+        await qc.invalidateQueries({ queryKey: ['account'] });
+        if (alive) nav('/my-family', { replace: true });
+      })
       .catch((e) => { if (alive) { setError(e instanceof ApiError ? e.message : 'That link is invalid or has expired.'); setState('error'); } });
     return () => { alive = false; };
-  }, [token, nav, qc]);
+  }, [token, nav, qc, toast]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();

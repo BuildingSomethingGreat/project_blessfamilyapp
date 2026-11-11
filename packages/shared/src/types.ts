@@ -117,7 +117,31 @@ export interface Sponsor {
   wallOptIn: boolean;
   /** Staff removed this name from the wall. */
   wallHidden: boolean;
+  /**
+   * Co-sponsor team ('' = on their own). Everyone on a team sees and can update every family any of
+   * them sponsors; there is no lead. Up to TEAM_MAX people, counting pending invites.
+   */
+  teamId: string;
+  /** A team this person was invited to and hasn't joined yet ('' = none). */
+  teamInvite: string;
+  /** Email of the teammate who sent the latest invite. */
+  invitedBy: string;
+  invitedAt: string | null;
+  joinedTeamAt: string | null;
   createdAt: string;
+}
+
+/** A person on a co-sponsor team, as shown to teammates and staff. */
+export interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  organization: string;
+  status: 'Joined' | 'Invited';
+  /** Name of the teammate who invited them ('' for whoever started the team). */
+  invitedBy: string;
+  invitedAt: string | null;
+  joinedAt: string | null;
 }
 
 export const HANDOFFS = ['Drop off', 'Deliver directly'] as const;
@@ -153,7 +177,7 @@ export interface Sponsorship {
 
 export type ActivityType =
   | 'catalog_view' | 'family_view' | 'claim_start' | 'claim_complete' | 'message_sent' | 'sponsor_response'
-  | 'status_change' | 'admin_action' | 'agent_action' | 'flag' | 'release' | 'chip_in' | 'quote';
+  | 'status_change' | 'admin_action' | 'agent_action' | 'flag' | 'release' | 'chip_in' | 'quote' | 'team';
 
 export interface Activity {
   id: string;
@@ -232,6 +256,10 @@ export interface SponsorPortalView {
   sponsor: Pick<Sponsor, 'name' | 'email' | 'preferredContact' | 'displayName' | 'wallOptIn'>;
   family: PublicFamily;
   settings: SeasonSettings;
+  /** Everyone on the co-sponsor team behind this family (just the Konnector when they're on their own). */
+  team: TeamMember[];
+  /** Who is looking: the signed-in teammate, else null (opened from an emailed link). */
+  viewer: { id: string; name: string; email: string; claimedThis: boolean } | null;
   timeline: Pick<Activity, 'type' | 'subject' | 'body' | 'occurredAt' | 'channel'>[];
 }
 

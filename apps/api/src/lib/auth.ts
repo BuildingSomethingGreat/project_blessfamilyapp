@@ -8,7 +8,9 @@ export interface SessionClaims {
   email: string;
   exp: number; // epoch seconds
   /** session/login = admin; k_session/k_login = Holiday Konnector account. */
-  kind: 'session' | 'login' | 'k_session' | 'k_login';
+  kind: 'session' | 'login' | 'k_session' | 'k_login' | 'k_invite';
+  /** k_invite only: the team the link joins. */
+  team?: string;
 }
 
 export function issueToken(claims: SessionClaims): string {
@@ -38,5 +40,7 @@ export const SESSION_COOKIE = 'bf_admin';
 
 export const konnectorLoginToken = (email: string) => issueToken({ email: email.toLowerCase(), exp: Math.floor(Date.now() / 1000) + 30 * 60, kind: 'k_login' });
 export const konnectorSessionToken = (email: string) => issueToken({ email: email.toLowerCase(), exp: Math.floor(Date.now() / 1000) + 60 * 86_400, kind: 'k_session' });
+/** Team invite link: signs the invitee in and joins the team. Lasts two weeks; cancelling the invite makes it a plain sign-in. */
+export const konnectorInviteToken = (email: string, team: string) => issueToken({ email: email.toLowerCase(), exp: Math.floor(Date.now() / 1000) + 14 * 86_400, kind: 'k_invite', team });
 export const KONNECTOR_COOKIE = 'bf_konnector';
 export const KONNECTOR_COOKIE_MAX_AGE = 60 * 86_400;
